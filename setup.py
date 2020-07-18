@@ -12,11 +12,17 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/NCAR/mom6-bathy",
-    packages=['midas'],
+    packages=['mom6_bathy', 'midas'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
+    install_requires=[
+        "numpy>=1.19",
+        "xarray>=0.16",
+        "matplotlib>=3.3.0",
+        "netCDF4",
+    ]
 )
