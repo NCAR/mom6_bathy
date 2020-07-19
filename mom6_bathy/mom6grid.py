@@ -1,11 +1,12 @@
 import os, sys
+import xarray as xr
 sys.path.append(os.path.join(os.path.dirname(__file__),'./midas'))
 from midas.rectgrid_gen import supergrid
 
 class mom6grid(object):
-    
+
     def __init__(self, nx, ny, config, axis_units, lenx, leny,
-                 srefine=2, xstart=0.0, ystart=0.0, cyclic_x=True, cyclic_y=False, 
+                 srefine=2, xstart=0.0, ystart=0.0, cyclic_x=True, cyclic_y=False,
                  tripolar_n=False, displace_pole=False):
         '''
         Parameters
@@ -25,7 +26,7 @@ class mom6grid(object):
         srefine : int, optional
             refinement factor for the supergrid. 2 by default
         xstart : float, optional
-            starting x coordinate. 0.0 by default.       
+            starting x coordinate. 0.0 by default.
         ystart : float, optional
             starting y coordinate. 0.0 by default.
         cyclic_x : bool, optional
@@ -37,11 +38,11 @@ class mom6grid(object):
         displace_pole : bool, optional
             flag to make the grid displaced polar. False by default.
         '''
-        
+
         # define valid values for certain constructor arguments
         config_valid_vals = ['cartesian', 'mercator', 'spherical']
         axis_units_valid_vals = ['degrees', 'm', 'km']
-        
+
         # consistency checks for constructor arguments
         assert nx>0, "nx must be a positive integer"
         assert ny>0, "ny must be a positive integer"
@@ -50,14 +51,14 @@ class mom6grid(object):
         assert axis_units in axis_units_valid_vals, \
             "axis_units value is invalid. pick one: "+" ".join(axis_units_valid_vals)
         assert cyclic_y==False, "cyclic_y grids are not supported in MOM6 yet."
-        
+
         assert tripolar_n==False, "tripolar not supported yet"
         assert displace_pole==False, "displaced pole not supported yet"
-        
-        
-        self.supergrid = supergrid(nxtot = nx*srefine, 
-                                    nytot = ny*srefine, 
-                                    config = config, 
+
+
+        self.supergrid = supergrid(nxtot = nx*srefine,
+                                    nytot = ny*srefine,
+                                    config = config,
                                     axis_units = axis_units,
                                     ystart = ystart,
                                     leny = leny,
@@ -79,13 +80,13 @@ class mom6grid(object):
         else: # ini_file is a string in ini format
             ini = configparser.ConfigParser()
             ini.read_string(ini_file)
-        
+
         g = ini['grid']
-        
+
         # remove comments from values:
         for option in g:
             g[option] = g[option].split("#")[0].strip()
-                    
+
         # required entries:
         required_grid_options = ['nx', 'ny', 'config', 'axis_units', 'lenx', 'leny']
         assert set(g) >= set(required_grid_options), \
@@ -96,7 +97,7 @@ class mom6grid(object):
         axis_units = g['axis_units'].strip()
         lenx = float(g['lenx'].strip())
         leny = float(g['leny'].strip())
-        
+
         # optional entries:
         srefine = float(g['srefine'].strip()) if 'srefine' in g else 2
         xstart = float(g['xstart'].strip()) if 'xstart' in g else 0.0
@@ -105,25 +106,25 @@ class mom6grid(object):
         cyclic_y = g['cyclic_y'].strip().lower()=="true" if 'cyclic_y' in g else False
         tripolar_n = g['tripolar_n'].strip().lower()=="true" if 'tripolar_n' in g else False
         displace_pole = g['displace_pole'].strip().lower()=="true" if 'displace_pole' in g else False
-      
-        return cls(nx, ny, config, axis_units, lenx, leny, srefine, xstart, ystart, 
+
+        return cls(nx, ny, config, axis_units, lenx, leny, srefine, xstart, ystart,
                 cyclic_x, cyclic_y, tripolar_n, displace_pole)
-    
+
     @property
     def supergrid(self):
         return self._supergrid
-    
+
     @supergrid.setter
     def supergrid(self, new_supergrid):
         print("Updating supergrid...")
         self._supergrid=new_supergrid
         self._supergrid.grid_metrics()
         self.MOM6_grid_metrics()
-    
+
     def MOM6_grid_metrics(self):
-        
+
         sg = self._supergrid
-        
+
         # T coords
         self.tlon = sg.x[1::2,1::2]
         self.tlat = sg.y[1::2,1::2]
@@ -136,7 +137,7 @@ class mom6grid(object):
         # Corner coords
         self.qlon = sg.x[::2,::2]
         self.qlat = sg.y[::2,::2]
-        
+
         # T area
         self.tarea = sg.area[::2,::2] + sg.area[1::2,1::2] + sg.area[::2,1::2] + sg.area[::2,1::2]
 
@@ -148,10 +149,10 @@ class mom6grid(object):
         self.dxCv = sg.dx[2::2,::2] + sg.dx[2::2,1::2]
         # y-distance between qpoints
         self.dyCu = sg.dy[::2,2::2] + sg.dy[1::2,2::2]
-    
-    
+
+
     def plot(self, property_name):
-        
+
         import matplotlib.pyplot as plt
         import cartopy.crs as ccrs
         import cartopy.feature as cfeature
@@ -161,9 +162,9 @@ class mom6grid(object):
         if property_name not in self.__dict__:
             print("ERROR: not a valid MOM6 grid property")
             return
-        
+
         data = self.__dict__[property_name]
-        
+
         #determine staggering
         if data.shape == self.tlon.shape:
             lons, lats = self.tlon, self.tlat
@@ -176,31 +177,31 @@ class mom6grid(object):
         else:
             print("ERROR: cannot determine property staggering")
             return
-       
+
         data = self.__dict__[property_name]
-        
+
         fig = plt.figure()#figsize=(10, 5))
         ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
         ax.pcolormesh(lons, lats, data, transform=ccrs.PlateCarree(central_longitude=-180),cmap='nipy_spectral')
         ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=2, color='gray', alpha=0.5, linestyle='--')
         #ax.coastlines()
         ax.set_global()
-        plt.show() 
-        
-            
-    
+        plt.show()
+
+
+
     def plot_cross_section(self, property_name, iy=None, ix=None):
-        
+
         import matplotlib.pyplot as plt
 
         assert (iy!=None)*(ix!=None)==0, "Cannot provide both iy and ix"
-        
+
         if property_name not in self.__dict__:
             print("ERROR: not a valid MOM6 grid property")
             return
-        
+
         data = self.__dict__[property_name]
-        
+
         #determine staggering
         if data.shape == self.tlon.shape:
             lons, lats = self.tlon, self.tlat
@@ -213,9 +214,9 @@ class mom6grid(object):
         else:
             print("ERROR: cannot determine property staggering")
             return
-       
+
         data = self.__dict__[property_name]
-        
+
         fig, ax = plt.subplots()
         if iy:
             ax.set(xlabel='latitude', ylabel=property_name,
@@ -247,3 +248,52 @@ class mom6grid(object):
         )
 
         self.supergrid = new_supergrid
+
+    def to_netcdf(self, mom6grid_path=None, supergrid_path=None, author=None):
+
+        from datetime import datetime
+
+        if not (mom6grid_path or supergrid_path):
+            raise RuntimeError("Must provide at least one of mom6grid_path and supergrid_path")
+
+        if mom6grid_path:
+            raise NotImplementedError()
+
+        if supergrid_path:
+
+            # initialize the dataset:
+            ds = xr.Dataset()
+
+            # global attrs:
+            ds.attrs['filename'] = os.path.basename(supergrid_path)
+            ds.attrs['type'] = "MOM6 supergrid"
+            ds.attrs['Created'] = datetime.now().isoformat()
+            if author:
+                ds.attrs['Author'] = author
+
+            # data arrays:
+            ds['y'] = xr.DataArray(self.supergrid.y,
+                                   dims = ['nyp','nxp'],
+                                   attrs = {'units': self.supergrid.dict['axis_units']}
+                                  )
+            ds['x'] = xr.DataArray(self.supergrid.x,
+                                   dims = ['nyp','nxp'],
+                                   attrs = {'units': self.supergrid.dict['axis_units']}
+                                  )
+            ds['dy'] = xr.DataArray(self.supergrid.dy,
+                                   dims = ['ny','nxp'],
+                                   attrs = {'units': 'meters'}
+                                  )
+            ds['dx'] = xr.DataArray(self.supergrid.dx,
+                                   dims = ['nyp','nx'],
+                                   attrs = {'units': 'meters'}
+                                  )
+            ds['area'] = xr.DataArray(self.supergrid.area,
+                                   dims = ['ny','nx'],
+                                   attrs = {'units': 'm2'}
+                                  )
+            ds['angle_dx'] = xr.DataArray(self.supergrid.angle_dx,
+                                   dims = ['nyp','nxp'],
+                                   attrs = {'units': 'meters'}
+                                  )
+            ds.to_netcdf(supergrid_path)
