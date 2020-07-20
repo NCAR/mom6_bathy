@@ -137,122 +137,129 @@ class mom6grid(object):
 
         # T coords
         self.tlon = xr.DataArray(
-                        sg.x[1::2,1::2],
-                        dims = ['ny','nx'],
-                        attrs = {"name":"array of t-grid longitudes",
-                                 "units":"degrees_east"}
-                    )
+            sg.x[1::2,1::2],
+            dims = ['ny','nx'],
+            attrs = {"name":"array of t-grid longitudes",
+                     "units":"degrees_east"}
+        )
         self.tlat = xr.DataArray(
-                        sg.y[1::2,1::2],
-                        dims = ['ny','nx'],
-                        attrs = {"name":"array of t-grid latitudes",
-                                 "units":"degrees_north"}
-                    )
+            sg.y[1::2,1::2],
+            dims = ['ny','nx'],
+            attrs = {"name":"array of t-grid latitudes",
+                     "units":"degrees_north"}
+        )
 
         # U coords
         self.ulon = xr.DataArray(
-                        sg.x[1::2,::2],
-                        dims = ['ny','nxp'],
-                        attrs = {"name":"array of u-grid longitudes",
-                                 "units":"degrees_east"}
-                    )
+            sg.x[1::2,::2],
+            dims = ['ny','nxp'],
+            attrs = {"name":"array of u-grid longitudes",
+                     "units":"degrees_east"}
+        )
         self.ulat = xr.DataArray(
-                        sg.y[1::2,::2],
-                        dims = ['ny','nxp'],
-                        attrs = {"name":"array of u-grid latitudes",
-                                 "units":"degrees_north"}
-                    )
+            sg.y[1::2,::2],
+            dims = ['ny','nxp'],
+            attrs = {"name":"array of u-grid latitudes",
+                     "units":"degrees_north"}
+        )
 
         # V coords
         self.vlon = xr.DataArray(
-                        sg.x[::2,1::2],
-                        dims = ['nyp','nx'],
-                        attrs = {"name":"array of v-grid longitudes",
-                                 "units":"degrees_east"}
-                    )
+            sg.x[::2,1::2],
+            dims = ['nyp','nx'],
+            attrs = {"name":"array of v-grid longitudes",
+                     "units":"degrees_east"}
+        )
         self.vlat = xr.DataArray(
-                        sg.y[::2,1::2],
-                        dims = ['nyp','nx'],
-                        attrs = {"name":"array of v-grid latitudes",
-                                 "units":"degrees_north"}
-                    )
+            sg.y[::2,1::2],
+            dims = ['nyp','nx'],
+            attrs = {"name":"array of v-grid latitudes",
+                     "units":"degrees_north"}
+        )
 
         # Corner coords
         self.qlon = xr.DataArray(
-                        sg.x[::2,::2],
-                        dims = ['nyp','nxp'],
-                        attrs = {"name":"array of q-grid longitudes",
-                                 "units":"degrees_east"}
-                    )
+            sg.x[::2,::2],
+            dims = ['nyp','nxp'],
+            attrs = {"name":"array of q-grid longitudes",
+                     "units":"degrees_east"}
+        )
         self.qlat = xr.DataArray(
-                        sg.y[::2,::2],
-                        dims = ['nyp','nxp'],
-                        attrs = {"name":"array of q-grid latitudes",
-                                  "units":"degrees_north"}
-                    )
+            sg.y[::2,::2],
+            dims = ['nyp','nxp'],
+            attrs = {"name":"array of q-grid latitudes",
+                      "units":"degrees_north"}
+        )
 
         # x-distance between U points, centered at t
         self.dxt = xr.DataArray(
-                        sg.dx[1::2,::2] + sg.dx[1::2,1::2],
-                        dims = ['ny','nx'],
-                        attrs = {"name":"x-distance between u-points, centered at t",
-                                 "units":"meters"}
-                    )
+            sg.dx[1::2,::2] + sg.dx[1::2,1::2],
+            dims = ['ny','nx'],
+            attrs = {"name":"x-distance between u-points, centered at t",
+                     "units":"meters"}
+        )
         # y-distance between V points, centered at t
         self.dyt = xr.DataArray(
-                        sg.dy[::2,1::2] + sg.dy[1::2,1::2],
-                        dims = ['ny','nx'],
-                        attrs = {"name":"y-distance between v-points, centered at t",
-                                 "units":"meters"}
-                    )
+            sg.dy[::2,1::2] + sg.dy[1::2,1::2],
+            dims = ['ny','nx'],
+            attrs = {"name":"y-distance between v-points, centered at t",
+                     "units":"meters"}
+        )
 
         # x-distance between q points, centered at v
         self.dxCv = xr.DataArray(
-                        sg.dx[2::2,::2] + sg.dx[2::2,1::2],
-                        dims = ['ny','nx'],
-                        attrs = {"name":"x-distance between q-points, centered at v",
-                                 "units":"meters"}
-                    )
+            sg.dx[2::2,::2] + sg.dx[2::2,1::2],
+            dims = ['ny','nx'],
+            attrs = {"name":"x-distance between q-points, centered at v",
+                     "units":"meters"}
+        )
 
         # y-distance between q points, centered at u
         self.dyCu = xr.DataArray(
-                        sg.dy[::2,2::2] + sg.dy[1::2,2::2],
-                        dims = ['ny','nx'],
-                        attrs = {"name":"y-distance between q-points, centered at u",
-                                 "units":"meters"}
-                    )
+            sg.dy[::2,2::2] + sg.dy[1::2,2::2],
+            dims = ['ny','nx'],
+            attrs = {"name":"y-distance between q-points, centered at u",
+                     "units":"meters"}
+        )
 
         # x-distance between y points, centered at u"
         self.dxCu = xr.DataArray(
-                        sg.dx[1::2,1::2] + np.roll(sg.dx[1::2,1::2], -1, axis=-1),
-                        dims = ['ny','nx'],
-                        attrs = {"name":"x-distance between t-points, centered at u",
-                                 "units":"meters"}
-                    )
+            sg.dx[1::2,1::2] + np.roll(sg.dx[1::2,1::2], -1, axis=-1),
+            dims = ['ny','nx'],
+            attrs = {"name":"x-distance between t-points, centered at u",
+                     "units":"meters"}
+        )
 
         # y-distance between t points, centered at v"
         self.dyCv = xr.DataArray(
-                        sg.dy[1::2,1::2] + np.roll(sg.dy[1::2,1::2], -1, axis=0),
-                        dims = ['ny','nx'],
-                        attrs = {"name":"y-distance between t-points, centered at v",
-                                 "units":"meters"}
-                    )
-                        
+            sg.dy[1::2,1::2] + np.roll(sg.dy[1::2,1::2], -1, axis=0),
+            dims = ['ny','nx'],
+            attrs = {"name":"y-distance between t-points, centered at v",
+                     "units":"meters"}
+        )
+
         # T point angle:
         self.angle = xr.DataArray(
-                        sg.angle_dx[1::2,1::2],
-                        dims = ['ny','nx'],
-                        attrs = {"name":"angle grid makes with latitude line",
-                                 "units":"degrees"}
-                    )
+            sg.angle_dx[1::2,1::2],
+            dims = ['ny','nx'],
+            attrs = {"name":"angle grid makes with latitude line",
+                     "units":"degrees"}
+        )
 
         # T area
         self.tarea = xr.DataArray(
-                        sg.area[::2,::2] + sg.area[1::2,1::2] + sg.area[::2,1::2] + sg.area[::2,1::2],
-                        dims = ['ny','nx'],
-                        attrs = {"name":"area of t-cells",
-                                 "units":"meters^2"}
-                    )
+            sg.area[::2,::2] + sg.area[1::2,1::2] + sg.area[::2,1::2] + sg.area[::2,1::2],
+            dims = ['ny','nx'],
+            attrs = {"name":"area of t-cells",
+                     "units":"meters^2"}
+        )
+
+        # T mask
+        self.tmask = xr.DataArray(
+            np.ones((self.ny, self.nx)),
+            dims = ['ny','nx'],
+            attrs = {"name":"T mask"}
+        )
 
 
     def plot(self, property_name):
@@ -375,29 +382,29 @@ class mom6grid(object):
 
             # data arrays:
             ds['y'] = xr.DataArray(self.supergrid.y,
-                                   dims = ['nyp','nxp'],
-                                   attrs = {'units': self.supergrid.dict['axis_units']}
-                                  )
+                dims = ['nyp','nxp'],
+                attrs = {'units': self.supergrid.dict['axis_units']}
+            )
             ds['x'] = xr.DataArray(self.supergrid.x,
-                                   dims = ['nyp','nxp'],
-                                   attrs = {'units': self.supergrid.dict['axis_units']}
-                                  )
+                dims = ['nyp','nxp'],
+                attrs = {'units': self.supergrid.dict['axis_units']}
+            )
             ds['dy'] = xr.DataArray(self.supergrid.dy,
-                                   dims = ['ny','nxp'],
-                                   attrs = {'units': 'meters'}
-                                  )
+                dims = ['ny','nxp'],
+                attrs = {'units': 'meters'}
+            )
             ds['dx'] = xr.DataArray(self.supergrid.dx,
-                                   dims = ['nyp','nx'],
-                                   attrs = {'units': 'meters'}
-                                  )
+                dims = ['nyp','nx'],
+                attrs = {'units': 'meters'}
+            )
             ds['area'] = xr.DataArray(self.supergrid.area,
-                                   dims = ['ny','nx'],
-                                   attrs = {'units': 'm2'}
-                                  )
+                dims = ['ny','nx'],
+                attrs = {'units': 'm2'}
+            )
             ds['angle_dx'] = xr.DataArray(self.supergrid.angle_dx,
-                                   dims = ['nyp','nxp'],
-                                   attrs = {'units': 'meters'}
-                                  )
+                dims = ['nyp','nxp'],
+                attrs = {'units': 'meters'}
+            )
             ds.to_netcdf(supergrid_path)
 
     def to_SCRIP(self, SCRIP_path, title=None):
@@ -412,19 +419,29 @@ class mom6grid(object):
 
         ds['grid_center_lat'] = xr.DataArray(
             self.tlat.data.flatten(),
-            dims = ['grid_size']
+            dims = ['grid_size'],
+            attrs = {'units': self.supergrid.dict['axis_units']}
         )
         ds['grid_center_lon'] = xr.DataArray(
             self.tlon.data.flatten(),
-            dims = ['grid_size']
+            dims = ['grid_size'],
+            attrs = {'units': self.supergrid.dict['axis_units']}
         )
+        ds['grid_imask'] = xr.DataArray(
+            self.imask.astype(int).flatten(),
+            dims = ['grid_size'],
+            attrs = {'units': "unitless"}
+        )
+
         ds['grid_corner_lat'] = xr.DataArray(
             np.zeros((ds.dims['grid_size'],4)),
-            dims = ['grid_size', 'grid_corners']
+            dims = ['grid_size', 'grid_corners'],
+            attrs = {'units': self.supergrid.dict['axis_units']}
         )
         ds['grid_corner_lon'] = xr.DataArray(
             np.zeros((ds.dims['grid_size'],4)),
-            dims = ['grid_size', 'grid_corners']
+            dims = ['grid_size', 'grid_corners'],
+            attrs = {'units': self.supergrid.dict['axis_units']}
         )
         for i in range(self.nx):
             for j in range(self.ny):
@@ -443,7 +460,7 @@ class mom6grid(object):
         )
 
         ds.to_netcdf(SCRIP_path)
-        
+
 
 
 
