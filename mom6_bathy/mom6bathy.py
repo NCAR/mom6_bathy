@@ -19,6 +19,10 @@ class mom6bathy(object):
     def min_depth(self):
         return self._min_depth
 
+    @property
+    def max_depth(self):
+        return self.depth.max().item()
+
     @min_depth.setter
     def min_depth(self, new_min_depth):
         self._min_depth = new_min_depth
@@ -122,6 +126,41 @@ class mom6bathy(object):
             self._depth[j,:] +=  ridge_height_mapped
 
 
+    def print_MOM6_runtime_params(self):
+
+        print("{} = {}".format("TRIPOLAR_N", self._grid.supergrid.dict['tripolar_n']))
+        print("{} = {}".format("NIGLOBAL", self._grid.nx))
+        print("{} = {}".format("NJGLOBAL", self._grid.ny))
+        print("{} = {}".format("GRID_CONFIG", "mosaic"))
+        print("{} = {}".format("GRID_FILE", "???"))
+        print("{} = {}".format("TOPO_CONFIG", "file"))
+        print("{} = {}".format("TOPO_FILE", "???"))
+        print("{} = {}".format("MAXIMUM_DEPTH", str(self.max_depth)))
+        print("{} = {}".format("MINIMUM_DEPTH", str(self.min_depth)))
+
+
+
+    def to_topog(self, file_path, title=None):
+
+        ds = xr.Dataset()
+
+        # global attrs:
+        ds.attrs['date_created'] = datetime.now().isoformat()
+        if title:
+            ds.attrs['title'] = title
+        else:
+            ds.attrs['title'] = "MOM6 topography file"
+
+        ds['depth'] = xr.DataArray(
+            self._depth.data,
+            dims = ['nj', 'ni'],
+            attrs = {'long_name' : 'Depth of ocean bottom',
+                     'units' : 'm'}
+        )
+
+        ds.to_netcdf(file_path)
+
+
     def to_SCRIP(self, SCRIP_path, title=None):
 
         ds = xr.Dataset()
@@ -132,6 +171,10 @@ class mom6bathy(object):
         if title:
             ds.attrs['title'] = title
 
+        ds['grid_dims'] = xr.DataArray(
+            np.array([self._grid.ny, self._grid.nx]).astype(np.int32),
+            dims = ['grid_rank']
+        )
         ds['grid_center_lat'] = xr.DataArray(
             self._grid.tlat.data.flatten(),
             dims = ['grid_size'],
@@ -143,7 +186,7 @@ class mom6bathy(object):
             attrs = {'units': self._grid.supergrid.dict['axis_units']}
         )
         ds['grid_imask'] = xr.DataArray(
-            self.tmask.data.astype(int).flatten(),
+            self.tmask.data.astype(np.int32).flatten(),
             dims = ['grid_size'],
             attrs = {'units': "unitless"}
         )
@@ -175,9 +218,6 @@ class mom6bathy(object):
         )
 
         ds.to_netcdf(SCRIP_path)
-
-
-
 
 
 
