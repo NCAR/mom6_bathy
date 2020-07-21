@@ -6,13 +6,31 @@ from midas.rectgrid_gen import supergrid
 from scipy import interpolate
 
 class mom6bathy(object):
-    def __init__(self, grid):
+    def __init__(self, grid, min_depth):
         self._grid = grid
         self._depth = None
+        self._min_depth = min_depth
 
     @property
     def depth(self):
-        return self._depth.copy()
+        return self._depth
+
+    @property
+    def min_depth(self):
+        return self._min_depth
+
+    @min_depth.setter
+    def min_depth(self, new_min_depth):
+        self._min_depth = new_min_depth
+
+    @property
+    def tmask(self):
+        tmask_da = xr.DataArray(
+            np.where(self._depth>=self._min_depth, 1, 0),
+            dims = ['ny','nx'],
+            attrs = {"name":"T mask"}
+        )
+        return tmask_da
 
     def set_flat(self, D):
         self._depth = xr.DataArray(
@@ -102,6 +120,64 @@ class mom6bathy(object):
 
         for j in range(ilat[0], ilat[1]):
             self._depth[j,:] +=  ridge_height_mapped
+
+
+    def to_SCRIP(self, SCRIP_path, title=None):
+
+        ds = xr.Dataset()
+
+        # global attrs:
+        ds.attrs['Conventions'] = "SCRIP"
+        ds.attrs['date_created'] = datetime.now().isoformat()
+        if title:
+            ds.attrs['title'] = title
+
+        ds['grid_center_lat'] = xr.DataArray(
+            self._grid.tlat.data.flatten(),
+            dims = ['grid_size'],
+            attrs = {'units': self._grid.supergrid.dict['axis_units']}
+        )
+        ds['grid_center_lon'] = xr.DataArray(
+            self._grid.tlon.data.flatten(),
+            dims = ['grid_size'],
+            attrs = {'units': self._grid.supergrid.dict['axis_units']}
+        )
+        ds['grid_imask'] = xr.DataArray(
+            self.tmask.data.astype(int).flatten(),
+            dims = ['grid_size'],
+            attrs = {'units': "unitless"}
+        )
+
+        ds['grid_corner_lat'] = xr.DataArray(
+            np.zeros((ds.dims['grid_size'],4)),
+            dims = ['grid_size', 'grid_corners'],
+            attrs = {'units': self._grid.supergrid.dict['axis_units']}
+        )
+        ds['grid_corner_lon'] = xr.DataArray(
+            np.zeros((ds.dims['grid_size'],4)),
+            dims = ['grid_size', 'grid_corners'],
+            attrs = {'units': self._grid.supergrid.dict['axis_units']}
+        )
+        for i in range(self._grid.nx):
+            for j in range(self._grid.ny):
+                k = (j*self._grid.nx+i)
+                ds['grid_corner_lat'][k,0] = self._grid.qlat[j,i]
+                ds['grid_corner_lat'][k,1] = self._grid.qlat[j,i+1]
+                ds['grid_corner_lat'][k,2] = self._grid.qlat[j+1,i+1]
+                ds['grid_corner_lat'][k,3] = self._grid.qlat[j+1,i]
+                ds['grid_corner_lon'][k,0] = self._grid.qlon[j,i]
+                ds['grid_corner_lon'][k,1] = self._grid.qlon[j,i+1]
+                ds['grid_corner_lon'][k,2] = self._grid.qlon[j+1,i+1]
+                ds['grid_corner_lon'][k,3] = self._grid.qlon[j+1,i]
+        ds['grid_area'] = xr.DataArray(
+            self._grid.tarea.data.flatten(),
+            dims = ['grid_size']
+        )
+
+        ds.to_netcdf(SCRIP_path)
+
+
+
 
 
 

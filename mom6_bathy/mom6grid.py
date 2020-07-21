@@ -2,7 +2,6 @@ import os, sys
 import numpy as np
 import xarray as xr
 from datetime import datetime
-sys.path.append(os.path.join(os.path.dirname(__file__),'./midas'))
 from midas.rectgrid_gen import supergrid
 
 class mom6grid(object):
@@ -254,13 +253,6 @@ class mom6grid(object):
                      "units":"meters^2"}
         )
 
-        # T mask
-        self.tmask = xr.DataArray(
-            np.ones((self.ny, self.nx)),
-            dims = ['ny','nx'],
-            attrs = {"name":"T mask"}
-        )
-
 
     def plot(self, property_name):
 
@@ -406,61 +398,3 @@ class mom6grid(object):
                 attrs = {'units': 'meters'}
             )
             ds.to_netcdf(supergrid_path)
-
-    def to_SCRIP(self, SCRIP_path, title=None):
-
-        ds = xr.Dataset()
-
-        # global attrs:
-        ds.attrs['Conventions'] = "SCRIP"
-        ds.attrs['date_created'] = datetime.now().isoformat()
-        if title:
-            ds.attrs['title'] = title
-
-        ds['grid_center_lat'] = xr.DataArray(
-            self.tlat.data.flatten(),
-            dims = ['grid_size'],
-            attrs = {'units': self.supergrid.dict['axis_units']}
-        )
-        ds['grid_center_lon'] = xr.DataArray(
-            self.tlon.data.flatten(),
-            dims = ['grid_size'],
-            attrs = {'units': self.supergrid.dict['axis_units']}
-        )
-        ds['grid_imask'] = xr.DataArray(
-            self.imask.astype(int).flatten(),
-            dims = ['grid_size'],
-            attrs = {'units': "unitless"}
-        )
-
-        ds['grid_corner_lat'] = xr.DataArray(
-            np.zeros((ds.dims['grid_size'],4)),
-            dims = ['grid_size', 'grid_corners'],
-            attrs = {'units': self.supergrid.dict['axis_units']}
-        )
-        ds['grid_corner_lon'] = xr.DataArray(
-            np.zeros((ds.dims['grid_size'],4)),
-            dims = ['grid_size', 'grid_corners'],
-            attrs = {'units': self.supergrid.dict['axis_units']}
-        )
-        for i in range(self.nx):
-            for j in range(self.ny):
-                k = (j*self.nx+i)
-                ds['grid_corner_lat'][k,0] = self.qlat[j,i]
-                ds['grid_corner_lat'][k,1] = self.qlat[j,i+1]
-                ds['grid_corner_lat'][k,2] = self.qlat[j+1,i+1]
-                ds['grid_corner_lat'][k,3] = self.qlat[j+1,i]
-                ds['grid_corner_lon'][k,0] = self.qlon[j,i]
-                ds['grid_corner_lon'][k,1] = self.qlon[j,i+1]
-                ds['grid_corner_lon'][k,2] = self.qlon[j+1,i+1]
-                ds['grid_corner_lon'][k,3] = self.qlon[j+1,i]
-        ds['grid_area'] = xr.DataArray(
-            self.tarea.data.flatten(),
-            dims = ['grid_size']
-        )
-
-        ds.to_netcdf(SCRIP_path)
-
-
-
-
