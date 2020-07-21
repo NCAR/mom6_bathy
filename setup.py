@@ -23,6 +23,7 @@ setuptools.setup(
         "numpy>=1.19",
         "xarray>=0.16",
         "matplotlib>=3.3.0",
+        "scipy>=1.5.1",
         "netCDF4",
     ]
 )
