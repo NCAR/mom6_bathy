@@ -1,0 +1,329 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Quickstart Guide &mdash; mom6_bathy 0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Examples" href="examples.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> mom6_bathy
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#step-1-import-modules">Step 1: Import modules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-create-the-horizontal-grid-instance">Step 2: Create the horizontal grid instance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#grid-metrics-and-attributes"><em>Grid Metrics and Attributes</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#supergrid"><em>Supergrid</em></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Python API:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">mom6_bathy</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">mom6_bathy</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Quickstart Guide</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/quickstart.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="quickstart-guide">
+<h1>Quickstart Guide<a class="headerlink" href="#quickstart-guide" title="Permalink to this headline">¶</a></h1>
+<p>mom6_tools library can be utilized via its Python API, i.e., directly in Python
+scripts or in Jupyter notebooks. In this quickstart guide, we describe how
+the tool can be utilized within a Jupyter Notebook, but the majority of
+these instructions apply to Python scripts as well.</p>
+<div class="section" id="step-1-import-modules">
+<h2>Step 1: Import modules<a class="headerlink" href="#step-1-import-modules" title="Permalink to this headline">¶</a></h2>
+<p>The first step is to import some relevant, auxiliary Python libraries. (These
+libraries are automatically installed when the mom6_bathy installer gets
+executed.)</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+</pre></div>
+</div>
+<p>We then import the <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> class of the mom6_bathy package as follows.
+This class is used to generate a horizontal grid, which is the first
+step of constructing a MOM6 grid and an associated bathymetry:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">mom6_bathy.mom6grid</span> <span class="kn">import</span> <span class="n">mom6grid</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="step-2-create-the-horizontal-grid-instance">
+<h2>Step 2: Create the horizontal grid instance<a class="headerlink" href="#step-2-create-the-horizontal-grid-instance" title="Permalink to this headline">¶</a></h2>
+<p>After having imported the modules, we can now create a horizontal grid.
+An exmaple mom6grid object instantiation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grd</span> <span class="o">=</span> <span class="n">mom6grid</span><span class="p">(</span>
+    <span class="n">nx</span>         <span class="o">=</span> <span class="mi">180</span><span class="p">,</span>           <span class="c1"># Number of grid points in x direction</span>
+    <span class="n">ny</span>         <span class="o">=</span> <span class="mi">90</span><span class="p">,</span>            <span class="c1"># Number of grid points in y direction</span>
+    <span class="n">config</span>     <span class="o">=</span> <span class="s2">&quot;cartesian&quot;</span><span class="p">,</span>   <span class="c1"># Grid configuration. Valid values: &#39;cartesian&#39;, &#39;mercator&#39;, &#39;spherical&#39;</span>
+    <span class="n">axis_units</span> <span class="o">=</span> <span class="s2">&quot;degrees&quot;</span><span class="p">,</span>     <span class="c1"># Grid axis units. Valid values: &#39;degrees&#39;, &#39;m&#39;, &#39;km&#39;</span>
+    <span class="n">lenx</span>       <span class="o">=</span> <span class="mf">360.0</span><span class="p">,</span>         <span class="c1"># grid length in x direction, e.g., 360.0 (degrees)</span>
+    <span class="n">leny</span>       <span class="o">=</span> <span class="mf">160.0</span><span class="p">,</span>         <span class="c1"># grid length in y direction</span>
+    <span class="n">ystart</span>     <span class="o">=</span> <span class="o">-</span><span class="mf">80.0</span>          <span class="c1"># starting y coordinate</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>In the above example, the <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> object, named <code class="docutils literal notranslate"><span class="pre">grd</span></code>, is constructed by
+specifying the required argumants <code class="docutils literal notranslate"><span class="pre">nx</span></code>, <code class="docutils literal notranslate"><span class="pre">ny</span></code>, <code class="docutils literal notranslate"><span class="pre">config</span></code>, <code class="docutils literal notranslate"><span class="pre">axis_units</span></code>,  <code class="docutils literal notranslate"><span class="pre">lenx</span></code>,
+and <code class="docutils literal notranslate"><span class="pre">leny</span></code>, in addition to the optional argument <code class="docutils literal notranslate"><span class="pre">ystart</span></code>. The full list of
+<code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> arguments and their descriptions may be printed by running
+<code class="docutils literal notranslate"><span class="pre">mom6grid?</span></code> statement on a notebook cell:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>mom6grid?
+
+...
+
+Parameters
+----------
+nx : int
+    Number of grid points in x direction
+ny : int
+    Number of grid points in y direction
+config : str or None
+    Grid configuration. Valid values: &#39;cartesian&#39;, &#39;mercator&#39;, &#39;spherical&#39;
+axis_units : str
+    Grid axis units. Valid values: &#39;degrees&#39;, &#39;m&#39;, &#39;km&#39;
+lenx : float
+    grid length in x direction, e.g., 360.0 (degrees)
+leny : float
+    grid length in y direction, e.g., 160.0 (degrees)
+srefine : int, optional
+    refinement factor for the supergrid. 2 by default
+xstart : float, optional
+    starting x coordinate. 0.0 by default.
+ystart : float, optional
+    starting y coordinate. 0.0 by default.
+cyclic_x : bool, optional
+    flag to make the grid cyclic in x direction. True by default.
+cyclic_y : bool, optional
+    flag to make the grid cyclic in y direction. False by default.
+tripolar_n : bool, optional
+    flag to make the grid tripolar. False by default.
+displace_pole : bool, optional
+    flag to make the grid displaced polar. False by default.
+</pre></div>
+</div>
+<p>Notice above that <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> class may be used to create ‘cartesian’, ‘mercator’,
+or, ‘spherical’ grids, as well as tripolar or displaced pole grids.</p>
+<div class="section" id="grid-metrics-and-attributes">
+<h3><em>Grid Metrics and Attributes</em><a class="headerlink" href="#grid-metrics-and-attributes" title="Permalink to this headline">¶</a></h3>
+<p>When a <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> grid instance gets created, several grid metrics and attributes
+(on all staggerings) are automatically computed and populated. These metrics and attributes
+are accessible via the accessor operator (<code class="docutils literal notranslate"><span class="pre">.</span></code>). For example, to access “the array
+of t-grid longitutes” of <code class="docutils literal notranslate"><span class="pre">grd</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grd</span><span class="o">.</span><span class="n">tlon</span>
+</pre></div>
+</div>
+<p>The full list of grid metrics and attributes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tlon</span></code>: array of t-grid longitudes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tlat</span></code>: array of t-grid latitudes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ulon</span></code>: array of u-grid longitudes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ulat</span></code>: array of u-grid latitudes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vlon</span></code>: array of v-grid longitudes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vlat</span></code>: array of v-grid latitudes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">qlon</span></code>: array of corner longitudes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">qlat</span></code>: array of corner latitudes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dxt</span></code>: x-distance between U points, centered at t</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dyt</span></code>: y-distance between V points, centered at t</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dxCv</span></code>: x-distance between q points, centered at v</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dyCu</span></code>: y-distance between q points, centered at u</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dxCu</span></code>: x-distance between y points, centered at u</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dyCv</span></code>: y-distance between t points, centered at v</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">angle</span></code>: angle T-grid makes with latitude line</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tarea</span></code>: T-cell area</p></li>
+</ul>
+</div>
+<div class="section" id="supergrid">
+<h3><em>Supergrid</em><a class="headerlink" href="#supergrid" title="Permalink to this headline">¶</a></h3>
+<p>supergrid……</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, NCAR
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
