@@ -25,5 +25,6 @@ setuptools.setup(
         "matplotlib>=3.3.0",
         "scipy>=1.5.1",
         "netCDF4",
+        "jupyter",
     ]
 )
