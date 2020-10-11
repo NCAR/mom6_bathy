@@ -6,10 +6,53 @@ from midas.rectgrid_gen import supergrid
 
 class mom6grid(object):
 
+    """
+    Horizontal MOM6 grid. The first step of constructing a MOM6 grid within
+    the CESM simpler models framework is to create a mom6grid instance.
+
+    Attributes
+    ----------
+    tlon: xr.DataArray
+        array of t-grid longitudes
+    tlat: xr.DataArray
+        array of t-grid latitudes
+    ulon: xr.DataArray
+        array of u-grid longitudes
+    ulat: xr.DataArray
+        array of u-grid latitudes
+    vlon: xr.DataArray
+        array of v-grid longitudes
+    vlat: xr.DataArray
+        array of v-grid latitudes
+    qlon: xr.DataArray
+        array of corner longitudes
+    qlat: xr.DataArray
+        array of corner latitudes
+    dxt: xr.DataArray
+        x-distance between U points, centered at t
+    dyt: xr.DataArray
+        y-distance between V points, centered at t
+    dxCv: xr.DataArray
+        x-distance between q points, centered at v
+    dyCu: xr.DataArray
+        y-distance between q points, centered at u
+    dxCu: xr.DataArray
+        x-distance between y points, centered at u
+    dyCv: xr.DataArray
+        y-distance between t points, centered at v
+    angle: xr.DataArray
+        angle T-grid makes with latitude line
+    tarea: xr.DataArray
+        T-cell area
+
+    """
+
     def __init__(self, nx, ny, config, axis_units, lenx, leny,
                  srefine=2, xstart=0.0, ystart=0.0, cyclic_x=True, cyclic_y=False,
                  tripolar_n=False, displace_pole=False):
         '''
+        mom6grid instance constructor.
+
         Parameters
         ----------
         nx : int
@@ -113,6 +156,8 @@ class mom6grid(object):
 
     @property
     def supergrid(self):
+        """MOM6 supergrid contains the grid metrics and the areas at twice the
+        nominal resolution of the actual computational grid."""
         return self._supergrid
 
     @supergrid.setter
@@ -124,10 +169,12 @@ class mom6grid(object):
 
     @property
     def nx(self):
+        """Number of cells in x-direction."""
         return self.tlon.shape[1]
 
     @property
     def ny(self):
+        """Number of cells in y-direction."""
         return self.tlon.shape[0]
 
     def _compute_MOM6_grid_metrics(self):

@@ -6,6 +6,19 @@ from midas.rectgrid_gen import supergrid
 from scipy import interpolate
 
 class mom6bathy(object):
+    """
+    Bathymetry Generator for MOM6 grids (mom6grid).
+    ...
+
+    Methods
+    -------
+    colorspace(c='rgb')
+        Represent the photo in the given colorspace.
+    gamma(n=1.0)
+        Change the photo's gamma exposure.
+
+    """
+
     def __init__(self, grid, min_depth):
         self._grid = grid
         self._depth = None
@@ -13,6 +26,9 @@ class mom6bathy(object):
 
     @property
     def depth(self):
+        """
+        MOM6 grid depth array. Positive below MSL.
+        """
         return self._depth
 
     @property
