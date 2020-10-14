@@ -179,61 +179,72 @@ class mom6grid(object):
     def _compute_MOM6_grid_metrics(self):
 
         sg = self._supergrid
+        sg_units = sg.dict['axis_units']
+        if sg_units == "m":
+            sg_units = "meters"
 
         # T coords
+        units = "degrees_east" if sg_units == "degrees" else sg_units
         self.tlon = xr.DataArray(
             sg.x[1::2,1::2],
             dims = ['ny','nx'],
             attrs = {"name":"array of t-grid longitudes",
-                     "units":"degrees_east"}
+                     "units":units}
         )
+        units = "degrees_north" if sg_units == "degrees" else sg_units
         self.tlat = xr.DataArray(
             sg.y[1::2,1::2],
             dims = ['ny','nx'],
             attrs = {"name":"array of t-grid latitudes",
-                     "units":"degrees_north"}
+                     "units":units}
         )
 
         # U coords
+        units = "degrees_east" if sg_units == "degrees" else sg_units
         self.ulon = xr.DataArray(
             sg.x[1::2,::2],
             dims = ['ny','nxp'],
             attrs = {"name":"array of u-grid longitudes",
-                     "units":"degrees_east"}
+                     "units":units}
         )
+        units = "degrees_north" if sg_units == "degrees" else sg_units
         self.ulat = xr.DataArray(
             sg.y[1::2,::2],
             dims = ['ny','nxp'],
             attrs = {"name":"array of u-grid latitudes",
-                     "units":"degrees_north"}
+                     "units":units}
         )
 
         # V coords
+        units = "degrees_east" if sg_units == "degrees" else sg_units
         self.vlon = xr.DataArray(
             sg.x[::2,1::2],
             dims = ['nyp','nx'],
             attrs = {"name":"array of v-grid longitudes",
-                     "units":"degrees_east"}
+                     "units":units}
         )
+        units = "degrees_north" if sg_units == "degrees" else sg_units
         self.vlat = xr.DataArray(
             sg.y[::2,1::2],
             dims = ['nyp','nx'],
             attrs = {"name":"array of v-grid latitudes",
-                     "units":"degrees_north"}
+                     "units":units}
         )
 
         # Corner coords
+        units = "degrees_east" if sg_units == "degrees" else sg_units
         self.qlon = xr.DataArray(
             sg.x[::2,::2],
             dims = ['nyp','nxp'],
             attrs = {"name":"array of q-grid longitudes",
-                     "units":"degrees_east"}
+                     "units":units}
         )
+        units = "degrees_north" if sg_units == "degrees" else sg_units
         self.qlat = xr.DataArray(
             sg.y[::2,::2],
             dims = ['nyp','nxp'],
             attrs = {"name":"array of q-grid latitudes",
-                      "units":"degrees_north"}
+                      "units":units}
         )
 
         # x-distance between U points, centered at t

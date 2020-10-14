@@ -6,20 +6,22 @@ from midas.rectgrid_gen import supergrid
 from scipy import interpolate
 
 class mom6bathy(object):
-    """
+    '''
     Bathymetry Generator for MOM6 grids (mom6grid).
-    ...
-
-    Methods
-    -------
-    colorspace(c='rgb')
-        Represent the photo in the given colorspace.
-    gamma(n=1.0)
-        Change the photo's gamma exposure.
-
-    """
+    '''
 
     def __init__(self, grid, min_depth):
+        '''
+        MOM6 Simpler Models bathymetry constructor.
+
+        Parameters
+        ----------
+        grid: mom6grid
+            horizontal grid instance for which the bathymetry is to be created.
+        min_depth: float
+            Minimum water column depth. Columns with shallow depths are to be masked out.
+        '''
+
         self._grid = grid
         self._depth = None
         self._min_depth = min_depth
@@ -33,10 +35,16 @@ class mom6bathy(object):
 
     @property
     def min_depth(self):
+        """
+        Minimum water column depth. Columns with shallow depths are to be masked out.
+        """
         return self._min_depth
 
     @property
     def max_depth(self):
+        """
+        Maximum water column depth.
+        """
         return self.depth.max().item()
 
     @min_depth.setter
@@ -45,6 +53,9 @@ class mom6bathy(object):
 
     @property
     def tmask(self):
+        """
+        Ocean domain mask at T grid. 1 if ocean, 0 if land.
+        """
         tmask_da = xr.DataArray(
             np.where(self._depth>=self._min_depth, 1, 0),
             dims = ['ny','nx'],
@@ -53,13 +64,40 @@ class mom6bathy(object):
         return tmask_da
 
     def set_flat(self, D):
+        """
+        Create a flat bottom bathymetry with a given depth D.
+
+        Parameters
+        ----------
+        D: float
+            Bathymetric depth of the flat bottom to be generated.
+        """
         self._depth = xr.DataArray(
             np.full((self._grid.ny, self._grid.nx), D),
             dims = ['ny','nx'],
         )
 
+    def set_depth_arr(self, depth_arr):
+        """
+        Apply a custom bathymetry via a user-defined depth array.
+
+        Parameters
+        ----------
+        depth_arr: np.array
+            2-D Array of ocean depth.
+        """
+
+        assert depth_arr.shape == (self._grid.ny, self._grid.nx), "Incompatible depth array shape"
+        self._depth = xr.DataArray(
+            depth_arr,
+            dims = ['ny','nx'],
+        )
+
+
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         '''
+        Create a spoon-shaped bathymetry. Same effect as setting the TOPO_CONFIG parameter to "spoon".
+
         Parameters
         ----------
         max_depth : float
@@ -93,6 +131,8 @@ class mom6bathy(object):
 
     def set_bowl(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         '''
+        Create a bowl-shaped bathymetry. Same effect as setting the TOPO_CONFIG parameter to "bowl".
+
         Parameters
         ----------
         max_depth : float
@@ -128,6 +168,21 @@ class mom6bathy(object):
 
 
     def apply_ridge(self, height, width, lon, ilat):
+        '''
+        Apply a ridge to the bathymetry.
+
+        Parameters
+        ----------
+        height : float
+            Height of the ridge to be added.
+        width : float
+            Width of the ridge to be added.
+        lon : float
+            Longitude where the ridge is to be centered.
+        ilat : pair of integers
+            Initial and final latitude indices for the ridge.
+        '''
+
         ridge_lon = [self._grid.tlon[0,0].data,
                      lon-width/2.,
                      lon,
@@ -148,15 +203,27 @@ class mom6bathy(object):
         print("{} = {}".format("NIGLOBAL", self._grid.nx))
         print("{} = {}".format("NJGLOBAL", self._grid.ny))
         print("{} = {}".format("GRID_CONFIG", "mosaic"))
-        print("{} = {}".format("GRID_FILE", "???"))
         print("{} = {}".format("TOPO_CONFIG", "file"))
-        print("{} = {}".format("TOPO_FILE", "???"))
         print("{} = {}".format("MAXIMUM_DEPTH", str(self.max_depth)))
         print("{} = {}".format("MINIMUM_DEPTH", str(self.min_depth)))
+        print("{} = {}".format("REENTRANT_X", self._grid.supergrid.dict['cyclic_x']))
+        print("{} = {}".format("GRID_FILE", "???"))
+        print("{} = {}".format("TOPO_FILE", "???"))
 
 
 
     def to_topog(self, file_path, title=None):
+        '''
+        Write the TOPO_FILE (bathymetry file) in netcdf format. The written file is
+        to be read in by MOM6 during runtime.
+
+        Parameters
+        ----------
+        file_path: str
+            Path to TOPO_FILE to be written.
+        title: str, optional
+            File title.
+        '''
 
         ds = xr.Dataset()
 
@@ -178,6 +245,17 @@ class mom6bathy(object):
 
 
     def to_SCRIP(self, SCRIP_path, title=None):
+        '''
+        Write the SCRIP grid file
+
+        Parameters
+        ----------
+        SCRIP_path: str
+            Path to SCRIP file to be written.
+        title: str, optional
+            File title.
+        '''
+
 
         ds = xr.Dataset()
 
@@ -234,7 +312,5 @@ class mom6bathy(object):
         )
 
         ds.to_netcdf(SCRIP_path)
-
-
 
 
