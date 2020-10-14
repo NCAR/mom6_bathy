@@ -30,15 +30,16 @@ An exmaple mom6grid object instantiation:
 
 .. code-block:: python
 
-    grd = mom6grid(
-        nx         = 180,           # Number of grid points in x direction
-        ny         = 90,            # Number of grid points in y direction
-        config     = "spherical",   # Grid configuration. Valid values: 'cartesian', 'mercator', 'spherical'
-        axis_units = "degrees",     # Grid axis units. Valid values: 'degrees', 'm', 'km'
-        lenx       = 360.0,         # grid length in x direction, e.g., 360.0 (degrees)
-        leny       = 160.0,         # grid length in y direction
-        ystart     = -80.0          # starting y coordinate
-    )
+  grd = mom6grid(
+      nx         = 180,         # Number of grid points in x direction
+      ny         = 80,          # Number of grid points in y direction
+      config     = "spherical", # Grid configuration. Valid values: 'cartesian', 'mercator', 'spherical'
+      axis_units = "degrees",   # Grid axis units. Valid values: 'degrees', 'm', 'km'
+      lenx       = 360.0,       # grid length in x direction, e.g., 360.0 (degrees)
+      leny       = 160,         # grid length in y direction
+      cyclic_x   = "True",      # reentrant, spherical domain
+      ystart     = -80.0        # start/end 10 degrees above/below poles to avoid singularity 
+  )
 
 In the above example, the ``mom6grid`` object, named ``grd``, is constructed by
 specifying the required arguments ``nx``, ``ny``, ``config``, ``axis_units``,  ``lenx``,
@@ -208,6 +209,9 @@ Examples:
 The first and the second arguments of ``set_bowl`` and ``set_spoon`` methods are maximum depth
 and minimum depth, respectively.
 
+Check out the following notebook to see examples of above predefined bathymetry options: `1_cartesian_ideal_bathy.ipynb
+<https://github.com/NCAR/mom6_bathy/blob/master/notebooks/1_cartesian_ideal_bathy.ipynb>`_
+
 *Custom Bathymetry*
 *************************************
 In addition to the above predefined configurations, users may provide their own depth arrays. For
@@ -216,12 +220,13 @@ example:
 .. code-block:: python
 
     # define a custom depth
-    xi = grd.tlat.nx.data
-    yi = grd.tlat.ny.data[:,np.newaxis]
-    custom_d = 1000.0 + 50.0 * np.sin(xi*np.pi/6) * np.cos(yi*np.pi/6)
+    i = grd.tlat.nx.data                # array of x-indices
+    j = grd.tlat.ny.data[:,np.newaxis]  # array of y-indices 
+    custom_depth = 400.0 + 80.0 * np.sin(i*np.pi/6.) * np.cos(j*np.pi/6.)
 
     # update the bathymetry:
-    bathy.set_depth_arr(custom_d)
+    bathy.set_depth_arr(custom_depth)
+
 
 *Adding ridges*
 *************************************
@@ -233,7 +238,9 @@ to add ridges to the bathymetry. Example usage:
 
   bathy.apply_ridge(height=200, width=8, lon=240, ilat=(10,80) )
 
-See the `Examples` page to access Jupyter notebooks with example usages of these methods.
+Example notebook: `3_spherical_custom_bathy.ipynb
+<https://github.com/NCAR/mom6_bathy/blob/master/notebooks/3_spherical_custom_bathy.ipynb>`_
+
 
 Step 4: Write NetCDF Grid Files
 ----------------------------------------------

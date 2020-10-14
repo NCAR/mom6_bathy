@@ -209,13 +209,14 @@ classes is called <cite>mom6_bathy</cite>.</p>
 <p>After having imported the modules, we can now create a horizontal grid.
 An exmaple mom6grid object instantiation:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grd</span> <span class="o">=</span> <span class="n">mom6grid</span><span class="p">(</span>
-    <span class="n">nx</span>         <span class="o">=</span> <span class="mi">180</span><span class="p">,</span>           <span class="c1"># Number of grid points in x direction</span>
-    <span class="n">ny</span>         <span class="o">=</span> <span class="mi">90</span><span class="p">,</span>            <span class="c1"># Number of grid points in y direction</span>
-    <span class="n">config</span>     <span class="o">=</span> <span class="s2">&quot;spherical&quot;</span><span class="p">,</span>   <span class="c1"># Grid configuration. Valid values: &#39;cartesian&#39;, &#39;mercator&#39;, &#39;spherical&#39;</span>
-    <span class="n">axis_units</span> <span class="o">=</span> <span class="s2">&quot;degrees&quot;</span><span class="p">,</span>     <span class="c1"># Grid axis units. Valid values: &#39;degrees&#39;, &#39;m&#39;, &#39;km&#39;</span>
-    <span class="n">lenx</span>       <span class="o">=</span> <span class="mf">360.0</span><span class="p">,</span>         <span class="c1"># grid length in x direction, e.g., 360.0 (degrees)</span>
-    <span class="n">leny</span>       <span class="o">=</span> <span class="mf">160.0</span><span class="p">,</span>         <span class="c1"># grid length in y direction</span>
-    <span class="n">ystart</span>     <span class="o">=</span> <span class="o">-</span><span class="mf">80.0</span>          <span class="c1"># starting y coordinate</span>
+    <span class="n">nx</span>         <span class="o">=</span> <span class="mi">180</span><span class="p">,</span>         <span class="c1"># Number of grid points in x direction</span>
+    <span class="n">ny</span>         <span class="o">=</span> <span class="mi">80</span><span class="p">,</span>          <span class="c1"># Number of grid points in y direction</span>
+    <span class="n">config</span>     <span class="o">=</span> <span class="s2">&quot;spherical&quot;</span><span class="p">,</span> <span class="c1"># Grid configuration. Valid values: &#39;cartesian&#39;, &#39;mercator&#39;, &#39;spherical&#39;</span>
+    <span class="n">axis_units</span> <span class="o">=</span> <span class="s2">&quot;degrees&quot;</span><span class="p">,</span>   <span class="c1"># Grid axis units. Valid values: &#39;degrees&#39;, &#39;m&#39;, &#39;km&#39;</span>
+    <span class="n">lenx</span>       <span class="o">=</span> <span class="mf">360.0</span><span class="p">,</span>       <span class="c1"># grid length in x direction, e.g., 360.0 (degrees)</span>
+    <span class="n">leny</span>       <span class="o">=</span> <span class="mi">160</span><span class="p">,</span>         <span class="c1"># grid length in y direction</span>
+    <span class="n">cyclic_x</span>   <span class="o">=</span> <span class="s2">&quot;True&quot;</span><span class="p">,</span>      <span class="c1"># reentrant, spherical domain</span>
+    <span class="n">ystart</span>     <span class="o">=</span> <span class="o">-</span><span class="mf">80.0</span>        <span class="c1"># start/end 10 degrees above/below poles to avoid singularity</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -372,18 +373,19 @@ available in MOM6 as idealized configurations. (See <cite>TOPO_CONFIG</cite> par
 </div>
 <p>The first and the second arguments of <code class="docutils literal notranslate"><span class="pre">set_bowl</span></code> and <code class="docutils literal notranslate"><span class="pre">set_spoon</span></code> methods are maximum depth
 and minimum depth, respectively.</p>
+<p>Check out the following notebook to see examples of above predefined bathymetry options: <a class="reference external" href="https://github.com/NCAR/mom6_bathy/blob/master/notebooks/1_cartesian_ideal_bathy.ipynb">1_cartesian_ideal_bathy.ipynb</a></p>
 </div>
 <div class="section" id="custom-bathymetry">
 <h3><em>Custom Bathymetry</em><a class="headerlink" href="#custom-bathymetry" title="Permalink to this headline">¶</a></h3>
 <p>In addition to the above predefined configurations, users may provide their own depth arrays. For
 example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># define a custom depth</span>
-<span class="n">xi</span> <span class="o">=</span> <span class="n">grd</span><span class="o">.</span><span class="n">tlat</span><span class="o">.</span><span class="n">nx</span><span class="o">.</span><span class="n">data</span>
-<span class="n">yi</span> <span class="o">=</span> <span class="n">grd</span><span class="o">.</span><span class="n">tlat</span><span class="o">.</span><span class="n">ny</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>
-<span class="n">custom_d</span> <span class="o">=</span> <span class="mf">1000.0</span> <span class="o">+</span> <span class="mf">50.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">xi</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">6</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">yi</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">6</span><span class="p">)</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">grd</span><span class="o">.</span><span class="n">tlat</span><span class="o">.</span><span class="n">nx</span><span class="o">.</span><span class="n">data</span>                <span class="c1"># array of x-indices</span>
+<span class="n">j</span> <span class="o">=</span> <span class="n">grd</span><span class="o">.</span><span class="n">tlat</span><span class="o">.</span><span class="n">ny</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>  <span class="c1"># array of y-indices</span>
+<span class="n">custom_depth</span> <span class="o">=</span> <span class="mf">400.0</span> <span class="o">+</span> <span class="mf">80.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">i</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mf">6.</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">j</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mf">6.</span><span class="p">)</span>
 
 <span class="c1"># update the bathymetry:</span>
-<span class="n">bathy</span><span class="o">.</span><span class="n">set_depth_arr</span><span class="p">(</span><span class="n">custom_d</span><span class="p">)</span>
+<span class="n">bathy</span><span class="o">.</span><span class="n">set_depth_arr</span><span class="p">(</span><span class="n">custom_depth</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -395,7 +397,7 @@ to add ridges to the bathymetry. Example usage:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bathy</span><span class="o">.</span><span class="n">apply_ridge</span><span class="p">(</span><span class="n">height</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="mi">240</span><span class="p">,</span> <span class="n">ilat</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">80</span><span class="p">)</span> <span class="p">)</span>
 </pre></div>
 </div>
-<p>See the <cite>Examples</cite> page to access Jupyter notebooks with example usages of these methods.</p>
+<p>Example notebook: <a class="reference external" href="https://github.com/NCAR/mom6_bathy/blob/master/notebooks/3_spherical_custom_bathy.ipynb">3_spherical_custom_bathy.ipynb</a></p>
 </div>
 </div>
 <div class="section" id="step-4-write-netcdf-grid-files">
