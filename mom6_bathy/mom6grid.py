@@ -113,6 +113,28 @@ class mom6grid(object):
                                     tripolar_n = tripolar_n,
                                     displace_pole = displace_pole
                             )
+    @property
+    def supergrid(self):
+        """MOM6 supergrid contains the grid metrics and the areas at twice the
+        nominal resolution of the actual computational grid."""
+        return self._supergrid
+
+    @supergrid.setter
+    def supergrid(self, new_supergrid):
+        print("Updating supergrid...")
+        self._supergrid=new_supergrid
+        self._supergrid.grid_metrics()
+        self._compute_MOM6_grid_metrics()
+
+    @property
+    def nx(self):
+        """Number of cells in x-direction."""
+        return self.tlon.shape[1]
+
+    @property
+    def ny(self):
+        """Number of cells in y-direction."""
+        return self.tlon.shape[0]
 
     @classmethod
     def from_ini(cls, ini_file):
@@ -153,29 +175,6 @@ class mom6grid(object):
 
         return cls(nx, ny, config, axis_units, lenx, leny, srefine, xstart, ystart,
                 cyclic_x, cyclic_y, tripolar_n, displace_pole)
-
-    @property
-    def supergrid(self):
-        """MOM6 supergrid contains the grid metrics and the areas at twice the
-        nominal resolution of the actual computational grid."""
-        return self._supergrid
-
-    @supergrid.setter
-    def supergrid(self, new_supergrid):
-        print("Updating supergrid...")
-        self._supergrid=new_supergrid
-        self._supergrid.grid_metrics()
-        self._compute_MOM6_grid_metrics()
-
-    @property
-    def nx(self):
-        """Number of cells in x-direction."""
-        return self.tlon.shape[1]
-
-    @property
-    def ny(self):
-        """Number of cells in y-direction."""
-        return self.tlon.shape[0]
 
     def _compute_MOM6_grid_metrics(self):
 
@@ -303,8 +302,22 @@ class mom6grid(object):
 
     def plot(self, property_name):
 
+        '''
+        Plot a given grid property using cartopy.
+        Warning: cartopy module must be installed seperately
+
+        Parameters
+        ----------
+        property_name : str
+            The name of the grid property to plot, e.g., 'tlat'.
+        '''
+
         import matplotlib.pyplot as plt
-        import cartopy.crs as ccrs
+        try:
+            import cartopy.crs as ccrs
+        except:
+            print("Cannot import the cartopy library, which is required to run this method.")
+            return
         import cartopy.feature as cfeature
         import matplotlib.colors as colors
         import cartopy
@@ -341,6 +354,19 @@ class mom6grid(object):
 
 
     def plot_cross_section(self, property_name, iy=None, ix=None):
+
+        '''
+        Plot the cross-section of a given grid metric.
+
+        Parameters
+        ----------
+        property_name : str
+            The name of the grid property to plot, e.g., 'tlat'.
+        iy: int
+            y-index of the cross section
+        ix: int
+            x-inted of the cross section
+        '''
 
         import matplotlib.pyplot as plt
 
@@ -383,6 +409,18 @@ class mom6grid(object):
 
     def update_supergrid(self, xdat, ydat):
 
+        '''
+        Update the supergrid x and y coordinates. Running this method
+        also updates the nominal grid coordinates and metrics.
+
+        Parameters
+        ----------
+        xdat: np.array
+            2-dimensional array of the new x coordinates.
+        xdat: np.array
+            2-dimensional array of the new y coordinates.
+        '''
+
         new_supergrid = supergrid(
             config = self.supergrid.dict['config'],
             axis_units = self.supergrid.dict['axis_units'],
@@ -400,6 +438,20 @@ class mom6grid(object):
         self.supergrid = new_supergrid
 
     def to_netcdf(self, mom6grid_path=None, supergrid_path=None, author=None):
+
+        '''
+        Write the horizontal grid and/or supergrid to a netcdf file. The written out netcdf
+        supergrid file is to be read in by MOM6 during runtime.
+
+        Parameters
+        ----------
+        mom6grid_path: str, optional
+            Path to the mom6 horizontal grid file to be written.
+        supergrid_path: str, optional
+            Path to the supergrid file to be written.
+        author: str, optional
+            Name of the author. If provided, the name will appear in files as metadata.
+        '''
 
         if not (mom6grid_path or supergrid_path):
             raise RuntimeError("Must provide at least one of mom6grid_path and supergrid_path")
