@@ -61,3 +61,5 @@ html_static_path = ['_static']
 
 # docstrings ----------------------
 napoleon_numpy_docstring = True
+autoclass_content = 'both'
+

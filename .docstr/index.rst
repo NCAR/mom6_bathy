@@ -7,7 +7,7 @@ Welcome to `mom6_bathy` documentation!
 ======================================
 
 `mom6_bathy` is a Python tool to generate MOM6 horizontal grid and bathymetry files
-to be used within the **"CESM Simpler Model"s** framework. Follow the links below
+to be used within the **"CESM Simpler Models"** framework. Follow the links below
 to learn about the `mom6_bathy` tool.
 
 .. toctree::

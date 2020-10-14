@@ -3,7 +3,20 @@ Installation
 
 Prerequisite
 -------------
-    Python 3.7+
+* Python 3.7+: Make sure that you have Python 3.7 (or a later version) installed. 
+
+Note: If you are familiar with conda or Python virtual environments, it is strongly
+advised, but not required, to work on a new virtual environment dedicated to 
+the use of the mom6_bathy tool only. In conda framework, for example:
+
+.. code-block:: bash
+
+    # create a new conda environment (execute one time only)
+    conda create --name mom6_bathy_env
+
+    # activate this new environment (before installing mom6_bathy
+    # and before each use session.)
+    conda activate mom6_bathy_env
 
 Instructions
 -------------
