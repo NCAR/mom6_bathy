@@ -234,11 +234,32 @@ class mom6bathy(object):
         else:
             ds.attrs['title'] = "MOM6 topography file"
 
+        ds['y'] = xr.DataArray(
+            self._grid.tlat,
+            dims = ['ny', 'nx'],
+            attrs = {'long_name' : 'array of t-grid latitudes',
+                     'units' : self._grid.tlat.units}
+        )
+
+        ds['x'] = xr.DataArray(
+            self._grid.tlon,
+            dims = ['ny', 'nx'],
+            attrs = {'long_name' : 'array of t-grid longitutes',
+                     'units' : self._grid.tlon.units}
+        )
+
+        ds['mask'] = xr.DataArray(
+            self.tmask.astype(np.int32),
+            dims = ['ny', 'nx'],
+            attrs = {'long_name' : 'landsea mask at t points: 1 ocean, 0 land',
+                     'units' : 'nondim'}
+        )
+
         ds['depth'] = xr.DataArray(
             self._depth.data,
-            dims = ['nj', 'ni'],
-            attrs = {'long_name' : 'Depth of ocean bottom',
-                     'units' : 'm'}
+            dims = ['ny', 'nx'],
+            attrs = {'long_name' : 't-grid cell depth',
+                     'units' : "m"}
         )
 
         ds.to_netcdf(file_path)
@@ -313,4 +334,84 @@ class mom6bathy(object):
 
         ds.to_netcdf(SCRIP_path)
 
+
+    def to_ESMF_mesh(self, mesh_path, title=None):
+        '''
+        Write the ESMF mesh file
+
+        Parameters
+        ----------
+        mesh_path: str
+            Path to ESMF mesh file to be written.
+        title: str, optional
+            File title.
+        '''
+
+        ds = xr.Dataset()
+
+        # global attrs:
+        ds.attrs['gridType'] = "unstructured mesh"
+        ds.attrs['date_created'] = datetime.now().isoformat()
+        if title:
+            ds.attrs['title'] = title
+
+
+        tlon_flat = self._grid.tlon.data.flatten()
+        tlat_flat = self._grid.tlat.data.flatten()
+        ncells = len(tlon_flat) # i.e., elementCount in ESMF mesh nomenclature
+
+        coord_units = self._grid.supergrid.dict['axis_units']
+
+        ds['centerCoords'] = xr.DataArray(
+            [ [tlon_flat[i], tlat_flat[i]] for i in range(ncells)], 
+            dims = ['elementCount', 'coordDim'],
+            attrs = {'units': coord_units}
+        )
+
+        ds['numElementConn'] = xr.DataArray(
+            np.full(ncells, 4).astype(np.int8),
+            dims = ['elementCount'],
+            attrs = {'long_name':'Node indices that define the element connectivity'}
+        )
+
+        ds['elementArea'] = xr.DataArray(
+            self._grid.tarea.data.flatten(),
+            dims = ['elementCount'],
+            attrs = {'units': self._grid.tarea.units}
+        )
+
+        ds['elementMask'] = xr.DataArray(
+            self.tmask.data.astype(np.int32).flatten(),
+            dims = ['elementCount']
+        )
+
+        qlon_flat = self._grid.qlon.data.flatten()
+        qlat_flat = self._grid.qlat.data.flatten()
+
+        nnodes = len(qlon_flat)
+        ds['nodeCoords'] = xr.DataArray(
+            [ [qlon_flat[i], qlat_flat[i]] for i in range(nnodes)], 
+            dims = ['nodeCount', 'coordDim'],
+            attrs = {'units': coord_units}
+        )
+
+
+        nx = self._grid.nx
+        nxm1 = nx-1
+
+        # Below returns element connectivity of i-th element (assuming 0 based node and element indexing)
+        get_element_conn = lambda i: [
+            (i//nxm1)*nx + i%nxm1,
+            (i//nxm1)*nx + i%nxm1 + 1,
+            (i//nxm1+1)*nx + i%nxm1 + 1,
+            (i//nxm1+1)*nx + i%nxm1 ]
+
+        ds['elementConn'] = xr.DataArray(
+            np.array([get_element_conn(i) for i in range(ncells)]).astype(np.int32),
+            dims = ['elementCount', 'maxNodePElement'],
+            attrs = {'long_name': "Node indices that define the element connectivity",
+                     'start_index': np.int32(0)}
+        )
+
+        ds.to_netcdf(mesh_path)
 

@@ -2,7 +2,7 @@ import os, sys
 import numpy as np
 import xarray as xr
 from datetime import datetime
-from midas.rectgrid_gen import supergrid
+from midas.rectgrid_gen import supergrid as MidasSupergrid
 
 class mom6grid(object):
 
@@ -100,19 +100,21 @@ class mom6grid(object):
         assert displace_pole==False, "displaced pole not supported yet"
 
 
-        self.supergrid = supergrid(nxtot = nx*srefine,
-                                    nytot = ny*srefine,
-                                    config = config,
-                                    axis_units = axis_units,
-                                    ystart = ystart,
-                                    leny = leny,
-                                    xstart = xstart,
-                                    lenx = lenx,
-                                    cyclic_x = cyclic_x,
-                                    cyclic_y = cyclic_y,
-                                    tripolar_n = tripolar_n,
-                                    displace_pole = displace_pole
-                            )
+        self.supergrid = MidasSupergrid(
+            nxtot = nx*srefine,
+            nytot = ny*srefine,
+            config = config,
+            axis_units = axis_units,
+            ystart = ystart,
+            leny = leny,
+            xstart = xstart,
+            lenx = lenx,
+            cyclic_x = cyclic_x,
+            cyclic_y = cyclic_y,
+            tripolar_n = tripolar_n,
+            displace_pole = displace_pole
+        )
+
     @property
     def supergrid(self):
         """MOM6 supergrid contains the grid metrics and the areas at twice the
@@ -432,7 +434,7 @@ class mom6grid(object):
             2-dimensional array of the new y coordinates.
         '''
 
-        new_supergrid = supergrid(
+        new_supergrid = MidasSupergrid(
             config = self.supergrid.dict['config'],
             axis_units = self.supergrid.dict['axis_units'],
             xdat = xdat,
