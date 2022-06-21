@@ -195,15 +195,73 @@ class mom6bathy(object):
 
         for j in range(ilat[0], ilat[1]):
             self._depth[j,:] +=  ridge_height_mapped
+    
+    def apply_land_frac(self, landfrac_filepath, landfrac_name, xcoord_name, ycoord_name, depth_fillval=np.nan, cutoff_frac=0.5, method="bilinear"):
+        '''
+        Given a dataset containing land fraction, generate and apply ocean mask.
 
+        Parameters
+        ----------
+        landfrac_filepath : str
+            Path the netcdf file containing the land fraction field.
+        landfrac_name : str
+            The field name corresponding to the land fraction  (e.g., "landfrac").
+        xcoord_name : str
+            The name of the x coordinate of the landfrac dataset (e.g., "lon").
+        ycoord_name : str
+            The name of the y coordinate of the landfrac dataset (e.g., "lat").
+        depth_fillval : float
+            The depth value for dry cells.
+        cutoff_frac : float
+            Cells with landfrac > cutoff_frac are deemed land cells. 
+        method : str
+            Mapping method for determining the ocean mask (lnd -> ocn)
+        '''
+
+        import xesmf as xe
+
+        assert isinstance(landfrac_filepath, str), "landfrac_filepath must be a string"
+        assert landfrac_filepath.endswith('.nc'), "landfrac_filepath must point to a netcdf file"
+        ds = xr.open_dataset(landfrac_filepath)
+
+        assert isinstance(landfrac_name, str), "landfrac_name must be a string"
+        assert landfrac_name in ds, f"Couldn't find {landfrac_name} in {landfrac_filepath}"
+        assert isinstance(xcoord_name, str), "xcoord_name must be a string"
+        assert landfrac_name in ds, f"Couldn't find {xcoord_name} in {landfrac_filepath}"
+        assert isinstance(ycoord_name, str), "ycoord_name must be a string"
+        assert landfrac_name in ds, f"Couldn't find {ycoord_name} in {landfrac_filepath}"
+        assert isinstance(depth_fillval, float), f"depth_fillval={depth_fillval} must be a float"
+        assert depth_fillval is np.nan or depth_fillval<0.0, f"depth_fillval (the depth of dry cells) must be a negative number."
+        assert isinstance(cutoff_frac, float), f"cutoff_frac={cutoff_frac} must be a float"
+        assert 0.0<=cutoff_frac<=1.0, f"cutoff_frac={cutoff_frac} must be 0<= and <=1"
+
+        valid_methods = [
+            'bilinear',
+            'conservative',
+            'conservative_normed',
+            'patch',
+            'nearest_s2d',
+            'nearest_d2s']
+        assert method in valid_methods, f"{method} is not a valid mapping method. Choose from: {valid_methods}"
+        
+
+        ds_mapped = xr.Dataset(
+            data_vars = {},
+            coords = {'lat':self._grid.tlat, 'lon':self._grid.tlon}
+        )
+
+        regridder = xe.Regridder(ds, ds_mapped, method, periodic=self._grid.supergrid.dict['cyclic_x'])
+        mask_mapped = regridder(ds.landfrac)
+        self._depth.data =  np.where(mask_mapped>cutoff_frac, depth_fillval, self._depth)
 
     def print_MOM6_runtime_params(self):
 
+        print("{} = {}".format("INPUTDIR", '"./INPUT/"'))
         print("{} = {}".format("TRIPOLAR_N", self._grid.supergrid.dict['tripolar_n']))
         print("{} = {}".format("NIGLOBAL", self._grid.nx))
         print("{} = {}".format("NJGLOBAL", self._grid.ny))
-        print("{} = {}".format("GRID_CONFIG", "mosaic"))
-        print("{} = {}".format("TOPO_CONFIG", "file"))
+        print("{} = {}".format("GRID_CONFIG", '"mosaic"'))
+        print("{} = {}".format("TOPO_CONFIG", '"file"'))
         print("{} = {}".format("MAXIMUM_DEPTH", str(self.max_depth)))
         print("{} = {}".format("MINIMUM_DEPTH", str(self.min_depth)))
         print("{} = {}".format("REENTRANT_X", self._grid.supergrid.dict['cyclic_x']))
