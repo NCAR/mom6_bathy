@@ -196,7 +196,7 @@ class mom6bathy(object):
         for j in range(ilat[0], ilat[1]):
             self._depth[j,:] +=  ridge_height_mapped
     
-    def apply_land_frac(self, landfrac_filepath, landfrac_name, xcoord_name, ycoord_name, depth_fillval=np.nan, cutoff_frac=0.5, method="bilinear"):
+    def apply_land_frac(self, landfrac_filepath, landfrac_name, xcoord_name, ycoord_name, depth_fillval=0.0, cutoff_frac=0.5, method="bilinear"):
         '''
         Given a dataset containing land fraction, generate and apply ocean mask.
 
@@ -231,7 +231,7 @@ class mom6bathy(object):
         assert isinstance(ycoord_name, str), "ycoord_name must be a string"
         assert landfrac_name in ds, f"Couldn't find {ycoord_name} in {landfrac_filepath}"
         assert isinstance(depth_fillval, float), f"depth_fillval={depth_fillval} must be a float"
-        assert depth_fillval is np.nan or depth_fillval<0.0, f"depth_fillval (the depth of dry cells) must be a negative number."
+        assert depth_fillval<self._min_depth, f"depth_fillval (the depth of dry cells) must be smaller than the minimum depth {self._min_depth}"
         assert isinstance(cutoff_frac, float), f"cutoff_frac={cutoff_frac} must be a float"
         assert 0.0<=cutoff_frac<=1.0, f"cutoff_frac={cutoff_frac} must be 0<= and <=1"
 
