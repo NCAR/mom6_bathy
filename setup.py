@@ -18,8 +18,9 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     install_requires=[
+        "setuptools>=62.5",
         "numpy>=1.19",
         "xarray>=0.16",
         "matplotlib>=3.3.0",
