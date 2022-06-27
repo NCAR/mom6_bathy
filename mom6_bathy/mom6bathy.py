@@ -195,7 +195,7 @@ class mom6bathy(object):
 
         for j in range(ilat[0], ilat[1]):
             self._depth[j,:] +=  ridge_height_mapped
-    
+
     def apply_land_frac(self, landfrac_filepath, landfrac_name, xcoord_name, ycoord_name, depth_fillval=0.0, cutoff_frac=0.5, method="bilinear"):
         '''
         Given a dataset containing land fraction, generate and apply ocean mask.
@@ -213,7 +213,7 @@ class mom6bathy(object):
         depth_fillval : float
             The depth value for dry cells.
         cutoff_frac : float
-            Cells with landfrac > cutoff_frac are deemed land cells. 
+            Cells with landfrac > cutoff_frac are deemed land cells.
         method : str
             Mapping method for determining the ocean mask (lnd -> ocn)
         '''
@@ -243,7 +243,7 @@ class mom6bathy(object):
             'nearest_s2d',
             'nearest_d2s']
         assert method in valid_methods, f"{method} is not a valid mapping method. Choose from: {valid_methods}"
-        
+
 
         ds_mapped = xr.Dataset(
             data_vars = {},
@@ -421,7 +421,7 @@ class mom6bathy(object):
         coord_units = self._grid.supergrid.dict['axis_units']
 
         ds['centerCoords'] = xr.DataArray(
-            [ [tlon_flat[i], tlat_flat[i]] for i in range(ncells)], 
+            [ [tlon_flat[i], tlat_flat[i]] for i in range(ncells)],
             dims = ['elementCount', 'coordDim'],
             attrs = {'units': coord_units}
         )
@@ -443,26 +443,52 @@ class mom6bathy(object):
             dims = ['elementCount']
         )
 
-        qlon_flat = self._grid.qlon.data.flatten()
-        qlat_flat = self._grid.qlat.data.flatten()
 
-        nnodes = len(qlon_flat)
-        ds['nodeCoords'] = xr.DataArray(
-            [ [qlon_flat[i], qlat_flat[i]] for i in range(nnodes)], 
-            dims = ['nodeCount', 'coordDim'],
-            attrs = {'units': coord_units}
-        )
+        if self._grid.supergrid.dict['cyclic_x'] == False:
 
+            qlon_flat = self._grid.qlon.data.flatten()
+            qlat_flat = self._grid.qlat.data.flatten()
+            nnodes = len(qlon_flat)
+            nx = self._grid.nx
+            ny = self._grid.ny
+            assert nnodes == (nx+1) * (ny+1)
 
-        nx = self._grid.nx
-        nxm1 = nx-1
+            ds['nodeCoords'] = xr.DataArray(
+                [ [qlon_flat[i], qlat_flat[i]] for i in range(nnodes)],
+                dims = ['nodeCount', 'coordDim'],
+                attrs = {'units': coord_units}
+            )
 
-        # Below returns element connectivity of i-th element (assuming 0 based node and element indexing)
-        get_element_conn = lambda i: [
-            (i//nxm1)*nx + i%nxm1,
-            (i//nxm1)*nx + i%nxm1 + 1,
-            (i//nxm1+1)*nx + i%nxm1 + 1,
-            (i//nxm1+1)*nx + i%nxm1 ]
+            # Below returns element connectivity of i-th element (assuming 0 based node and element indexing)
+            get_element_conn = lambda i: [
+                i%nx + (i//nx)*(nx+1),
+                i%nx + (i//nx)*(nx+1) + 1,
+                i%nx + (i//nx+1)*(nx+1) + 1,
+                i%nx + (i//nx+1)*(nx+1)
+            ]
+
+        else: # cyclic x
+
+            qlon_flat = self._grid.qlon.data[:,:-1].flatten()
+            qlat_flat = self._grid.qlat.data[:,:-1].flatten()
+            nnodes = len(qlon_flat)
+            nx = self._grid.nx
+            ny = self._grid.ny
+            assert nnodes == nx * (ny+1)
+
+            ds['nodeCoords'] = xr.DataArray(
+                [ [qlon_flat[i], qlat_flat[i]] for i in range(nnodes)],
+                dims = ['nodeCount', 'coordDim'],
+                attrs = {'units': coord_units}
+            )
+
+            # Below returns element connectivity of i-th element (assuming 0 based node and element indexing)
+            get_element_conn = lambda i: [
+                i%nx + (i//nx)*(nx),
+                i%nx + (i//nx)*(nx) + 1 - ( ((i+1)%nx)==0 )*nx,
+                i%nx + (i//nx+1)*(nx) + 1 - ( ((i+1)%nx)==0 )*nx,
+                i%nx + (i//nx+1)*(nx)
+            ]
 
         ds['elementConn'] = xr.DataArray(
             np.array([get_element_conn(i) for i in range(ncells)]).astype(np.int32),
