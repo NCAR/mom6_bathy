@@ -1,68 +1,34 @@
-
-
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quickstart Guide &mdash; mom6_bathy 0.1 documentation</title>
-  
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-
-  
-  
-  
-  
-
-  
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
         <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Examples" href="examples.html" />
     <link rel="prev" title="Installation" href="installation.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
-
-          
-            <a href="index.html" class="icon icon-home" alt="Documentation Home"> mom6_bathy
-          
-
-          
+            <a href="index.html" class="icon icon-home"> mom6_bathy
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
@@ -70,19 +36,8 @@
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart Guide</a><ul>
@@ -116,82 +71,43 @@
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Python API:</span></p>
+<p class="caption" role="heading"><span class="caption-text">Python API:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="modules.html">mom6_bathy</a></li>
 </ul>
 
-            
-          
         </div>
-        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">mom6_bathy</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
       <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-        
       <li>Quickstart Guide</li>
-    
-    
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/quickstart.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="quickstart-guide">
-<h1>Quickstart Guide<a class="headerlink" href="#quickstart-guide" title="Permalink to this headline">¶</a></h1>
+             
+  <section id="quickstart-guide">
+<h1>Quickstart Guide<a class="headerlink" href="#quickstart-guide" title="Permalink to this headline"></a></h1>
 <p><cite>mom6_tools</cite> library can be utilized via its Python API, i.e., directly within Python
 scripts or within Jupyter notebooks. In this quickstart guide, we describe how
 the tool can be utilized within a Jupyter Notebook, but the majority of
 these instructions apply to Python scripts as well.</p>
-<div class="section" id="step-1-import-modules">
-<h2>Step 1: Import modules<a class="headerlink" href="#step-1-import-modules" title="Permalink to this headline">¶</a></h2>
+<section id="step-1-import-modules">
+<h2>Step 1: Import modules<a class="headerlink" href="#step-1-import-modules" title="Permalink to this headline"></a></h2>
 <p>The first step is to import the <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> and <code class="docutils literal notranslate"><span class="pre">mom6bathy</span></code> classes of the
 <cite>mom6_bathy</cite> package, in addition to <code class="docutils literal notranslate"><span class="pre">numpy</span></code>. The <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> class is used
 to generate a horizontal grid, which is the first step of constructing a MOM6
@@ -203,9 +119,9 @@ classes is called <cite>mom6_bathy</cite>.</p>
 <span class="kn">from</span> <span class="nn">mom6_bathy.mom6bathy</span> <span class="kn">import</span> <span class="n">mom6bathy</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="step-2-create-the-horizontal-grid">
-<h2>Step 2: Create the horizontal grid<a class="headerlink" href="#step-2-create-the-horizontal-grid" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="step-2-create-the-horizontal-grid">
+<h2>Step 2: Create the horizontal grid<a class="headerlink" href="#step-2-create-the-horizontal-grid" title="Permalink to this headline"></a></h2>
 <p>After having imported the modules, we can now create a horizontal grid.
 An exmaple mom6grid object instantiation:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grd</span> <span class="o">=</span> <span class="n">mom6grid</span><span class="p">(</span>
@@ -261,8 +177,8 @@ displace_pole : bool, optional
 </div>
 <p>Notice above that <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> class may be used to create ‘cartesian’, ‘mercator’,
 or, ‘spherical’ grids, as well as tripolar or displaced pole grids.</p>
-<div class="section" id="avoiding-singularity-points">
-<h3><em>Avoiding singularity points</em><a class="headerlink" href="#avoiding-singularity-points" title="Permalink to this headline">¶</a></h3>
+<section id="avoiding-singularity-points">
+<h3><em>Avoiding singularity points</em><a class="headerlink" href="#avoiding-singularity-points" title="Permalink to this headline"></a></h3>
 <dl class="simple">
 <dt>To avoid singularity points within the ocean grid:</dt><dd><ul class="simple">
 <li><p>The grid poles (which may be different than the true poles) must be left out of the grid,
@@ -278,9 +194,9 @@ left out the geographic extent of the grid.</p></li>
 </dl>
 <p>In either case, a land component (active, data, or stub) must be present for the purpose of
 hiding the singularity points of spherical ocean grids within the CESM framework.</p>
-</div>
-<div class="section" id="grid-metrics-and-attributes">
-<h3><em>Grid Metrics and Attributes</em><a class="headerlink" href="#grid-metrics-and-attributes" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="grid-metrics-and-attributes">
+<h3><em>Grid Metrics and Attributes</em><a class="headerlink" href="#grid-metrics-and-attributes" title="Permalink to this headline"></a></h3>
 <p>When a <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> grid instance gets created, several grid metrics and attributes
 (on all staggerings) are automatically computed and populated. These metrics and attributes
 are accessible via the accessor operator (<code class="docutils literal notranslate"><span class="pre">.</span></code>). For example, to access “the array
@@ -307,9 +223,9 @@ of t-grid longitutes” of <code class="docutils literal notranslate"><span clas
 <li><p><code class="docutils literal notranslate"><span class="pre">angle</span></code>: angle T-grid makes with latitude line</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">tarea</span></code>: T-cell area</p></li>
 </ul>
-</div>
-<div class="section" id="supergrid">
-<h3><em>Supergrid</em><a class="headerlink" href="#supergrid" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="supergrid">
+<h3><em>Supergrid</em><a class="headerlink" href="#supergrid" title="Permalink to this headline"></a></h3>
 <p>In addition to above grid metrics and attributes, the <code class="docutils literal notranslate"><span class="pre">mom6grid</span></code> class incorporates an
 underlying <a class="reference internal" href="glossary.html#term-supergrid"><span class="xref std std-term">supergrid</span></a> instance associated the grid instance, which is again
 accessible via the (<code class="docutils literal notranslate"><span class="pre">.</span></code>) operator:</p>
@@ -331,10 +247,10 @@ method of a <code class="docutils literal notranslate"><span class="pre">mom6gri
 above.</p>
 <p>Note: the supergrid implementation in <cite>mom6_bathy</cite> relies on <a class="reference external" href="https://github.com/mjharriso/MIDAS">MIDAS</a>,
 a python library developed by M. Harrison (GFDL).</p>
-</div>
-</div>
-<div class="section" id="step-3-create-bathymetry">
-<h2>Step 3: Create Bathymetry<a class="headerlink" href="#step-3-create-bathymetry" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+<section id="step-3-create-bathymetry">
+<h2>Step 3: Create Bathymetry<a class="headerlink" href="#step-3-create-bathymetry" title="Permalink to this headline"></a></h2>
 <p>After having generated the horizontal grid, we can now create an associated bathymetry
 using the <code class="docutils literal notranslate"><span class="pre">mom6bathy</span></code> class of the <cite>mom6_bathy</cite> tool. We instantiate a bathymetry
 object as follows:</p>
@@ -349,8 +265,8 @@ assignment operator. For example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bathy</span><span class="o">.</span><span class="n">min_depth</span> <span class="o">=</span> <span class="mf">5.0</span>
 </pre></div>
 </div>
-<div class="section" id="predefined-bathymetry-configurations">
-<h3><em>Predefined Bathymetry Configurations</em><a class="headerlink" href="#predefined-bathymetry-configurations" title="Permalink to this headline">¶</a></h3>
+<section id="predefined-bathymetry-configurations">
+<h3><em>Predefined Bathymetry Configurations</em><a class="headerlink" href="#predefined-bathymetry-configurations" title="Permalink to this headline"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">mom6bathy</span></code> class provides three predefined bathymetry configurations, which are also
 available in MOM6 as idealized configurations. (See <cite>TOPO_CONFIG</cite> parameter in MOM_input)</p>
 <blockquote>
@@ -374,9 +290,9 @@ available in MOM6 as idealized configurations. (See <cite>TOPO_CONFIG</cite> par
 <p>The first and the second arguments of <code class="docutils literal notranslate"><span class="pre">set_bowl</span></code> and <code class="docutils literal notranslate"><span class="pre">set_spoon</span></code> methods are maximum depth
 and minimum depth, respectively.</p>
 <p>Check out the following notebook to see examples of above predefined bathymetry options: <a class="reference external" href="https://github.com/NCAR/mom6_bathy/blob/master/notebooks/1_cartesian_ideal_bathy.ipynb">1_cartesian_ideal_bathy.ipynb</a></p>
-</div>
-<div class="section" id="custom-bathymetry">
-<h3><em>Custom Bathymetry</em><a class="headerlink" href="#custom-bathymetry" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="custom-bathymetry">
+<h3><em>Custom Bathymetry</em><a class="headerlink" href="#custom-bathymetry" title="Permalink to this headline"></a></h3>
 <p>In addition to the above predefined configurations, users may provide their own depth arrays. For
 example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># define a custom depth</span>
@@ -388,9 +304,9 @@ example:</p>
 <span class="n">bathy</span><span class="o">.</span><span class="n">set_depth_arr</span><span class="p">(</span><span class="n">custom_depth</span><span class="p">)</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="adding-ridges">
-<h3><em>Adding ridges</em><a class="headerlink" href="#adding-ridges" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="adding-ridges">
+<h3><em>Adding ridges</em><a class="headerlink" href="#adding-ridges" title="Permalink to this headline"></a></h3>
 <p>Simpler model bathymetry configurations typically include ridges to represent straits and
 continents in an idealized manner. The <code class="docutils literal notranslate"><span class="pre">mom6bathy</span></code> class provides <code class="docutils literal notranslate"><span class="pre">apply_ridge</span></code> method
 to add ridges to the bathymetry. Example usage:</p>
@@ -398,30 +314,30 @@ to add ridges to the bathymetry. Example usage:</p>
 </pre></div>
 </div>
 <p>Example notebook: <a class="reference external" href="https://github.com/NCAR/mom6_bathy/blob/master/notebooks/3_spherical_custom_bathy.ipynb">3_spherical_custom_bathy.ipynb</a></p>
-</div>
-</div>
-<div class="section" id="step-4-write-netcdf-grid-files">
-<h2>Step 4: Write NetCDF Grid Files<a class="headerlink" href="#step-4-write-netcdf-grid-files" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+<section id="step-4-write-netcdf-grid-files">
+<h2>Step 4: Write NetCDF Grid Files<a class="headerlink" href="#step-4-write-netcdf-grid-files" title="Permalink to this headline"></a></h2>
 <p>The final step of <cite>mom6_bathy</cite> workflow is to write out the netcdf files containing grid
 and bathymetry data. These files are to be read in by MOM6 during runtime.</p>
-<div class="section" id="supergrid-file">
-<h3><em>Supergrid File</em><a class="headerlink" href="#supergrid-file" title="Permalink to this headline">¶</a></h3>
+<section id="supergrid-file">
+<h3><em>Supergrid File</em><a class="headerlink" href="#supergrid-file" title="Permalink to this headline"></a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">GRID_FILE</span></code> parameter in <code class="docutils literal notranslate"><span class="pre">MOM_input</span></code> file is to be set to the supergrid file path,
 which is specified as <code class="docutils literal notranslate"><span class="pre">./ocean_hgrid.nc</span></code> in the below example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grd</span><span class="o">.</span><span class="n">to_netcdf</span><span class="p">(</span><span class="n">supergrid_path</span> <span class="o">=</span> <span class="s2">&quot;./ocean_hgrid.nc&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="topography-bathymetry-file">
-<h3><em>Topography (Bathymetry) File</em><a class="headerlink" href="#topography-bathymetry-file" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="topography-bathymetry-file">
+<h3><em>Topography (Bathymetry) File</em><a class="headerlink" href="#topography-bathymetry-file" title="Permalink to this headline"></a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">TOPO_FILE</span></code> parameter in <code class="docutils literal notranslate"><span class="pre">MOM_input</span></code> file is to be set to the topography file path,
 which is specified as <code class="docutils literal notranslate"><span class="pre">./ocean_topog.nc</span></code> in the below example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bathy</span><span class="o">.</span><span class="n">to_topog</span><span class="p">(</span><span class="n">supergrid_path</span> <span class="o">=</span> <span class="s2">&quot;./ocean_topog.nc&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="scrip-file-and-esmf-mesh-file">
-<h3><em>SCRIP File and ESMF Mesh file</em><a class="headerlink" href="#scrip-file-and-esmf-mesh-file" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="scrip-file-and-esmf-mesh-file">
+<h3><em>SCRIP File and ESMF Mesh file</em><a class="headerlink" href="#scrip-file-and-esmf-mesh-file" title="Permalink to this headline"></a></h3>
 <p>In addition to the supergrid file and the topography file, which are both MOM6 input files,
 the CESM simpler models users are required to generate a SCRIP file and an additional
 ESMF mesh file to be able work with the NUOPC driver.</p>
@@ -439,23 +355,23 @@ from the ESMF toolkit.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ESMF_Scrip2Unstruct sg0v1_SCRIP.nc sg0v1_ESMFmesh.nc <span class="m">0</span>
 </pre></div>
 </div>
-</div>
-</div>
-<div class="section" id="further-steps">
-<h2>Further steps<a class="headerlink" href="#further-steps" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+<section id="further-steps">
+<h2>Further steps<a class="headerlink" href="#further-steps" title="Permalink to this headline"></a></h2>
 <p>The remaining steps of configuring the model, which are listed below, are beyond
 the scope of the <cite>mom6_bathy</cite> tool, but we give a brief overview here as a reference.</p>
-<div class="section" id="initial-conditions">
-<h3><em>Initial Conditions</em><a class="headerlink" href="#initial-conditions" title="Permalink to this headline">¶</a></h3>
+<section id="initial-conditions">
+<h3><em>Initial Conditions</em><a class="headerlink" href="#initial-conditions" title="Permalink to this headline"></a></h3>
 <p>Users need to generate initial conditions for a newly generated grid and bathymetry.
 Depending on the configuration, creating initial conditions may involve mapping and
 regridding of already available initial conditions, or, for simpler configurations, users
 may choose to use out-of-the-box MOM6 idealized temperature-salinity profiles as
 initial conditions. This may be accomplished by setting the <code class="docutils literal notranslate"><span class="pre">TS_COMFIG</span></code> parameter
 in <code class="docutils literal notranslate"><span class="pre">MOM_input</span></code> file to <code class="docutils literal notranslate"><span class="pre">fit</span></code>, <code class="docutils literal notranslate"><span class="pre">linear</span></code>, <code class="docutils literal notranslate"><span class="pre">USER</span></code>, etc.</p>
-</div>
-<div class="section" id="configuring-mom6">
-<h3><em>Configuring MOM6</em><a class="headerlink" href="#configuring-mom6" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="configuring-mom6">
+<h3><em>Configuring MOM6</em><a class="headerlink" href="#configuring-mom6" title="Permalink to this headline"></a></h3>
 <p>Several <code class="docutils literal notranslate"><span class="pre">MOM_input</span></code> (or <code class="docutils literal notranslate"><span class="pre">MOM_override</span></code>) entries need to be updated for a newly
 created grid and bathymetry configuration. To print out the values of these parameters,
 one can run the <code class="docutils literal notranslate"><span class="pre">print_MOM6_runtime_params()</span></code> method of <code class="docutils literal notranslate"><span class="pre">mom6bathy</span></code>. The list
@@ -474,68 +390,43 @@ of these parameters:</p>
 <li><p>REENTRANT_X</p></li>
 </ul>
 </div></blockquote>
-</div>
-<div class="section" id="configuring-cesm">
-<h3><em>Configuring CESM</em><a class="headerlink" href="#configuring-cesm" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="configuring-cesm">
+<h3><em>Configuring CESM</em><a class="headerlink" href="#configuring-cesm" title="Permalink to this headline"></a></h3>
 <p>[TODO]</p>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        
-        &copy; Copyright 2020, NCAR
-
-    </p>
+    <p>&#169; Copyright 2020, NCAR.</p>
   </div>
-    
-    
-    
-    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>
