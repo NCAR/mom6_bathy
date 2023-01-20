@@ -1,4 +1,4 @@
-import os, sys
+import os
 import numpy as np
 import xarray as xr
 from datetime import datetime
@@ -48,8 +48,8 @@ class mom6grid(object):
     """
 
     def __init__(self, nx, ny, config, axis_units, lenx, leny,
-                 srefine=2, xstart=0.0, ystart=0.0, cyclic_x=True, cyclic_y=False,
-                 tripolar_n=False, displace_pole=False):
+                 srefine=2, xstart=0.0, ystart=0.0, cyclic_x=False, cyclic_y=False,
+                 tripolar_n=False, displace_pole=False, _supergrid=None):
         '''
         mom6grid instance constructor.
 
@@ -74,46 +74,94 @@ class mom6grid(object):
         ystart : float, optional
             starting y coordinate. 0.0 by default.
         cyclic_x : bool, optional
-            flag to make the grid cyclic in x direction. True by default.
+            flag to make the grid cyclic in x direction. False by default.
         cyclic_y : bool, optional
             flag to make the grid cyclic in y direction. False by default.
         tripolar_n : bool, optional
             flag to make the grid tripolar. False by default.
         displace_pole : bool, optional
             flag to make the grid displaced polar. False by default.
+        _supergrid : MIDAS supergrid object
+            This argument should not be directly specified by the users.
+            To instantiate a grid object from an existing supergrid, the
+            users should instead call the mom6grid.from_supergrid() method.
         '''
 
         # define valid values for certain constructor arguments
         config_valid_vals = ['cartesian', 'mercator', 'spherical']
         axis_units_valid_vals = ['degrees', 'm', 'km']
 
-        # consistency checks for constructor arguments
-        assert nx>0, "nx must be a positive integer"
-        assert ny>0, "ny must be a positive integer"
-        assert config in config_valid_vals, \
-            "config value is invalid. pick one: "+" ".join(config_valid_vals)
-        assert axis_units in axis_units_valid_vals, \
-            "axis_units value is invalid. pick one: "+" ".join(axis_units_valid_vals)
-        assert cyclic_y==False, "cyclic_y grids are not supported in MOM6 yet."
+        self.tripolar_n = tripolar_n # todo: remove this data member and use self._grid.supergrid.dict['tripolar_n'])
+                                     # when midas tripolar gets fixed
 
-        assert tripolar_n==False, "tripolar not supported yet"
-        assert displace_pole==False, "displaced pole not supported yet"
+        if _supergrid is None:
+
+            # consistency checks for constructor arguments
+            assert nx>0, "nx must be a positive integer"
+            assert ny>0, "ny must be a positive integer"
+            assert config in config_valid_vals, \
+                "config value is invalid. pick one: "+" ".join(config_valid_vals)
+            assert axis_units in axis_units_valid_vals, \
+                "axis_units value is invalid. pick one: "+" ".join(axis_units_valid_vals)
+            assert cyclic_y==False, "cyclic_y grids are not supported in MOM6 yet."
+
+            assert tripolar_n==False, "tripolar not supported yet"
+            assert displace_pole==False, "displaced pole not supported yet"
+
+            self.supergrid = MidasSupergrid(
+                nxtot = nx*srefine,
+                nytot = ny*srefine,
+                config = config,
+                axis_units = axis_units,
+                ystart = ystart,
+                leny = leny,
+                xstart = xstart,
+                lenx = lenx,
+                cyclic_x = cyclic_x,
+                cyclic_y = cyclic_y,
+                tripolar_n = tripolar_n,
+                displace_pole = displace_pole
+            )
+        
+        else: # supergrid_path is not None
+            assert isinstance(_supergrid,MidasSupergrid), "Supergrid must be of type MIDAS supergrid object"
+            self.supergrid = _supergrid
 
 
-        self.supergrid = MidasSupergrid(
-            nxtot = nx*srefine,
-            nytot = ny*srefine,
-            config = config,
-            axis_units = axis_units,
-            ystart = ystart,
-            leny = leny,
-            xstart = xstart,
-            lenx = lenx,
-            cyclic_x = cyclic_x,
-            cyclic_y = cyclic_y,
-            tripolar_n = tripolar_n,
-            displace_pole = displace_pole
+    
+    @classmethod
+    def from_supergrid(cls, supergrid_path, cyclic_x, cyclic_y, tripolar_n):
+
+        # read supergrid dataset
+        ds = xr.open_dataset(supergrid_path)
+
+        assert 'x' in ds and 'y' in ds, f"Cannot find 'x' and/or 'y' in supergrid file: {supergrid_path}."
+        assert 'units' in ds.x.attrs, f"'units attribute for x coordinate is missing in {supergrid_path}."
+        assert 'units' in ds.y.attrs, f"'units attribute for y coordinate is missing in {supergrid_path}."
+        assert ds.x.units == ds.y.units, "Different units in x and y coordinates not supported"
+
+        supergrid = MidasSupergrid(
+            xdat = ds.x.data,
+            ydat = ds.y.data,
+            axis_units = ds.x.units,
+            cyclic_x=cyclic_x,
+            cyclic_y=cyclic_y,
+            #tripolar_n=tripolar_n # todo, uncomment this when midas tripolar feature is fixed
         )
+
+        obj = cls(
+            nx=None,
+            ny=None,
+            config=None,
+            axis_units=None,
+            lenx=None, 
+            leny=None,
+            _supergrid=supergrid)
+        
+        obj.tripolar_n = tripolar_n # todo, remove this when midas tripolar feature is fixed
+        
+        return obj
+
 
     @property
     def supergrid(self):
