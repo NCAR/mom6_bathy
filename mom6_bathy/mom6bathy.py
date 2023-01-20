@@ -76,22 +76,43 @@ class mom6bathy(object):
             np.full((self._grid.ny, self._grid.nx), D),
             dims = ['ny','nx'],
         )
-
-    def set_depth_arr(self, depth_arr):
+    
+    def set_depth(self, depth):
         """
         Apply a custom bathymetry via a user-defined depth array.
 
         Parameters
         ----------
-        depth_arr: np.array
+        depth: np.array
             2-D Array of ocean depth.
         """
 
-        assert depth_arr.shape == (self._grid.ny, self._grid.nx), "Incompatible depth array shape"
+        assert depth.shape == (self._grid.ny, self._grid.nx), "Incompatible depth array shape"
         self._depth = xr.DataArray(
-            depth_arr,
+            depth,
             dims = ['ny','nx'],
         )
+
+    def set_depth_via_topog_file(self, topog_file_path):
+        """
+        Apply a bathymetry read from an existing topog file
+
+        Parameters
+        ----------
+        topog_file_path: str
+            absolute path to an existing MOM6 topog file
+        """
+
+        assert os.path.exists(topog_file_path), f"Cannot find topog file at {topog_file_path}."
+
+        ds = xr.open_dataset(topog_file_path)
+
+        # sanity checks
+        assert 'depth' in ds, f"Cannot find the 'depth' field in topog file {topog_file_path}"
+        assert ds.depth.shape == (self._grid.ny, self._grid.nx), \
+            f"Incompatible depth array shape in topog file {topog_file_path}"
+        
+        self.set_depth(ds.depth)
 
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
@@ -257,7 +278,7 @@ class mom6bathy(object):
     def print_MOM6_runtime_params(self):
 
         print("{} = {}".format("INPUTDIR", '"./INPUT/"'))
-        print("{} = {}".format("TRIPOLAR_N", self._grid.supergrid.dict['tripolar_n']))
+        print("{} = {}".format("TRIPOLAR_N", self._grid.tripolar_n))
         print("{} = {}".format("NIGLOBAL", self._grid.nx))
         print("{} = {}".format("NJGLOBAL", self._grid.ny))
         print("{} = {}".format("GRID_CONFIG", '"mosaic"'))
@@ -392,6 +413,36 @@ class mom6bathy(object):
 
         ds.to_netcdf(SCRIP_path)
 
+    #def to_CICE_grid(self, CICE_grid_path):
+
+    #    assert 'degrees' in self._grid.tlat.units and 'degrees' in self._grid.tlon.units, "Unsupported coord units for CICE grid generator"
+
+    #    ds = xr.Dataset()
+
+    #    # global attrs:
+    #    ds.attrs['Conventions'] = "CF-1.0"
+    #    if title:
+    #        ds.attrs['title'] = title
+    #    
+    #    ds['yc'] = xr.DataArray(
+    #        self._grid.tlat,
+    #        dims = ['nj', 'ni'],
+    #        attrs = {
+    #            'long_name' : 'latitude of grid cell center',
+    #            'units' : 'degrees_east' 
+    #            'bounds' : 'yv' 
+    #        }
+    #    )
+
+    #    ds['xc'] = xr.DataArray(
+    #        self._grid.tlon,
+    #        dims = ['nj', 'ni'],
+    #        attrs = {
+    #            'long_name' : 'longitude of grid cell center',
+    #            'units' : 'degrees_east' 
+    #            'bounds' : 'yv' 
+    #        }
+    #    )
 
     def to_ESMF_mesh(self, mesh_path, title=None):
         '''
