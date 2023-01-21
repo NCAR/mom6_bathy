@@ -32,13 +32,13 @@ class DepthModifier(widgets.AppLayout):
         self.ax.set_yticks(np.arange(-.5, self.ny, 1), minor=True)
 
         # Gridlines based on minor ticks
-        self.ax.grid(which='minor', color='w', linestyle='-', linewidth=1, alpha=0.3)
+        self.ax.grid(which='minor', color='w', linestyle='-', linewidth=1, alpha=0.1)
 
         # Remove minor ticks
         self.ax.tick_params(which='minor', bottom=False, left=False)
 
         # plot
-        self.im = self.ax.imshow(self.depth_data)
+        self.im = self.ax.imshow(self.depth_data, origin='lower')
 
         # colorbar
         self.cbar = plt.colorbar(self.im)
@@ -183,10 +183,10 @@ class DepthModifier(widgets.AppLayout):
             mode = self.tbtn_display.value
 
         if mode == "Depth":
-            self.ax.imshow(self.depth_data)
+            self.ax.imshow(self.depth_data, origin='lower')
             self.im.set_clim((self.depth_min,self.depth_max))
             self.cbar.update_normal(self.im)
         else:
-            self.ax.imshow(self.tmask_data)
+            self.ax.imshow(self.tmask_data, origin='lower')
             self.im.set_clim((0.0,1.0))
             self.cbar.update_normal(self.im)

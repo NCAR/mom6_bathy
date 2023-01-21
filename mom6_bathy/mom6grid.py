@@ -128,6 +128,21 @@ class mom6grid(object):
             self.supergrid = _supergrid
 
 
+    @staticmethod
+    def check_supergrid(supergrid_ds):
+        '''
+        Check a given supergrid dataset
+
+        Parameters
+        ----------
+        supergrid_ds : xarray.Dataset
+            MOM6 Supergrid dataset
+        '''
+        assert 'x' in supergrid_ds and 'y' in supergrid_ds, "Cannot find 'x' and/or 'y' in supergrid dataset."
+        assert 'units' in supergrid_ds.x.attrs, "units attribute for x coordinate is missing in supergrid dataset."
+        assert 'units' in supergrid_ds.y.attrs, "units attribute for y coordinate is missing in supergrid dataset."
+        assert supergrid_ds.x.units == supergrid_ds.y.units, "Different units in x and y coordinates not supported"
+
     
     @classmethod
     def from_supergrid(cls, supergrid_path, cyclic_x, cyclic_y, tripolar_n):
@@ -135,10 +150,8 @@ class mom6grid(object):
         # read supergrid dataset
         ds = xr.open_dataset(supergrid_path)
 
-        assert 'x' in ds and 'y' in ds, f"Cannot find 'x' and/or 'y' in supergrid file: {supergrid_path}."
-        assert 'units' in ds.x.attrs, f"'units attribute for x coordinate is missing in {supergrid_path}."
-        assert 'units' in ds.y.attrs, f"'units attribute for y coordinate is missing in {supergrid_path}."
-        assert ds.x.units == ds.y.units, "Different units in x and y coordinates not supported"
+        # check supergrid
+        mom6grid.check_supergrid(ds)
 
         supergrid = MidasSupergrid(
             xdat = ds.x.data,
