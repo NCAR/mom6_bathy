@@ -274,6 +274,33 @@ class mom6bathy(object):
         regridder = xe.Regridder(ds, ds_mapped, method, periodic=self._grid.supergrid.dict['cyclic_x'])
         mask_mapped = regridder(ds.landfrac)
         self._depth.data =  np.where(mask_mapped>cutoff_frac, depth_fillval, self._depth)
+    
+    def record_runtime_params(self):
+        self._grid.append_to_mbs(key='runtime_params', val={
+                'INPUTDIR': './INPUT',
+                'TRIPOLAR_N': self._grid.tripolar_n,
+                'NIGLOBAL': self._grid.nx,
+                'NJGLOBAL': self._grid.ny,
+                'GRID_CONFIG': 'mosaic',
+                'TOPO_CONFIG': '"file"',
+                'MAXIMUM_DEPTH': str(self.max_depth),
+                'MINIMUM_DEPTH': str(self.min_depth),
+                'REENTRANT_X': self._grid.supergrid.dict['cyclic_x'],
+                'REENTRANT_Y': self._grid.supergrid.dict['cyclic_y'],
+                '\n# = =': "Modify timestep below. = = =",
+                'DT': 1800.0,
+                '\n# = =': "Modify vertical grid below. = = =",
+                'NK': 20,
+                'COORD_CONFIG': '"none"',
+                'REGRIDDING_COORDINATE_MODE': '"Z*"',
+                'ALE_COORDINATE_CONFIG': '"UNIFORM"',
+                '\n# = =': "Modify initial conditions below. = = =",
+                'TS_CONFIG': '"fit"',
+                'T_REF': 5.0,
+                'FIT_SALINITY': True,
+            }
+        )
+
 
     def print_MOM6_runtime_params(self):
 
@@ -342,6 +369,7 @@ class mom6bathy(object):
         )
 
         ds.to_netcdf(file_path)
+        self._grid.append_to_mbs(key='topog_path', val=os.path.join(os.getcwd(), file_path))
 
 
     def to_SCRIP(self, SCRIP_path, title=None):
@@ -549,4 +577,6 @@ class mom6bathy(object):
         )
 
         ds.to_netcdf(mesh_path)
+        self._grid.append_to_mbs(key='mesh_path', val=os.path.join(os.getcwd(),mesh_path))
+        self.record_runtime_params()
 

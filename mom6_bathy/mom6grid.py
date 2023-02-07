@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import xarray as xr
 from datetime import datetime
@@ -49,7 +50,7 @@ class mom6grid(object):
 
     def __init__(self, nx, ny, config, axis_units, lenx, leny,
                  srefine=2, xstart=0.0, ystart=0.0, cyclic_x=False, cyclic_y=False,
-                 tripolar_n=False, displace_pole=False, _supergrid=None):
+                 tripolar_n=False, displace_pole=False, _supergrid=None, session_id=None):
         '''
         mom6grid instance constructor.
 
@@ -85,6 +86,8 @@ class mom6grid(object):
             This argument should not be directly specified by the users.
             To instantiate a grid object from an existing supergrid, the
             users should instead call the mom6grid.from_supergrid() method.
+        session_id: str, optional
+            visualCaseGen session identifier.
         '''
 
         # define valid values for certain constructor arguments
@@ -122,10 +125,12 @@ class mom6grid(object):
                 tripolar_n = tripolar_n,
                 displace_pole = displace_pole
             )
-        
+
         else: # supergrid_path is not None
             assert isinstance(_supergrid,MidasSupergrid), "Supergrid must be of type MIDAS supergrid object"
             self.supergrid = _supergrid
+
+        self.session_id = session_id
 
 
     @staticmethod
@@ -511,6 +516,35 @@ class mom6grid(object):
 
         self.supergrid = new_supergrid
 
+    def append_to_mbs(self, key, val):
+
+        if self.session_id is None:
+            return
+
+        # mom6_bathy stat file
+        fname_prefix = 'mbs_'
+        fname_suffix = 'json'
+        internal_dir =  os.path.join(
+            os.path.dirname(__file__),
+            '../../..',
+            'internal'
+        )
+
+        mbs_path = os.path.join(internal_dir, f'{fname_prefix}{self.session_id}.{fname_suffix}')
+
+        if not os.path.exists(mbs_path):
+            print("Warning: Cannot find mom6_bathy stat file. visualCaseGen sync not possible!")
+            return
+
+        with open(mbs_path, 'r') as mbs_file:
+            mbs = json.load(mbs_file)
+        
+        mbs[key] = val
+
+        with open(mbs_path, 'w') as mbs_file:
+            json.dump(mbs, mbs_file)
+
+
     def to_netcdf(self, mom6grid_path=None, supergrid_path=None, author=None):
 
         '''
@@ -571,3 +605,4 @@ class mom6grid(object):
                 attrs = {'units': 'meters'}
             )
             ds.to_netcdf(supergrid_path)
+            self.append_to_mbs(key='supergrid_path', val=os.path.join(os.getcwd(),supergrid_path))
