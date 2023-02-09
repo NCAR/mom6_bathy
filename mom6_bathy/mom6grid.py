@@ -544,6 +544,8 @@ class mom6grid(object):
         with open(mbs_path, 'w') as mbs_file:
             json.dump(mbs, mbs_file)
 
+        if all(key in mbs for key in ['supergrid_path', 'mesh_path', 'topog_path', 'runtime_params']):
+            print("SUCCESS! All necessary MOM6 input files are generated. You may now return to visualCaseGen to finalize the case.")
 
     def to_netcdf(self, mom6grid_path=None, supergrid_path=None, author=None):
 
