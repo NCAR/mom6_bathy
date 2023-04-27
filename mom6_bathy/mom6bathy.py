@@ -76,7 +76,7 @@ class mom6bathy(object):
             np.full((self._grid.ny, self._grid.nx), D),
             dims = ['ny','nx'],
         )
-    
+
     def set_depth(self, depth):
         """
         Apply a custom bathymetry via a user-defined depth array.
@@ -111,7 +111,7 @@ class mom6bathy(object):
         assert 'depth' in ds, f"Cannot find the 'depth' field in topog file {topog_file_path}"
         assert ds.depth.shape == (self._grid.ny, self._grid.nx), \
             f"Incompatible depth array shape in topog file {topog_file_path}"
-        
+
         self.set_depth(ds.depth)
 
 
@@ -274,9 +274,11 @@ class mom6bathy(object):
         regridder = xe.Regridder(ds, ds_mapped, method, periodic=self._grid.supergrid.dict['cyclic_x'])
         mask_mapped = regridder(ds.landfrac)
         self._depth.data =  np.where(mask_mapped>cutoff_frac, depth_fillval, self._depth)
-    
+
     def record_runtime_params(self):
-        self._grid.append_to_mbs(key='runtime_params', val={
+
+        self._grid.append_to_sdb({
+            'runtime_params' :{
                 'INPUTDIR': './INPUT',
                 'TRIPOLAR_N': self._grid.tripolar_n,
                 'NIGLOBAL': self._grid.nx,
@@ -299,7 +301,8 @@ class mom6bathy(object):
                 'T_REF': 5.0,
                 'FIT_SALINITY': True,
             }
-        )
+        })
+
 
 
     def print_MOM6_runtime_params(self):
@@ -369,7 +372,7 @@ class mom6bathy(object):
         )
 
         ds.to_netcdf(file_path)
-        self._grid.append_to_mbs(key='topog_path', val=os.path.join(os.getcwd(), file_path))
+        self._grid.append_to_sdb({'topog_path' : os.path.join(os.getcwd(), file_path)})
 
 
     def to_SCRIP(self, SCRIP_path, title=None):
@@ -451,14 +454,14 @@ class mom6bathy(object):
     #    ds.attrs['Conventions'] = "CF-1.0"
     #    if title:
     #        ds.attrs['title'] = title
-    #    
+    #
     #    ds['yc'] = xr.DataArray(
     #        self._grid.tlat,
     #        dims = ['nj', 'ni'],
     #        attrs = {
     #            'long_name' : 'latitude of grid cell center',
-    #            'units' : 'degrees_east' 
-    #            'bounds' : 'yv' 
+    #            'units' : 'degrees_east'
+    #            'bounds' : 'yv'
     #        }
     #    )
 
@@ -467,7 +470,7 @@ class mom6bathy(object):
     #        dims = ['nj', 'ni'],
     #        attrs = {
     #            'long_name' : 'longitude of grid cell center',
-    #            'units' : 'degrees_east' 
+    #            'units' : 'degrees_east'
     #            'bounds' : 'yv' 
     #        }
     #    )
@@ -577,6 +580,6 @@ class mom6bathy(object):
         )
 
         ds.to_netcdf(mesh_path)
-        self._grid.append_to_mbs(key='mesh_path', val=os.path.join(os.getcwd(),mesh_path))
+        self._grid.append_to_sdb({'mesh_path' : os.path.join(os.getcwd(), mesh_path)})
         self.record_runtime_params()
 

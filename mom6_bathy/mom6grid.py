@@ -1,5 +1,4 @@
 import os
-import json
 import numpy as np
 import xarray as xr
 from datetime import datetime
@@ -130,8 +129,12 @@ class mom6grid(object):
             assert isinstance(_supergrid,MidasSupergrid), "Supergrid must be of type MIDAS supergrid object"
             self.supergrid = _supergrid
 
-        self.session_id = session_id
-
+        self.sdb = None
+        try:
+            from visualCaseGen.sdb import SDB
+            self.sdb = SDB(session_id)
+        except ModuleNotFoundError:
+            print("ERROR: Cannot import the SDB class from visualCaseGen. Tool syncronization will not work!")
 
     @staticmethod
     def check_supergrid(supergrid_ds):
@@ -148,7 +151,7 @@ class mom6grid(object):
         assert 'units' in supergrid_ds.y.attrs, "units attribute for y coordinate is missing in supergrid dataset."
         assert supergrid_ds.x.units == supergrid_ds.y.units, "Different units in x and y coordinates not supported"
 
-    
+
     @classmethod
     def from_supergrid(cls, supergrid_path, cyclic_x, cyclic_y, tripolar_n):
 
@@ -172,12 +175,12 @@ class mom6grid(object):
             ny=None,
             config=None,
             axis_units=None,
-            lenx=None, 
+            lenx=None,
             leny=None,
             _supergrid=supergrid)
-        
+
         obj.tripolar_n = tripolar_n # todo, remove this when midas tripolar feature is fixed
-        
+
         return obj
 
 
@@ -516,37 +519,6 @@ class mom6grid(object):
 
         self.supergrid = new_supergrid
 
-    def append_to_mbs(self, key, val):
-
-        if self.session_id is None:
-            return
-
-        # mom6_bathy stat file
-        fname_prefix = 'mbs_'
-        fname_suffix = 'json'
-        internal_dir =  os.path.join(
-            os.path.dirname(__file__),
-            '../../..',
-            'internal'
-        )
-
-        mbs_path = os.path.join(internal_dir, f'{fname_prefix}{self.session_id}.{fname_suffix}')
-
-        if not os.path.exists(mbs_path):
-            print("Warning: Cannot find mom6_bathy stat file. visualCaseGen sync not possible!")
-            return
-
-        with open(mbs_path, 'r') as mbs_file:
-            mbs = json.load(mbs_file)
-        
-        mbs[key] = val
-
-        with open(mbs_path, 'w') as mbs_file:
-            json.dump(mbs, mbs_file)
-
-        if all(key in mbs for key in ['supergrid_path', 'mesh_path', 'topog_path', 'runtime_params']):
-            print("SUCCESS! All necessary MOM6 input files are generated. You may now return to visualCaseGen to finalize the case.")
-
     def to_netcdf(self, mom6grid_path=None, supergrid_path=None, author=None):
 
         '''
@@ -607,4 +579,13 @@ class mom6grid(object):
                 attrs = {'units': 'meters'}
             )
             ds.to_netcdf(supergrid_path)
-            self.append_to_mbs(key='supergrid_path', val=os.path.join(os.getcwd(),supergrid_path))
+            self.append_to_sdb({'supergrid_path' : os.path.join(os.getcwd(),supergrid_path)})
+
+
+    def append_to_sdb(self, new_d):
+        if self.sdb is None:
+            return
+        self.sdb.append(new_d)
+
+        if all(key in self.sdb.get_data() for key in ['supergrid_path', 'mesh_path', 'topog_path', 'runtime_params']):
+            print("SUCCESS! All necessary MOM6 input files are generated. You may now return to visualCaseGen to finalize the case.")
