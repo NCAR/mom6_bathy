@@ -585,7 +585,7 @@ class mom6grid(object):
     def append_to_sdb(self, new_d):
         if self.sdb is None:
             return
-        self.sdb.append(new_d)
+        self.sdb.update(new_d)
 
         if all(key in self.sdb.get_data() for key in ['supergrid_path', 'mesh_path', 'topog_path', 'runtime_params']):
             print("SUCCESS! All necessary MOM6 input files are generated. You may now return to visualCaseGen to finalize the case.")
