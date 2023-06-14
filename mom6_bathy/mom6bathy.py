@@ -525,6 +525,7 @@ class mom6bathy(object):
             dims = ['elementCount']
         )
 
+        i0 = 1 # start index for node id's
 
         if self._grid.supergrid.dict['cyclic_x'] == False:
 
@@ -543,10 +544,10 @@ class mom6bathy(object):
 
             # Below returns element connectivity of i-th element (assuming 0 based node and element indexing)
             get_element_conn = lambda i: [
-                i%nx + (i//nx)*(nx+1),
-                i%nx + (i//nx)*(nx+1) + 1,
-                i%nx + (i//nx+1)*(nx+1) + 1,
-                i%nx + (i//nx+1)*(nx+1)
+                i0 + i%nx + (i//nx)*(nx+1),
+                i0 + i%nx + (i//nx)*(nx+1) + 1,
+                i0 + i%nx + (i//nx+1)*(nx+1) + 1,
+                i0 + i%nx + (i//nx+1)*(nx+1)
             ]
 
         else: # cyclic x
@@ -566,17 +567,17 @@ class mom6bathy(object):
 
             # Below returns element connectivity of i-th element (assuming 0 based node and element indexing)
             get_element_conn = lambda i: [
-                i%nx + (i//nx)*(nx),
-                i%nx + (i//nx)*(nx) + 1 - ( ((i+1)%nx)==0 )*nx,
-                i%nx + (i//nx+1)*(nx) + 1 - ( ((i+1)%nx)==0 )*nx,
-                i%nx + (i//nx+1)*(nx)
+                i0 + i%nx + (i//nx)*(nx),
+                i0 + i%nx + (i//nx)*(nx) + 1 - ( ((i+1)%nx)==0 )*nx,
+                i0 + i%nx + (i//nx+1)*(nx) + 1 - ( ((i+1)%nx)==0 )*nx,
+                i0 + i%nx + (i//nx+1)*(nx)
             ]
 
         ds['elementConn'] = xr.DataArray(
             np.array([get_element_conn(i) for i in range(ncells)]).astype(np.int32),
             dims = ['elementCount', 'maxNodePElement'],
             attrs = {'long_name': "Node indices that define the element connectivity",
-                     'start_index': np.int32(0)}
+                     'start_index': np.int32(i0)}
         )
 
         ds.to_netcdf(mesh_path)
