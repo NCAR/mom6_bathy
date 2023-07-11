@@ -48,7 +48,7 @@ class mom6grid(object):
     """
 
     def __init__(self, nx, ny, config, axis_units, lenx, leny,
-                 srefine=2, xstart=0.0, ystart=0.0, cyclic_x=False, cyclic_y=False,
+                 srefine=2, xstart=0.0, ystart=None, cyclic_x=False, cyclic_y=False,
                  tripolar_n=False, displace_pole=False, _supergrid=None, session_id=None):
         '''
         mom6grid instance constructor.
@@ -72,7 +72,7 @@ class mom6grid(object):
         xstart : float, optional
             starting x coordinate. 0.0 by default.
         ystart : float, optional
-            starting y coordinate. 0.0 by default.
+            starting y coordinate. -0.5*leny by default.
         cyclic_x : bool, optional
             flag to make the grid cyclic in x direction. False by default.
         cyclic_y : bool, optional
@@ -95,6 +95,10 @@ class mom6grid(object):
 
         self.tripolar_n = tripolar_n # todo: remove this data member and use self._grid.supergrid.dict['tripolar_n'])
                                      # when midas tripolar gets fixed
+        
+        # default ystart value (centers the domain at the Equator)
+        if ystart is None:
+            ystart = -0.5*leny
 
         if _supergrid is None:
 
