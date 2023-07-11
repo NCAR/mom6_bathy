@@ -277,8 +277,19 @@ class mom6bathy(object):
 
     def record_runtime_params(self):
 
+        # Custom grid-specific XML changes:
         self._grid.append_to_sdb({
-            'runtime_params' :{
+            'xmlchanges' :{
+                'OCN_DOMAIN_MESH': os.path.join(os.getcwd(), self.mesh_path),
+                'OCN_NX': self._grid.nx,
+                'OCN_NY': self._grid.ny,
+                'ICE_NX': self._grid.nx, #warning: this assumes ocn and ice grids are the same.
+                'ICE_NY': self._grid.ny, #warning: this assumes ocn and ice grids are the same.
+            }
+        })
+
+        self._grid.append_to_sdb({
+            'mom6_params' :{
                 'INPUTDIR': './INPUT',
                 'TRIPOLAR_N': self._grid.tripolar_n,
                 'NIGLOBAL': self._grid.nx,
@@ -289,14 +300,11 @@ class mom6bathy(object):
                 'MINIMUM_DEPTH': str(self.min_depth),
                 'REENTRANT_X': self._grid.supergrid.dict['cyclic_x'],
                 'REENTRANT_Y': self._grid.supergrid.dict['cyclic_y'],
-                '\n# = =': "Modify timestep below. = = =",
                 'DT': 1800.0,
-                '\n# = =': "Modify vertical grid below. = = =",
                 'NK': 20,
                 'COORD_CONFIG': '"none"',
                 'REGRIDDING_COORDINATE_MODE': '"Z*"',
                 'ALE_COORDINATE_CONFIG': '"UNIFORM"',
-                '\n# = =': "Modify initial conditions below. = = =",
                 'TS_CONFIG': '"fit"',
                 'T_REF': 5.0,
                 'FIT_SALINITY': True,
@@ -580,7 +588,8 @@ class mom6bathy(object):
                      'start_index': np.int32(i0)}
         )
 
-        ds.to_netcdf(mesh_path)
-        self._grid.append_to_sdb({'mesh_path' : os.path.join(os.getcwd(), mesh_path)})
+        self.mesh_path = mesh_path
+        ds.to_netcdf(self.mesh_path)
+        self._grid.append_to_sdb({'mesh_path' : os.path.join(os.getcwd(), self.mesh_path)})
         self.record_runtime_params()
 
