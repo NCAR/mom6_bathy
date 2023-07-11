@@ -452,36 +452,91 @@ class mom6bathy(object):
 
         ds.to_netcdf(SCRIP_path)
 
-    #def to_CICE_grid(self, CICE_grid_path):
+    def to_cice_grid(self, cice_grid_path):
 
-    #    assert 'degrees' in self._grid.tlat.units and 'degrees' in self._grid.tlon.units, "Unsupported coord units for CICE grid generator"
+        assert 'degrees' in self._grid.tlat.units and 'degrees' in self._grid.tlon.units, "Unsupported coord units for CICE grid generator"
 
-    #    ds = xr.Dataset()
+        ds = xr.Dataset()
 
-    #    # global attrs:
-    #    ds.attrs['Conventions'] = "CF-1.0"
-    #    if title:
-    #        ds.attrs['title'] = title
-    #
-    #    ds['yc'] = xr.DataArray(
-    #        self._grid.tlat,
-    #        dims = ['nj', 'ni'],
-    #        attrs = {
-    #            'long_name' : 'latitude of grid cell center',
-    #            'units' : 'degrees_east'
-    #            'bounds' : 'yv'
-    #        }
-    #    )
+        # global attrs:
+        ds.attrs['title'] = 'CESM domain data'
+        ds.attrs['Conventions'] = 'CF-1.0'
+    
+        ds['yc'] = xr.DataArray(
+            self._grid.tlat,
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'latitude of grid cell center',
+                'units' : 'degrees_north',
+                'bounds' : 'yv',
+            }
+        )
 
-    #    ds['xc'] = xr.DataArray(
-    #        self._grid.tlon,
-    #        dims = ['nj', 'ni'],
-    #        attrs = {
-    #            'long_name' : 'longitude of grid cell center',
-    #            'units' : 'degrees_east'
-    #            'bounds' : 'yv' 
-    #        }
-    #    )
+        ds['xc'] = xr.DataArray(
+            self._grid.tlon,
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'longitude of grid cell center',
+                'units' : 'degrees_east',
+                'bounds' : 'xv', 
+            }
+        )
+
+        ds['yv'] = xr.DataArray(
+            np.zeros((ds.dims['nj'],ds.dims['ni'],4)),
+            dims = ['nj', 'ni', 'nv'],
+            attrs = {
+                'long_name' : 'latitude of grid cell vertices',
+                'units' : 'degrees_north',
+            }
+        )
+
+        ds['xv'] = xr.DataArray(
+            np.zeros((ds.dims['nj'],ds.dims['ni'],4)),
+            dims = ['nj', 'ni', 'nv'],
+            attrs = {
+                'long_name' : 'longitude of grid cell vertices',
+                'units' : 'degrees_east',
+            }
+        )
+
+        ds['yv'][:,:,0] = self._grid.qlat[:-1,:-1] 
+        ds['yv'][:,:,1] = self._grid.qlat[:-1, 1:] 
+        ds['yv'][:,:,2] = self._grid.qlat[1: ,1: ] 
+        ds['yv'][:,:,3] = self._grid.qlat[1: ,:-1] 
+        ds['xv'][:,:,0] = self._grid.qlon[:-1,:-1] 
+        ds['xv'][:,:,1] = self._grid.qlon[:-1,1: ] 
+        ds['xv'][:,:,2] = self._grid.qlon[1: ,1: ] 
+        ds['xv'][:,:,3] = self._grid.qlon[1: ,:-1] 
+
+        ds['mask'] = xr.DataArray(
+            self.tmask.astype(np.int32),
+            dims = ['nj', 'ni'],
+            attrs = {'long_name' : 'domain mask',
+                     'units' : 'unitless',
+                     'coordinates' : 'xc yc',
+                     'comment' : '0 value indicates cell is not active'}
+        )
+
+        ds['area'] = xr.DataArray(
+            self._grid.tarea,
+            dims = ['nj', 'ni'],
+            attrs = {'long_name' : 'area of grid cell in radians squared',
+                     'units' : 'radian2',
+                     'coordinates' : 'xc yc'}
+        )
+
+        ds['frac'] = xr.DataArray(
+            self.tmask.astype(np.float64),
+            dims = ['nj', 'ni'],
+            attrs = {'long_name' : 'fraction of grid cell that is active',
+                     'units' : 'unitless',
+                     'coordinates' : 'xc yc',
+                     'filter1' : 'error if frac> 1.0+eps or frac < 0.0-eps; eps = 0.1000000E-11',
+                     'filter2' : 'limit frac to [fminval,fmaxval]; fminval= 0.1000000E-02 fmaxval=  1.000000'}
+        )
+
+        ds.to_netcdf(cice_grid_path)
 
     def to_ESMF_mesh(self, mesh_path, title=None):
         '''
