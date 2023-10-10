@@ -275,12 +275,13 @@ class mom6bathy(object):
         mask_mapped = regridder(ds.landfrac)
         self._depth.data =  np.where(mask_mapped>cutoff_frac, depth_fillval, self._depth)
 
-    def record_runtime_params(self):
-
+    def record_xml_changes(self):
         # Custom grid-specific XML changes:
         self._grid.append_to_sdb({
             'xmlchanges' :{
                 'OCN_DOMAIN_MESH': os.path.join(os.getcwd(), self.mesh_path),
+                'ICE_DOMAIN_MESH': os.path.join(os.getcwd(), self.mesh_path), #warning: this assumes ocn and ice grids are the same. 
+                'MASK_MESH': os.path.join(os.getcwd(), self.mesh_path), #warning: this assumes ocn and ice grids are the same. 
                 'OCN_NX': self._grid.nx,
                 'OCN_NY': self._grid.ny,
                 'ICE_NX': self._grid.nx, #warning: this assumes ocn and ice grids are the same.
@@ -288,6 +289,8 @@ class mom6bathy(object):
             }
         })
 
+    def record_mom6_params(self):
+        # Custom grid-specific MOM_input params:
         self._grid.append_to_sdb({
             'mom6_params' :{
                 'INPUTDIR': './INPUT',
@@ -311,7 +314,15 @@ class mom6bathy(object):
             }
         })
 
-
+    def record_cice_params(self, grid_file_path):
+        # Custom grid-specific cice namelist params:
+        self._grid.append_to_sdb({
+            'cice_params' :{
+                'grid_format' : 'nc',
+                'grid_file' : os.path.join(os.getcwd(), grid_file_path),
+                'kmt_file' : os.path.join(os.getcwd(), grid_file_path) # todo: correct this  
+            }
+        })
 
     def print_MOM6_runtime_params(self):
 
@@ -383,6 +394,134 @@ class mom6bathy(object):
         self._grid.append_to_sdb({'topog_path' : os.path.join(os.getcwd(), file_path)})
 
 
+    def to_cice_grid(self, grid_file_path):
+
+        assert 'degrees' in self._grid.tlat.units and 'degrees' in self._grid.tlon.units, "Unsupported coord"
+
+        ds = xr.Dataset()
+
+        # global attrs:
+        ds.attrs['title'] = 'CICE grid file'
+
+        ny = self._grid.ny
+        nx = self._grid.nx
+
+
+        ds['ulat'] = xr.DataArray(
+            np.deg2rad(self._grid.qlat[1:,1:].data),
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'U grid center latitude',
+                'units' : 'radians',
+                'bounds' : 'latu_bounds',
+            }
+        )
+
+        ds['ulon'] = xr.DataArray(
+            np.deg2rad(self._grid.qlon[1:,1:].data),
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'U grid center longitude',
+                'units' : 'radians',
+                'bounds' : 'lonu_bounds',
+            }
+        )
+
+        ds['tlat'] = xr.DataArray(
+            np.deg2rad(self._grid.tlat.data),
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'T grid center latitude',
+                'units' : 'degrees_north',
+                'bounds' : 'latt_bounds',
+            }
+        )
+
+        ds['tlon'] = xr.DataArray(
+            np.deg2rad(self._grid.tlon.data),
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'T grid center longitude',
+                'units' : 'degrees_east',
+                'bounds' : 'lont_bounds',
+            }
+        )
+
+        ds['htn'] = xr.DataArray(
+            self._grid.dxCv.data * 100.0,
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'T cell width on North side',
+                'units' : 'cm',
+                'coordinates' : 'TLON TLAT',
+            }
+        )
+
+        ds['hte'] = xr.DataArray(
+            self._grid.dyCu.data * 100,
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'T cell width on East side',
+                'units' : 'cm',
+                'coordinates' : 'TLON TLAT',
+            }
+        )
+
+        #ds['hus'] = xr.DataArray(
+        #    self._grid.dxCu.data,
+        #    dims = ['nj', 'ni'],
+        #    attrs = {
+        #        'long_name' : 'U cell width on South side',
+        #        'units' : 'm',
+        #        'coordinates' : 'ULON ULAT',
+        #    }
+        #)
+
+        #ds['huw'] = xr.DataArray(
+        #    self._grid.dyCv.data,
+        #    dims = ['nj', 'ni'],
+        #    attrs = {
+        #        'long_name' : 'U cell width on West side',
+        #        'units' : 'm',
+        #        'coordinates' : 'ULON ULAT',
+        #    }
+        #)
+
+        ds['angle'] = xr.DataArray(
+            np.deg2rad(self._grid.angle.data), # todo: this is most likely wrong and will cause trouble with dipole/tripole grids.
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'angle grid makes with latitude line on U grid',
+                'units' : 'radians',
+                'coordinates' : 'ULON ULAT',
+            }
+        ) 
+
+
+        ds['anglet'] = xr.DataArray(
+            np.deg2rad(self._grid.angle.data), # todo: this is most likely wrong and will cause trouble with dipole/tripole grids.
+            dims = ['nj', 'ni'],
+            attrs = {
+                'long_name' : 'angle grid makes with latitude line on T grid',
+                'units' : 'radians',
+                'coordinates' : 'TLON TLAT',
+            }
+        ) 
+
+        ds['kmt'] = xr.DataArray(
+            self.tmask.astype(np.float32),
+            dims = ['nj', 'ni'],
+            attrs = {'long_name' : 'mask of T grid cells',
+                     'units' : 'unitless',
+                     'coordinates' : 'TLON TLAT',
+            }
+        )
+
+        ds.to_netcdf(grid_file_path)
+
+        self.record_cice_params(grid_file_path)
+
+
     def to_SCRIP(self, SCRIP_path, title=None):
         '''
         Write the SCRIP grid file
@@ -452,9 +591,9 @@ class mom6bathy(object):
 
         ds.to_netcdf(SCRIP_path)
 
-    def to_cice_grid(self, cice_grid_path):
+    def to_domain_file(self, domain_file_path):
 
-        assert 'degrees' in self._grid.tlat.units and 'degrees' in self._grid.tlon.units, "Unsupported coord units for CICE grid generator"
+        assert 'degrees' in self._grid.tlat.units and 'degrees' in self._grid.tlon.units, "Unsupported coord"
 
         ds = xr.Dataset()
 
@@ -500,14 +639,14 @@ class mom6bathy(object):
             }
         )
 
-        ds['yv'][:,:,0] = self._grid.qlat[:-1,:-1] 
-        ds['yv'][:,:,1] = self._grid.qlat[:-1, 1:] 
-        ds['yv'][:,:,2] = self._grid.qlat[1: ,1: ] 
-        ds['yv'][:,:,3] = self._grid.qlat[1: ,:-1] 
-        ds['xv'][:,:,0] = self._grid.qlon[:-1,:-1] 
-        ds['xv'][:,:,1] = self._grid.qlon[:-1,1: ] 
-        ds['xv'][:,:,2] = self._grid.qlon[1: ,1: ] 
-        ds['xv'][:,:,3] = self._grid.qlon[1: ,:-1] 
+        ds['yv'][:,:,0].data = self._grid.qlat[:-1,:-1].data 
+        ds['yv'][:,:,1].data = self._grid.qlat[:-1, 1:].data 
+        ds['yv'][:,:,2].data = self._grid.qlat[1: ,1: ].data 
+        ds['yv'][:,:,3].data = self._grid.qlat[1: ,:-1].data 
+        ds['xv'][:,:,0].data = self._grid.qlon[:-1,:-1].data 
+        ds['xv'][:,:,1].data = self._grid.qlon[:-1,1: ].data 
+        ds['xv'][:,:,2].data = self._grid.qlon[1: ,1: ].data 
+        ds['xv'][:,:,3].data = self._grid.qlon[1: ,:-1].data 
 
         ds['mask'] = xr.DataArray(
             self.tmask.astype(np.int32),
@@ -536,7 +675,7 @@ class mom6bathy(object):
                      'filter2' : 'limit frac to [fminval,fmaxval]; fminval= 0.1000000E-02 fmaxval=  1.000000'}
         )
 
-        ds.to_netcdf(cice_grid_path)
+        ds.to_netcdf(domain_file_path)
 
     def to_ESMF_mesh(self, mesh_path, title=None):
         '''
@@ -646,5 +785,6 @@ class mom6bathy(object):
         self.mesh_path = mesh_path
         ds.to_netcdf(self.mesh_path)
         self._grid.append_to_sdb({'mesh_path' : os.path.join(os.getcwd(), self.mesh_path)})
-        self.record_runtime_params()
+        self.record_xml_changes()
+        self.record_mom6_params()
 
