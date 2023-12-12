@@ -278,7 +278,7 @@ class mom6bathy(object):
     def record_xml_changes(self):
         # Custom grid-specific XML changes:
         self._grid.append_to_sdb({
-            'xmlchanges' :{
+            'ocnice_xmlchanges' :{
                 'OCN_DOMAIN_MESH': os.path.join(os.getcwd(), self.mesh_path),
                 'ICE_DOMAIN_MESH': os.path.join(os.getcwd(), self.mesh_path), #warning: this assumes ocn and ice grids are the same. 
                 'MASK_MESH': os.path.join(os.getcwd(), self.mesh_path), #warning: this assumes ocn and ice grids are the same. 
