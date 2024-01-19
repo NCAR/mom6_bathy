@@ -57,7 +57,7 @@ class mom6bathy(object):
         Ocean domain mask at T grid. 1 if ocean, 0 if land.
         """
         tmask_da = xr.DataArray(
-            np.where(self._depth>=self._min_depth, 1, 0),
+            np.where(self._depth>self._min_depth, 1, 0),
             dims = ['ny','nx'],
             attrs = {"name":"T mask"}
         )
