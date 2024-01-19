@@ -138,7 +138,7 @@ class mom6grid(object):
             from visualCaseGen.sdb import SDB
             self.sdb = SDB(session_id)
         except ModuleNotFoundError:
-            print("ERROR: Cannot import the SDB class from visualCaseGen. Tool syncronization will not work!")
+            print("WARNING: Cannot import the SDB class. visualCaseGen syncronization disabled!")
 
     @staticmethod
     def check_supergrid(supergrid_ds):

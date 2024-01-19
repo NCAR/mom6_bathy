@@ -225,7 +225,7 @@ example:
     custom_depth = 400.0 + 80.0 * np.sin(i*np.pi/6.) * np.cos(j*np.pi/6.)
 
     # update the bathymetry:
-    bathy.set_depth_arr(custom_depth)
+    bathy.set_depth(custom_depth)
 
 
 *Adding ridges*
