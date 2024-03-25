@@ -297,6 +297,8 @@ class mom6bathy(object):
             ds.attrs['title'] = title
         else:
             ds.attrs['title'] = "MOM6 topography file"
+        ds.attrs['min_depth'] = self.min_depth
+        ds.attrs['max_depth'] = self.max_depth
 
         ds['y'] = xr.DataArray(
             self._grid.tlat,
