@@ -315,9 +315,7 @@ in ``MOM_input`` file to ``fit``, ``linear``, ``USER``, etc.
 *******************************
 
 Several ``MOM_input`` (or ``MOM_override``) entries need to be updated for a newly
-created grid and bathymetry configuration. To print out the values of these parameters,
-one can run the ``print_MOM6_runtime_params()`` method of ``mom6bathy``. The list
-of these parameters:
+created grid and bathymetry configuration. Some of these parameters include:
 
   * TRIPOLAR_N
   * NIGLOBAL

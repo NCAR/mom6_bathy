@@ -49,7 +49,7 @@ class mom6grid(object):
 
     def __init__(self, nx, ny, config, axis_units, lenx, leny,
                  srefine=2, xstart=0.0, ystart=None, cyclic_x=False, cyclic_y=False,
-                 tripolar_n=False, displace_pole=False, _supergrid=None, session_id=None):
+                 tripolar_n=False, displace_pole=False, _supergrid=None):
         '''
         mom6grid instance constructor.
 
@@ -85,8 +85,6 @@ class mom6grid(object):
             This argument should not be directly specified by the users.
             To instantiate a grid object from an existing supergrid, the
             users should instead call the mom6grid.from_supergrid() method.
-        session_id: str, optional
-            visualCaseGen session identifier.
         '''
 
         # define valid values for certain constructor arguments
@@ -133,12 +131,6 @@ class mom6grid(object):
             assert isinstance(_supergrid,MidasSupergrid), "Supergrid must be of type MIDAS supergrid object"
             self.supergrid = _supergrid
 
-        self.sdb = None
-        try:
-            from visualCaseGen.sdb import SDB
-            self.sdb = SDB(session_id)
-        except ModuleNotFoundError:
-            print("WARNING: Cannot import the SDB class. visualCaseGen syncronization disabled!")
 
     @staticmethod
     def check_supergrid(supergrid_ds):
@@ -583,13 +575,4 @@ class mom6grid(object):
                 attrs = {'units': 'meters'}
             )
             ds.to_netcdf(supergrid_path)
-            self.append_to_sdb({'supergrid_path' : os.path.join(os.getcwd(),supergrid_path)})
 
-
-    def append_to_sdb(self, new_d):
-        if self.sdb is None:
-            return
-        self.sdb.update(new_d)
-
-        if all(key in self.sdb.get_data() for key in ['supergrid_path', 'mesh_path', 'topog_path', 'mom6_params']):
-            print("SUCCESS! All necessary MOM6 input files are generated. You may now return to visualCaseGen to finalize the case.")

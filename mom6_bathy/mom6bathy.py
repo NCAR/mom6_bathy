@@ -275,70 +275,6 @@ class mom6bathy(object):
         mask_mapped = regridder(ds.landfrac)
         self._depth.data =  np.where(mask_mapped>cutoff_frac, depth_fillval, self._depth)
 
-    def record_xml_changes(self):
-        # Custom grid-specific XML changes:
-        self._grid.append_to_sdb({
-            'ocnice_xmlchanges' :{
-                'OCN_DOMAIN_MESH': os.path.join(os.getcwd(), self.mesh_path),
-                'ICE_DOMAIN_MESH': os.path.join(os.getcwd(), self.mesh_path), #warning: this assumes ocn and ice grids are the same. 
-                'MASK_MESH': os.path.join(os.getcwd(), self.mesh_path), #warning: this assumes ocn and ice grids are the same. 
-                'OCN_NX': self._grid.nx,
-                'OCN_NY': self._grid.ny,
-                'ICE_NX': self._grid.nx, #warning: this assumes ocn and ice grids are the same.
-                'ICE_NY': self._grid.ny, #warning: this assumes ocn and ice grids are the same.
-            }
-        })
-
-    def record_mom6_params(self):
-        # Custom grid-specific MOM_input params:
-        self._grid.append_to_sdb({
-            'mom6_params' :{
-                'INPUTDIR': './INPUT',
-                'TRIPOLAR_N': self._grid.tripolar_n,
-                'NIGLOBAL': self._grid.nx,
-                'NJGLOBAL': self._grid.ny,
-                'GRID_CONFIG': 'mosaic',
-                'TOPO_CONFIG': '"file"',
-                'MAXIMUM_DEPTH': str(self.max_depth),
-                'MINIMUM_DEPTH': str(self.min_depth),
-                'REENTRANT_X': self._grid.supergrid.dict['cyclic_x'],
-                'REENTRANT_Y': self._grid.supergrid.dict['cyclic_y'],
-                'DT': 1800.0,
-                'NK': 20,
-                'COORD_CONFIG': '"none"',
-                'REGRIDDING_COORDINATE_MODE': '"Z*"',
-                'ALE_COORDINATE_CONFIG': '"UNIFORM"',
-                'TS_CONFIG': '"fit"',
-                'T_REF': 5.0,
-                'FIT_SALINITY': True,
-            }
-        })
-
-    def record_cice_params(self, grid_file_path):
-        # Custom grid-specific cice namelist params:
-        self._grid.append_to_sdb({
-            'cice_params' :{
-                'grid_format' : 'nc',
-                'grid_file' : os.path.join(os.getcwd(), grid_file_path),
-                'kmt_file' : os.path.join(os.getcwd(), grid_file_path) # todo: correct this  
-            }
-        })
-
-    def print_MOM6_runtime_params(self):
-
-        print("{} = {}".format("INPUTDIR", '"./INPUT/"'))
-        print("{} = {}".format("TRIPOLAR_N", self._grid.tripolar_n))
-        print("{} = {}".format("NIGLOBAL", self._grid.nx))
-        print("{} = {}".format("NJGLOBAL", self._grid.ny))
-        print("{} = {}".format("GRID_CONFIG", '"mosaic"'))
-        print("{} = {}".format("TOPO_CONFIG", '"file"'))
-        print("{} = {}".format("MAXIMUM_DEPTH", str(self.max_depth)))
-        print("{} = {}".format("MINIMUM_DEPTH", str(self.min_depth)))
-        print("{} = {}".format("REENTRANT_X", self._grid.supergrid.dict['cyclic_x']))
-        print("{} = {}".format("GRID_FILE", "???"))
-        print("{} = {}".format("TOPO_FILE", "???"))
-
-
 
     def to_topog(self, file_path, title=None):
         '''
@@ -391,7 +327,6 @@ class mom6bathy(object):
         )
 
         ds.to_netcdf(file_path)
-        self._grid.append_to_sdb({'topog_path' : os.path.join(os.getcwd(), file_path)})
 
 
     def to_cice_grid(self, grid_file_path):
@@ -518,8 +453,6 @@ class mom6bathy(object):
         )
 
         ds.to_netcdf(grid_file_path)
-
-        self.record_cice_params(grid_file_path)
 
 
     def to_SCRIP(self, SCRIP_path, title=None):
@@ -784,7 +717,4 @@ class mom6bathy(object):
 
         self.mesh_path = mesh_path
         ds.to_netcdf(self.mesh_path)
-        self._grid.append_to_sdb({'mesh_path' : os.path.join(os.getcwd(), self.mesh_path)})
-        self.record_xml_changes()
-        self.record_mom6_params()
 
