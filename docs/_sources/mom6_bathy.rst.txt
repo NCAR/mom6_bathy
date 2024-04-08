@@ -12,5 +12,5 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   mom6_bathy.mom6bathy
-   mom6_bathy.mom6grid
+   mom6_bathy.grid
+   mom6_bathy.topo
