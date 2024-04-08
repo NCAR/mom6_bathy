@@ -29,5 +29,7 @@ setuptools.setup(
         "jupyterlab>=4.0,<4.1",
         "ipympl>=0.9,<0.9.3",
         "sphinx>=5.0,<5.1",
+        "black>=24.1,<24.2",
+        "pytest>=8.0"
     ]
 )

@@ -77,7 +77,7 @@ class DepthModifier(widgets.AppLayout):
             header = self.tbtn_display,
             center=fig.canvas,
             footer=self.modifier_widget,
-            pane_heights=[0, 5, 1],
+            pane_heights=[1, 5, 1],
             pane_widths=[0, 9, 0]
         )
 
