@@ -1,7 +1,7 @@
-mom6\_bathy.mom6bathy module
+mom6\_bathy.topo module
 ============================
 
-.. automodule:: mom6_bathy.mom6bathy
+.. automodule:: mom6_bathy.topo
    :members:
    :undoc-members:
    :show-inheritance:

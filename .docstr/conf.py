@@ -19,7 +19,7 @@ import mom6grid
 # -- Project information -----------------------------------------------------
 
 project = 'mom6_bathy'
-copyright = '2020, NCAR'
+copyright = '2024, NCAR'
 author = 'NCAR'
 
 # The full version, including alpha/beta/rc tags
