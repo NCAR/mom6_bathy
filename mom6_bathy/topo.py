@@ -50,6 +50,23 @@ class Topo:
         """
         return self._depth
 
+    @depth.setter
+    def depth(self, depth):
+        """
+        Apply a custom bathymetry via a user-defined depth array.
+
+        Parameters
+        ----------
+        depth: np.array
+            2-D Array of ocean depth.
+        """
+
+        assert depth.shape == (
+            self._grid.ny,
+            self._grid.nx,
+        ), "Incompatible depth array shape"
+        self._depth = xr.DataArray(depth)
+
     @property
     def min_depth(self):
         """
@@ -94,22 +111,6 @@ class Topo:
             dims=["ny", "nx"],
         )
 
-    def set_depth(self, depth):
-        """
-        Apply a custom bathymetry via a user-defined depth array.
-
-        Parameters
-        ----------
-        depth: np.array
-            2-D Array of ocean depth.
-        """
-
-        assert depth.shape == (
-            self._grid.ny,
-            self._grid.nx,
-        ), "Incompatible depth array shape"
-        self._depth = xr.DataArray(depth)
-
     def set_depth_via_topog_file(self, topog_file_path):
         """
         Apply a bathymetry read from an existing topog file
@@ -135,7 +136,7 @@ class Topo:
             self._grid.nx,
         ), f"Incompatible depth array shape in topog file {topog_file_path}"
 
-        self.set_depth(ds.depth)
+        self.depth = ds.depth
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
