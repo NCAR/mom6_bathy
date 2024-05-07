@@ -28,6 +28,7 @@ setuptools.setup(
         "netcdf4>=1.6,<1.7",
         "jupyterlab>=4.0,<4.1",
         "ipympl>=0.9,<0.9.3",
+        "ipywidgets>=8.1.1,<8.2",
         "sphinx>=5.0,<5.1",
         "black>=24.1,<24.2",
         "pytest>=8.0"

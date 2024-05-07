@@ -61,6 +61,10 @@ class Topo:
             2-D Array of ocean depth.
         """
 
+        if np.isscalar(depth):
+            self.set_flat(depth)
+            return
+
         assert depth.shape == (
             self._grid.ny,
             self._grid.nx,

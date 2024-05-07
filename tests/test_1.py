@@ -121,18 +121,23 @@ def test_global_grid():
     assert topo.tmask[25, 50] == 1
 
 
-def test_from_supergrid():
+def test_from_file():
     """Test the creation of a grid object from a supergrid file."""
 
-    hostname = socket.gethostname()
-    if not ("derecho" in hostname or "casper" in hostname):
+    if not on_cisl_machine():
         pytest.skip("This test is only for the derecho and casper machines")
 
+    print ("Running test_from_file")
     supergrid_path = (
         "/glade/p/cesmdata/cseg/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc"
     )
 
+    topo_path = (
+        "/glade/p/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_topog_230413.nc"
+    )
+
     grid = Grid.from_supergrid(supergrid_path)
+    topo = Topo.from_topo_file(grid, topo_path)
 
     # write the bathymetry to a netcdf file
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -147,6 +152,13 @@ def test_from_supergrid():
         assert (ds_orig.y == ds_new.y).all()
         assert (ds_orig.dx == ds_new.dx).all()
         assert (ds_orig.dy == ds_new.dy).all()
+
+        topo.write_topo(tmpdirname + "/ocean_topog_2.nc")
+
+        ds_orig = xr.open_dataset(topo_path)
+        ds_new = xr.open_dataset(tmpdirname + "/ocean_topog_2.nc")
+
+        assert (ds_orig['geolon'] == ds_new['x']).all()
 
 
 def test_equatorial_refinement():
@@ -190,5 +202,5 @@ if __name__ == "__main__":
     test_is_tripolar()
     test_regional_grid()
     test_global_grid()
-    test_from_supergrid()
+    test_from_file()
     test_equatorial_refinement()

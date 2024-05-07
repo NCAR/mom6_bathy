@@ -54,7 +54,6 @@ class Grid:
         ny: int,
         lenx: float,
         leny: float,
-        srefine: int = 2,
         xstart: float = 0.0,
         ystart: Optional[float] = None,
         cyclic_x: bool = False,
@@ -74,8 +73,6 @@ class Grid:
             grid length in x direction, e.g., 360.0 (degrees)
         leny : float
             grid length in y direction, e.g., 160.0 (degrees)
-        srefine : int, optional
-            refinement factor for the supergrid. 2 by default
         xstart : float, optional
             starting x coordinate. 0.0 by default.
         ystart : float, optional
@@ -95,7 +92,6 @@ class Grid:
         # consistency checks for constructor arguments
         assert nx > 0, "nx must be a positive integer"
         assert ny > 0, "ny must be a positive integer"
-        assert np.log2(srefine).is_integer(), "srefine must be a power of two"
         assert (
             not cyclic_x or lenx == 360.0
         ), "cyclic_x is only supported for 360 degree domains."
@@ -105,6 +101,8 @@ class Grid:
         assert leny + ystart <= 90.0, "leny + ystart must be less than 90"
         assert tripolar_n is False, "tripolar not supported yet"
         assert displace_pole is False, "displaced pole not supported yet"
+
+        srefine = 2  # supergrid refinement factor
 
         self.supergrid = MidasSupergrid(
             nxtot=nx * srefine,
@@ -195,15 +193,13 @@ class Grid:
         )
 
     @classmethod
-    def from_supergrid(cls, path: str, srefine: int = 2) -> "Grid":
+    def from_supergrid(cls, path: str) -> "Grid":
         """Create a Grid instance from a supergrid file.
 
         Parameters
         ----------
         path : str
             Path to the supergrid file to be written
-        srefine : int, optional
-            refinement factor for the supergrid. 2 by default
 
         Returns
         -------
@@ -220,6 +216,8 @@ class Grid:
         # check supergrid
         Grid.check_supergrid(ds)
 
+        srefine = 2  # supergrid refinement factor
+
         # create an initial Grid object:
         obj = cls(
             nx=int(len(ds.nx) / srefine),
@@ -235,6 +233,9 @@ class Grid:
         obj.supergrid.dy = ds.dy.data
         obj.supergrid.area = ds.area.data
         obj.supergrid.angle_dx = ds.angle_dx.data
+
+        # update the MOM6 grid metrics based on the supergrid data
+        obj._compute_MOM6_grid_metrics()
 
         return obj
 
