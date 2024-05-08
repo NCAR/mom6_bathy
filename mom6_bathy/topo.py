@@ -38,7 +38,7 @@ class Topo:
         topo_file_path: str
             Path to an existing MOM6 topog file.
         min_depth: float, optional
-            Minimum water column depth. Columns with shallower depths are to be masked out.
+            Minimum water column depth (m). Columns with shallower depths are to be masked out.
         """
 
         topo = cls(grid, 0.0)
@@ -49,7 +49,7 @@ class Topo:
     @property
     def depth(self):
         """
-        MOM6 grid depth array. Positive below MSL.
+        MOM6 grid depth array (m). Positive below MSL.
         """
         return self._depth
 
@@ -61,7 +61,7 @@ class Topo:
         Parameters
         ----------
         depth: np.array
-            2-D Array of ocean depth.
+            2-D Array of ocean depth (m).
         """
 
         if np.isscalar(depth):
@@ -72,7 +72,19 @@ class Topo:
             self._grid.ny,
             self._grid.nx,
         ), "Incompatible depth array shape"
-        self._depth = xr.DataArray(depth)
+
+        if isinstance(depth, xr.DataArray):
+            depth = depth.data
+        else:
+            assert isinstance(
+                depth, np.ndarray
+            ), "depth must be a numpy array or xarray DataArray"
+
+        self._depth = xr.DataArray(
+            depth,
+            dims=["ny", "nx"],
+            attrs={"units": "m"},
+        )
 
     @property
     def min_depth(self):
@@ -116,6 +128,7 @@ class Topo:
         self._depth = xr.DataArray(
             np.full((self._grid.ny, self._grid.nx), D),
             dims=["ny", "nx"],
+            attrs={"units": "m"},
         )
 
     def set_depth_via_topog_file(self, topog_file_path):
@@ -171,6 +184,7 @@ class Topo:
         self._depth = xr.DataArray(
             np.full((ny, nx), max_depth),
             dims=["ny", "nx"],
+            attrs={"units": "m"},
         )
 
         D0 = (max_depth - dedge) / (
@@ -214,6 +228,7 @@ class Topo:
         self._depth = xr.DataArray(
             np.full((self._grid.ny, self._grid.nx), max_depth),
             dims=["ny", "nx"],
+            attrs={"units": "m"},
         )
 
         D0 = (max_depth - dedge) / (
