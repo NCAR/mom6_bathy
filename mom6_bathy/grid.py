@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 import numpy as np
 import xarray as xr
+from scipy.spatial import cKDTree
 from midas.rectgrid_gen import supergrid as MidasSupergrid
 
 
@@ -403,6 +404,29 @@ class Grid:
             dims=["ny", "nx"],
             attrs={"name": "area of t-cells", "units": "meters^2"},
         )
+
+        # create a KDTree for fast nearest neighbor search
+        self._kdtree = cKDTree(np.column_stack((self.tlat.values.flatten(), self.tlon.values.flatten())))
+
+    def get_indices(self, tlat: float, tlon: float) -> tuple[int, int]:
+        """
+        Get the i, j indices of a given tlat and tlon pair.
+
+        Parameters
+        ----------
+        tlat : float
+            The latitude value.
+        tlon : float
+            The longitude value.
+
+        Returns
+        -------
+        Tuple[int, int]
+            The j, i indices of the given tlat and tlon pair.
+        """
+        dist, indices = self._kdtree.query([tlat, tlon])
+        i, j = np.unravel_index(indices, self.tlat.shape)
+        return int(j), int(i)
 
     def plot(self, property_name):
         """

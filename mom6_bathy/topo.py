@@ -27,7 +27,7 @@ class Topo:
         self._min_depth = min_depth
 
     @classmethod
-    def from_topo_file(cls, grid, topo_file_path):
+    def from_topo_file(cls, grid, topo_file_path, min_depth=0.0):
         """
         Create a bathymetry object from an existing topog file.
 
@@ -37,11 +37,14 @@ class Topo:
             horizontal grid instance for which the bathymetry is to be created.
         topo_file_path: str
             Path to an existing MOM6 topog file.
+        min_depth: float, optional
+            Minimum water column depth. Columns with shallower depths are to be masked out.
         """
 
-        bathy = cls(grid, 0.0)
-        bathy.set_depth_via_topog_file(topo_file_path)
-        return bathy
+        topo = cls(grid, 0.0)
+        topo.set_depth_via_topog_file(topo_file_path)
+        topo.min_depth = min_depth
+        return topo
 
     @property
     def depth(self):
