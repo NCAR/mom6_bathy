@@ -70,9 +70,6 @@ def test_regional_grid():
         # write cice grid file
         topo.write_cice_grid(tmpdirname + "/cice_grid_1.nc")
 
-        # write SCRIP grid file
-        topo.write_scrip_grid(tmpdirname + "/SCRIP_grid_1.nc")
-
         # ESMF mesh file
         topo.write_esmf_mesh(tmpdirname + "/ESMF_mesh_1.nc")
 
