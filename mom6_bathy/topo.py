@@ -523,47 +523,15 @@ class Topo:
             },
         )
 
-        # ds['hus'] = xr.DataArray(
-        #    self._grid.dxCu.data,
-        #    dims = ['nj', 'ni'],
-        #    attrs = {
-        #        'long_name' : 'U cell width on South side',
-        #        'units' : 'm',
-        #        'coordinates' : 'ULON ULAT',
-        #    }
-        # )
-
-        # ds['huw'] = xr.DataArray(
-        #    self._grid.dyCv.data,
-        #    dims = ['nj', 'ni'],
-        #    attrs = {
-        #        'long_name' : 'U cell width on West side',
-        #        'units' : 'm',
-        #        'coordinates' : 'ULON ULAT',
-        #    }
-        # )
-
         ds["angle"] = xr.DataArray(
             np.deg2rad(
                 self._grid.angle.data
-            ),  # todo: this is most likely wrong and will cause trouble with dipole/tripole grids.
+            ),
             dims=["nj", "ni"],
             attrs={
                 "long_name": "angle grid makes with latitude line on U grid",
                 "units": "radians",
                 "coordinates": "ULON ULAT",
-            },
-        )
-
-        ds["anglet"] = xr.DataArray(
-            np.deg2rad(
-                self._grid.angle.data
-            ),  # todo: this is most likely wrong and will cause trouble with dipole/tripole grids.
-            dims=["nj", "ni"],
-            attrs={
-                "long_name": "angle grid makes with latitude line on T grid",
-                "units": "radians",
-                "coordinates": "TLON TLAT",
             },
         )
 
@@ -696,20 +664,65 @@ class Topo:
 
         i0 = 1  # start index for node id's
 
-        if self._grid.supergrid.dict["cyclic_x"] == False:
+        if self._grid.is_tripolar(self._grid._supergrid):
+            
+            nx, ny = self._grid.nx, self._grid.ny
+            qlon_flat = self._grid.qlon.data[:, :-1].flatten()[:-(nx//2-1)]
+            qlat_flat = self._grid.qlat.data[:, :-1].flatten()[:-(nx//2-1)]
+            nnodes = len(qlon_flat)
+            assert nnodes + (nx//2-1) == nx * (ny + 1)
 
+            # Below returns element connectivity of i-th element
+            # (assuming 0 based node and element indexing)
+            def get_element_conn(i):
+                is_final_column = (i+1) % nx == 0
+                on_top_row = i // nx == ny-1
+                on_second_half_of_stitch = on_top_row and (i%nx) >= nx//2
+
+                # lower left corner
+                ll = i0 + i % nx + (i // nx) * (nx)
+
+                # lower right corner
+                lr = ll + 1
+                if is_final_column:
+                    lr -= nx
+
+                # upper right corner
+                ur = lr+nx
+                if on_second_half_of_stitch and not is_final_column:
+                    ur -= 2 * (i % nx + 1 - nx // 2)
+
+                # upper left corner
+                ul = ll+nx
+                if on_second_half_of_stitch:
+                    ul = ur+1
+
+                return [ll, lr, ur, ul]
+
+        elif self._grid.supergrid.dict["cyclic_x"] == True:
+
+            nx, ny = self._grid.nx, self._grid.ny
+            qlon_flat = self._grid.qlon.data[:, :-1].flatten()
+            qlat_flat = self._grid.qlat.data[:, :-1].flatten()
+            nnodes = len(qlon_flat)
+            assert nnodes == nx * (ny + 1)
+
+            # Below returns element connectivity of i-th element
+            # (assuming 0 based node and element indexing)
+            get_element_conn = lambda i: [
+                i0 + i % nx + (i // nx) * (nx),
+                i0 + i % nx + (i // nx) * (nx) + 1 - (((i + 1) % nx) == 0) * nx,
+                i0 + i % nx + (i // nx + 1) * (nx) + 1 - (((i + 1) % nx) == 0) * nx,
+                i0 + i % nx + (i // nx + 1) * (nx),
+            ]
+
+        else: # non-cyclic grid
+
+            nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data.flatten()
             qlat_flat = self._grid.qlat.data.flatten()
             nnodes = len(qlon_flat)
-            nx = self._grid.nx
-            ny = self._grid.ny
             assert nnodes == (nx + 1) * (ny + 1)
-
-            ds["nodeCoords"] = xr.DataArray(
-                [[qlon_flat[i], qlat_flat[i]] for i in range(nnodes)],
-                dims=["nodeCount", "coordDim"],
-                attrs={"units": coord_units},
-            )
 
             # Below returns element connectivity of i-th element
             # (assuming 0 based node and element indexing)
@@ -720,29 +733,12 @@ class Topo:
                 i0 + i % nx + (i // nx + 1) * (nx + 1),
             ]
 
-        else:  # cyclic x
 
-            qlon_flat = self._grid.qlon.data[:, :-1].flatten()
-            qlat_flat = self._grid.qlat.data[:, :-1].flatten()
-            nnodes = len(qlon_flat)
-            nx = self._grid.nx
-            ny = self._grid.ny
-            assert nnodes == nx * (ny + 1)
-
-            ds["nodeCoords"] = xr.DataArray(
-                [[qlon_flat[i], qlat_flat[i]] for i in range(nnodes)],
-                dims=["nodeCount", "coordDim"],
-                attrs={"units": coord_units},
-            )
-
-            # Below returns element connectivity of i-th element
-            # (assuming 0 based node and element indexing)
-            get_element_conn = lambda i: [
-                i0 + i % nx + (i // nx) * (nx),
-                i0 + i % nx + (i // nx) * (nx) + 1 - (((i + 1) % nx) == 0) * nx,
-                i0 + i % nx + (i // nx + 1) * (nx) + 1 - (((i + 1) % nx) == 0) * nx,
-                i0 + i % nx + (i // nx + 1) * (nx),
-            ]
+        ds["nodeCoords"] = xr.DataArray(
+            np.column_stack((qlon_flat, qlat_flat)),
+            dims=["nodeCount", "coordDim"],
+            attrs={"units": coord_units},
+        )
 
         ds["elementConn"] = xr.DataArray(
             np.array([get_element_conn(i) for i in range(ncells)]).astype(np.int32),

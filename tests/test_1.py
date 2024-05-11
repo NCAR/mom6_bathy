@@ -158,7 +158,7 @@ def test_from_file():
         ds_orig = xr.open_dataset(topo_path)
         ds_new = xr.open_dataset(tmpdirname + "/ocean_topog_2.nc")
 
-        assert (ds_orig['geolon'] == ds_new['x']).all()
+        assert (ds_orig['geolon'].data == ds_new['x'].data).all()
 
 
 def test_equatorial_refinement():

@@ -43,7 +43,7 @@ class Grid:
     dyCv: xr.DataArray
         y-distance between t points, centered at v
     angle: xr.DataArray
-        angle T-grid makes with latitude line
+        angle grid makes with latitude line
     tarea: xr.DataArray
         T-cell area
 
@@ -144,23 +144,38 @@ class Grid:
         ), "Different units in x and y coordinates not supported"
 
     @staticmethod
-    def is_tripolar(supergrid: xr.Dataset) -> bool:
+    def is_cyclic_x(supergrid) -> bool:
         """
-        Check if a supergrid instance is tripolar.
+        Check if a given supergrid x coordinate array is cyclic along the x-axis.
 
         Parameters
         ----------
-        supergrid : xarray.Dataset
-            MOM6 Supergrid dataset
+        supergrid : xr.DataArray or np.array or MidasSupergrid
+            Supergrid to check for cyclic x.
         """
-        Grid.check_supergrid(supergrid)
+        return np.allclose(
+            (supergrid.x[:, 0] + 360.0) % 360.0,
+            (supergrid.x[:, -1] + 360.0) % 360.0,
+            rtol=1e-5,
+        )
 
-        nx = supergrid.sizes["nx"]
+    @staticmethod
+    def is_tripolar(supergrid) -> bool:
+        """Check if the given supergrid x coordinates form a tripolar grid.
+        
+        Parameters
+        ----------
+        supergrid : xr.DataArray or np.array or MidasSupergrid
+            Supergrid to check if tripolar.
+        """
 
         nlines = (
             0  # number of lines along the top row,
             # (i.e., 2 or more cells with the same x coordinate)
         )
+
+        ny, nx = supergrid.x.shape
+
         within_line = False
         for i in range(0, nx - 1):
             if not within_line:
@@ -174,24 +189,6 @@ class Grid:
         # If there are 3 lines (i.e., 2 or more cells with the same x coordinate),
         # the grid is tripolar
         return nlines == 3
-
-    @staticmethod
-    def is_cyclic_x(supergrid: xr.Dataset) -> bool:
-        """
-        Check if a supergrid instance is cyclic along the x-axis.
-
-        Parameters
-        ----------
-        supergrid : xarray.Dataset
-            MOM6 Supergrid dataset
-        """
-        Grid.check_supergrid(supergrid)
-
-        return np.allclose(
-            (supergrid.x[:, 0] + 360.0) % 360.0,
-            (supergrid.x[:, -1] + 360.0) % 360.0,
-            rtol=1e-5,
-        )
 
     @classmethod
     def from_supergrid(cls, path: str) -> "Grid":
@@ -225,6 +222,7 @@ class Grid:
             ny=int(len(ds.ny) / srefine),
             lenx=(ds.x.max() - ds.x.min()).item(),
             leny=(ds.y.max() - ds.y.min()).item(),
+            cyclic_x=Grid.is_cyclic_x(ds),
         )
 
         # override obj.supergrid with the data from the original supergrid file
@@ -388,7 +386,7 @@ class Grid:
             },
         )
 
-        # T point angle:
+        # angle:
         self.angle = xr.DataArray(
             sg.angle_dx[1::2, 1::2],
             dims=["ny", "nx"],
