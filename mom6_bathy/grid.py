@@ -6,7 +6,6 @@ import xarray as xr
 from scipy.spatial import cKDTree
 from midas.rectgrid_gen import supergrid as MidasSupergrid
 
-from mom6_bathy.utils import get_git_short_hash
 
 class Grid:
     """
@@ -592,7 +591,6 @@ class Grid:
         ds.attrs["filename"] = os.path.basename(path)
         ds.attrs["type"] = "MOM6 supergrid"
         ds.attrs["Created"] = datetime.now().isoformat()
-        ds.attrs["mom6_bathy"] = get_git_short_hash()
         if author:
             ds.attrs["Author"] = author
 
