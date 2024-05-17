@@ -551,7 +551,9 @@ class Topo:
 
     def write_scrip_grid(self, file_path, title=None):
         """
-        Write the SCRIP grid file
+        Write the SCRIP grid file. In latest CESM versions, SCRIP grid files are
+        no longer required and are replaced by ESMF mesh files. However, SCRIP
+        files are still needed to generate custom ocean-runoff mapping files.
 
         Parameters
         ----------
