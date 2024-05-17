@@ -4,6 +4,8 @@ import xarray as xr
 from datetime import datetime
 from scipy import interpolate
 
+from mom6_bathy.aux import gc_qarea
+
 
 class Topo:
     """
@@ -568,7 +570,7 @@ class Topo:
             ds.attrs["title"] = title
 
         ds["grid_dims"] = xr.DataArray(
-            np.array([self._grid.ny, self._grid.nx]).astype(np.int32),
+            np.array([self._grid.nx, self._grid.ny]).astype(np.int32),
             dims=["grid_rank"],
         )
         ds["grid_center_lat"] = xr.DataArray(
@@ -597,19 +599,30 @@ class Topo:
             dims=["grid_size", "grid_corners"],
             attrs={"units": self._grid.supergrid.dict["axis_units"]},
         )
-        for i in range(self._grid.nx):
-            for j in range(self._grid.ny):
-                k = j * self._grid.nx + i
-                ds["grid_corner_lat"][k, 0] = self._grid.qlat[j, i]
-                ds["grid_corner_lat"][k, 1] = self._grid.qlat[j, i + 1]
-                ds["grid_corner_lat"][k, 2] = self._grid.qlat[j + 1, i + 1]
-                ds["grid_corner_lat"][k, 3] = self._grid.qlat[j + 1, i]
-                ds["grid_corner_lon"][k, 0] = self._grid.qlon[j, i]
-                ds["grid_corner_lon"][k, 1] = self._grid.qlon[j, i + 1]
-                ds["grid_corner_lon"][k, 2] = self._grid.qlon[j + 1, i + 1]
-                ds["grid_corner_lon"][k, 3] = self._grid.qlon[j + 1, i]
+
+        i_range = range(self._grid.nx)
+        j_range = range(self._grid.ny)
+        j, i = np.meshgrid(j_range, i_range, indexing="ij")
+        k = j * self._grid.nx + i
+
+        ds["grid_corner_lat"].data[k] = np.stack((
+            self._grid.qlat.data[j, i],
+            self._grid.qlat.data[j, i + 1],
+            self._grid.qlat.data[j + 1, i + 1],
+            self._grid.qlat.data[j + 1, i]
+        ), axis=-1)
+
+        ds["grid_corner_lon"].data[k] = np.stack((
+            self._grid.qlon.data[j, i],
+            self._grid.qlon.data[j, i + 1],
+            self._grid.qlon.data[j + 1, i + 1],
+            self._grid.qlon.data[j + 1, i]
+        ), axis=-1)
+
         ds["grid_area"] = xr.DataArray(
-            self._grid.tarea.data.flatten(), dims=["grid_size"]
+            gc_qarea(ds.grid_corner_lat.data, ds.grid_corner_lon.data, radius=1.0),
+            dims=["grid_size"],
+            attrs={"units": "radians^2"},
         )
 
         ds.to_netcdf(file_path)
