@@ -51,29 +51,35 @@ class Grid:
 
     def __init__(
         self,
-        nx: int,
-        ny: int,
         lenx: float,
         leny: float,
+        nx: int = None,
+        ny: int = None,
+        resolution: Optional[float] = None,
         xstart: float = 0.0,
         ystart: Optional[float] = None,
         cyclic_x: bool = False,
         tripolar_n: bool = False,
         displace_pole: bool = False,
+        name: Optional[str] = None,
     ) -> None:
         """
         Grid instance constructor.
 
         Parameters
         ----------
-        nx : int
-            Number of grid points in x direction
-        ny : int
-            Number of grid points in y direction
         lenx : float
             grid length in x direction, e.g., 360.0 (degrees)
         leny : float
             grid length in y direction, e.g., 160.0 (degrees)
+        nx : int, optional
+            Number of grid points in x direction
+        ny : int, optional
+            Number of grid points in y direction
+        resolution : float, optional
+            grid resolution in degrees. If provided, the grid
+            dimensions are computed based on the resolution:
+            nx = int(lenx / resolution) and ny = int(leny / resolution)
         xstart : float, optional
             starting x coordinate. 0.0 by default.
         ystart : float, optional
@@ -84,11 +90,21 @@ class Grid:
             flag to make the grid tripolar. False by default.
         displace_pole : bool, optional
             flag to make the grid displaced polar. False by default.
+        name : str, optional
+            name of the grid. None by default.
         """
 
         # default ystart value (centers the domain at the Equator)
         if ystart is None:
             ystart = -0.5 * leny
+        
+        if nx is not None or ny is not None:
+            assert nx is not None and ny is not None, "nx and ny must be provided together"
+            assert resolution is None, "resolution cannot be provided with nx and ny"
+        else:
+            assert resolution is not None, "resolution must be provided if nx and ny are not"
+            nx = int(lenx / resolution)
+            ny = int(leny / resolution)
 
         # consistency checks for constructor arguments
         assert nx > 0, "nx must be a positive integer"
@@ -102,6 +118,8 @@ class Grid:
         assert leny + ystart <= 90.0, "leny + ystart must be less than 90"
         assert tripolar_n is False, "tripolar not supported yet"
         assert displace_pole is False, "displaced pole not supported yet"
+        self.name = name
+
 
         srefine = 2  # supergrid refinement factor
 
@@ -119,6 +137,17 @@ class Grid:
             tripolar_n=tripolar_n,
             displace_pole=displace_pole,
         )
+
+
+    @property
+    def name(self) -> str:
+        """Name of the grid."""
+        return self._name
+    
+    @name.setter
+    def name(self, new_name: str) -> None:
+        assert new_name is None or new_name.replace("_", "").isalnum(), "Grid name must be alphanumeric"
+        self._name = new_name
 
     @staticmethod
     def check_supergrid(supergrid: xr.Dataset) -> None:
