@@ -218,6 +218,18 @@ class Grid:
         # If there are 3 lines (i.e., 2 or more cells with the same x coordinate),
         # the grid is tripolar
         return nlines == 3
+    
+    def is_rectangular(self) -> bool:
+        """Check if the grid is a rectangular lat-lon grid by comparing the
+        first and last rows and columns of the tlon and tlat arrays."""
+
+        if (all(self.tlon[:, 0] == self.tlon[:, 0]) and
+            all(self.tlon[:, -1] == self.tlon[0, -1]) and
+            all(self.tlat[0, :] == self.tlat[0, :]) and
+            all(self.tlat[-1, :] == self.tlat[-1, :])):
+            return True
+        return False
+
 
     @classmethod
     def from_supergrid(cls, path: str) -> "Grid":
