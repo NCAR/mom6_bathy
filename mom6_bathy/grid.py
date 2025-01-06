@@ -219,14 +219,14 @@ class Grid:
         # the grid is tripolar
         return nlines == 3
     
-    def is_rectangular(self) -> bool:
+    def is_rectangular(self, rtol=1e-3) -> bool:
         """Check if the grid is a rectangular lat-lon grid by comparing the
         first and last rows and columns of the tlon and tlat arrays."""
 
-        if (all(self.tlon[:, 0] == self.tlon[:, 0]) and
-            all(self.tlon[:, -1] == self.tlon[0, -1]) and
-            all(self.tlat[0, :] == self.tlat[0, :]) and
-            all(self.tlat[-1, :] == self.tlat[-1, :])):
+        if (np.allclose(self.tlon[:, 0], self.tlon[0, 0], rtol=rtol) and
+            np.allclose(self.tlon[:, -1], self.tlon[0, -1], rtol=rtol) and
+            np.allclose(self.tlat[0, :], self.tlat[0, 0], rtol=rtol) and
+            np.allclose(self.tlat[-1, :], self.tlat[-1, 0], rtol=rtol)):
             return True
         return False
 
@@ -279,6 +279,77 @@ class Grid:
 
         return obj
 
+    @classmethod
+    def subgrid_from_supergrid(cls, path: str, llc: tuple[float, float], urc: tuple[float, float], name: str) -> "Grid":
+        """Create a Grid instance from a subset of a supergrid file.
+
+        Parameters
+        ----------
+        path : str
+            Path to the full supergrid file to be carved out.
+        llc : tuple[float, float]
+            Lower left corner coordinates (lat, lon) of the subdomain to extract
+        urc : tuple[float, float]
+            Upper right corner coordinates (lat, lon) of the subset to extract
+        name : str
+            Name of the subgrid
+
+        Returns
+        -------
+        Grid
+            The Grid instance created from the supergrid file.
+        """
+
+        full_grid = cls.from_supergrid(path)
+
+        assert len(llc) == 2, "llc must be a tuple of two floats"
+        assert len(urc) == 2, "urc must be a tuple of two floats"
+
+        # subgrid indices
+        llc_j, llc_i = full_grid.get_indices(llc[0], llc[1])
+        urc_j, urc_i = full_grid.get_indices(urc[0], urc[1])
+
+        assert llc_j < urc_j, "Lower left corner must be below upper right corner"
+        assert llc_i < urc_i, "Lower left corner must be to the left of upper right corner"
+
+        srefine = 2  # supergrid refinement factor
+
+        # sub-supergrid indices:
+        y0 = llc_j * srefine
+        y1 = (urc_j + 1) * srefine
+        x0 = llc_i * srefine
+        x1 = (urc_i + 1) * srefine
+
+        # create the sub supergrid
+        sub_supergrid = MidasSupergrid(
+            config=full_grid.supergrid.dict["config"],
+            axis_units=full_grid.supergrid.dict["axis_units"],
+            xdat = full_grid.supergrid.x[y0:y1+1, x0:x1+1],
+            ydat = full_grid.supergrid.y[y0:y1+1, x0:x1+1],
+            cyclic_x=full_grid._supergrid.dict["cyclic_x"] and (x0 == 0) and (x1 == full_grid.supergrid.x.shape[1]),
+            cyclic_y=full_grid._supergrid.dict["cyclic_y"] and (y0 == 0) and (y1 == full_grid.supergrid.y.shape[0]),
+            tripolar_n=full_grid._supergrid.dict["tripolar_n"],
+            r0_pole=full_grid._supergrid.dict["r0_pole"],
+            lon0_pole=full_grid._supergrid.dict["lon0_pole"],
+            doughnut=full_grid._supergrid.dict["doughnut"],
+            radius=full_grid._supergrid.dict["radius"],
+        )
+
+        # Create the sub grid based on the sub supergrid
+        sub_grid = cls(
+            nx = (urc_i - llc_i),
+            ny = (urc_j - llc_j),
+            lenx = (sub_supergrid.x.max() - sub_supergrid.x.min()).item(),
+            leny = (sub_supergrid.y.max() - sub_supergrid.y.min()).item(),
+            cyclic_x = sub_supergrid.dict["cyclic_x"],
+            name = name
+        )
+
+        # override sub_grid.supergrid with the sub supergrid data
+        sub_grid.supergrid = sub_supergrid
+
+        return sub_grid
+        
     @property
     def supergrid(self) -> MidasSupergrid:
         """MOM6 supergrid contains the grid metrics and the areas at twice the
@@ -463,8 +534,18 @@ class Grid:
         Tuple[int, int]
             The j, i indices of the given tlat and tlon pair.
         """
+
+        max_tlon = self.tlon.max()
+        min_tlon = self.tlon.min()
+
+        # Try to adjust the longitude to the range of the grid (if possible)
+        if tlon > max_tlon and (tlon - 360.0) > min_tlon:
+            tlon -= 360.0
+        elif tlon < min_tlon and (tlon + 360.0) < max_tlon:
+            tlon += 360.0
+
         dist, indices = self._kdtree.query([tlat, tlon])
-        i, j = np.unravel_index(indices, self.tlat.shape)
+        j, i = np.unravel_index(indices, self.tlat.shape)
         return int(j), int(i)
 
     def plot(self, property_name):
