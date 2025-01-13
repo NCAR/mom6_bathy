@@ -122,12 +122,9 @@ class TopoEditor(widgets.HBox):
             layout={'width': '90%', 'display': 'flex'},
             style={'description_width': '100px'}
         )
-        self._basin_specifier = widgets.FloatText(
-            value=None,
-            step=1.0,
-            description='Basin (label):',
+        self._basin_specifier = widgets.Label(
+            value='Basin Label Number: None',
             disabled=True,
-            placeholder='Select a cell first.',
             layout={'width': '80%'},
             style={'description_width': 'auto'}
         )
@@ -192,7 +189,7 @@ class TopoEditor(widgets.HBox):
         # Enable the depth specifier
         self._depth_specifier.disabled = False
         self._depth_specifier.value = self.topo.depth.data[j, i]
-        self._basin_specifier.value = self.topo.basintmask.data[j,i]
+        self._basin_specifier.value = "Basin Label Number: " + str(self.topo.basintmask.data[j,i])
 
 
     def construct_observances(self):
