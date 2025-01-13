@@ -118,13 +118,13 @@ class TopoEditor(widgets.HBox):
 
         self._basin_specifier_toggle = widgets.Button(
             description="Erase Disconnected Basins",
-            disabled=False,
+            disabled=True,
             layout={'width': '90%', 'display': 'flex'},
             style={'description_width': '100px'}
         )
         self._basin_specifier = widgets.Label(
             value='Basin Label Number: None',
-            disabled=True,
+            disabled=False,
             layout={'width': '80%'},
             style={'description_width': 'auto'}
         )
@@ -189,7 +189,16 @@ class TopoEditor(widgets.HBox):
         # Enable the depth specifier
         self._depth_specifier.disabled = False
         self._depth_specifier.value = self.topo.depth.data[j, i]
-        self._basin_specifier.value = "Basin Label Number: " + str(self.topo.basintmask.data[j,i])
+
+        # Update Basin Specifier
+        label = self.topo.basintmask.data[j,i]
+        self._basin_specifier.value = "Basin Label Number: " + str(label)
+
+        # If not land, manifest button
+        if label != 0:
+            self._basin_specifier_toggle.disabled = False
+        else:
+            self._basin_specifier_toggle.disabled = True
 
 
     def construct_observances(self):
@@ -226,8 +235,6 @@ class TopoEditor(widgets.HBox):
             if self._selected_cell is not None:
                 
                 i, j, _ = self._selected_cell
-                if self.topo.basintmask[j, i] == 0:
-                    raise ValueError("Cannot erase, land selected")
                 ocean_mask_changed = np.where(self.topo.basintmask == self.topo.basintmask[j, i], 1, 0)
                 self.topo.depth = np.where(ocean_mask_changed == 0, 0, self.topo.depth)
                 self.im.set_array(self.topo.depth.data)
