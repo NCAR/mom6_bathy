@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 from datetime import datetime
 from scipy import interpolate
-
+from scipy.ndimage import label
 from mom6_bathy.aux import gc_qarea
 
 
@@ -117,6 +117,15 @@ class Topo:
             attrs={"name": "T mask"},
         )
         return tmask_da
+        
+    @property
+    def basintmask(self):
+        """
+        Ocean domain mask at T grid. seperate number for each connected water cell, 0 if land.
+        """
+        res, num_features = label(self.tmask)
+        
+        return xr.DataArray(res)
 
     def set_flat(self, D):
         """
