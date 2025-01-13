@@ -124,7 +124,6 @@ class TopoEditor(widgets.HBox):
         )
         self._basin_specifier = widgets.Label(
             value='Basin Label Number: None',
-            disabled=False,
             layout={'width': '80%'},
             style={'description_width': 'auto'}
         )
