@@ -231,7 +231,6 @@ class TopoEditor(widgets.HBox):
                 i, j, _ = self._selected_cell
                 if self.topo.basintmask[j, i] == 0:
                     raise ValueError("Cannot erase, land selected")
-                print("Running")
                 ocean_mask_changed = np.where(self.topo.basintmask == self.topo.basintmask[j, i], 1, 0)
                 self.topo.depth = np.where(ocean_mask_changed == 0, 0, self.topo.depth)
                 self.im.set_array(self.topo.depth.data)
