@@ -96,10 +96,10 @@ class TopoEditor(widgets.HBox):
         )
 
         self._display_mode_toggle = widgets.ToggleButtons(
-            options=['depth', 'mask'],
+            options=['depth', 'mask', 'basinmask'],
             description='Field:',
             disabled=False,
-            tooltips=['Display depth values', 'Display mask values'],
+            tooltips=['Display depth values', 'Display mask values', 'Display Basins'],
             layout={'width': '90%', 'display': 'flex'},
             style={'description_width': '100px', 'button_width': '90px'}
         )
@@ -116,6 +116,18 @@ class TopoEditor(widgets.HBox):
             style={'description_width': 'auto'}
         )
 
+        self._basin_specifier_toggle = widgets.Button(
+            description="Erase Disconnected Basins",
+            disabled=True,
+            layout={'width': '90%', 'display': 'flex'},
+            style={'description_width': '100px'}
+        )
+        self._basin_specifier = widgets.Label(
+            value='Basin Label Number: None',
+            layout={'width': '80%'},
+            style={'description_width': 'auto'}
+        )
+
         self._control_panel = widgets.VBox([
             widgets.HTML("<h2>Topo Editor</h2>"),
             widgets.HTML("<hr><h3>Display</h3>"),
@@ -125,6 +137,9 @@ class TopoEditor(widgets.HBox):
             widgets.HTML("<hr><h3>Cell Editing</h3>"),
             self._selected_cell_label,
             self._depth_specifier,
+            widgets.HTML("<hr><h3>Basin Selector</h3>"),
+            self._basin_specifier,
+            self._basin_specifier_toggle,
           ], layout= {'width': '30%', 'height': '100%'})
 
 
@@ -140,9 +155,13 @@ class TopoEditor(widgets.HBox):
             self.im.set_array(self.topo.tmask.data)
             self.im.set_clim((0, 1))
             self.cbar.set_label('Mask')
+        elif mode == 'basinmask':
+            self.im.set_array(self.topo.basintmask.data)
+            self.im.set_clim((0,self.topo.basintmask.data.max()))
+            self.cbar.set_label('Basin Mask')
         else:
             raise ValueError(f"Unknown display mode: {mode}")
-        
+                
 
     def _select_cell(self, i, j):
 
@@ -169,6 +188,16 @@ class TopoEditor(widgets.HBox):
         # Enable the depth specifier
         self._depth_specifier.disabled = False
         self._depth_specifier.value = self.topo.depth.data[j, i]
+
+        # Update Basin Specifier
+        label = self.topo.basintmask.data[j,i]
+        self._basin_specifier.value = "Basin Label Number: " + str(label)
+
+        # If not land, manifest button
+        if label != 0:
+            self._basin_specifier_toggle.disabled = False
+        else:
+            self._basin_specifier_toggle.disabled = True
 
 
     def construct_observances(self):
@@ -201,7 +230,18 @@ class TopoEditor(widgets.HBox):
             names='value',
             type='change'
         )
+        def erase_disconnected_basins(b):
+            if self._selected_cell is not None:
+                
+                i, j, _ = self._selected_cell
+                ocean_mask_changed = np.where(self.topo.basintmask == self.topo.basintmask[j, i], 1, 0)
+                self.topo.depth = np.where(ocean_mask_changed == 0, 0, self.topo.depth)
+                self.im.set_array(self.topo.depth.data)
+                self.im.set_clim((self.topo.min_depth, self.topo.depth.data.max()))
+                self.cbar.update_normal(self.im)
 
+        self._basin_specifier_toggle.on_click(erase_disconnected_basins)
+        
         def on_depth_change(change):
             if self._selected_cell is not None:
                 i, j, _ = self._selected_cell
