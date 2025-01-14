@@ -34,7 +34,7 @@ class TopoEditor(widgets.HBox):
         self.ax.clear()
 
         def format_coord(x, y):
-            i, j = self.topo._grid.get_indices(y, x)
+            j, i = self.topo._grid.get_indices(y, x)
             return f'x={x:.2f}, y={y:.2f}, i={i}, j={j} depth={self.topo.depth.data[j, i]:.2f}'
         self.ax.format_coord = format_coord
 
@@ -179,7 +179,7 @@ class TopoEditor(widgets.HBox):
 
                 # Get the coordinates of the click and retrieve the cell indices
                 y, x = event.ydata, event.xdata
-                i, j = self.topo._grid.get_indices(y, x)
+                j, i = self.topo._grid.get_indices(y, x)
 
                 self._select_cell(i, j)
                 
