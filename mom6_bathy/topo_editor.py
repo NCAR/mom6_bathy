@@ -122,6 +122,14 @@ class TopoEditor(widgets.HBox):
             layout={'width': '90%', 'display': 'flex'},
             style={'description_width': '100px'}
         )
+        
+        self._basin_specifier_toggle_beta = widgets.Button(
+            description="Erase Selected Basin",
+            disabled=True,
+            layout={'width': '90%', 'display': 'flex'},
+            style={'description_width': '100px'}
+        )
+        
         self._basin_specifier = widgets.Label(
             value='Basin Label Number: None',
             layout={'width': '80%'},
@@ -140,6 +148,7 @@ class TopoEditor(widgets.HBox):
             widgets.HTML("<hr><h3>Basin Selector</h3>"),
             self._basin_specifier,
             self._basin_specifier_toggle,
+            self._basin_specifier_toggle_beta
           ], layout= {'width': '30%', 'height': '100%'})
 
 
@@ -196,8 +205,10 @@ class TopoEditor(widgets.HBox):
         # If not land, manifest button
         if label != 0:
             self._basin_specifier_toggle.disabled = False
+            self._basin_specifier_toggle_beta.disabled = False
         else:
             self._basin_specifier_toggle.disabled = True
+            self._basin_specifier_toggle_beta.disabled = True
 
 
     def construct_observances(self):
@@ -241,6 +252,18 @@ class TopoEditor(widgets.HBox):
                 self.cbar.update_normal(self.im)
 
         self._basin_specifier_toggle.on_click(erase_disconnected_basins)
+        
+        def erase_selected_basin(b):
+            if self._selected_cell is not None:
+                
+                i, j, _ = self._selected_cell
+                ocean_mask_changed = np.where(self.topo.basintmask != self.topo.basintmask[i,j], 1, 0)
+                self.topo.depth = np.where(ocean_mask_changed == 0, 0, self.topo.depth)
+                self.im.set_array(self.topo.depth.data)
+                self.im.set_clim((self.topo.min_depth, self.topo.depth.data.max()))
+                self.cbar.update_normal(self.im)
+                
+        self._basin_specifier_toggle_beta.on_click(erase_selected_basin)
         
         def on_depth_change(change):
             if self._selected_cell is not None:
