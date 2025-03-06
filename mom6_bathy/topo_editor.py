@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as patches
 import ipywidgets as widgets
+from matplotlib.ticker import MaxNLocator
 
 class TopoEditor(widgets.HBox):
     
@@ -68,6 +69,8 @@ class TopoEditor(widgets.HBox):
         # colorbar title
         self.cbar.set_label(f'Depth ({self.topo.depth.units})')
 
+        # Enforce Cbar integer values for easier mask/basinmask colorbar
+        self.cbar.set_ticks(MaxNLocator(integer=True))  # Ensure ticks are integers 
         # x and y labels
         self.ax.set_xlabel(f'x ({self.topo._grid.qlon.units})')
         self.ax.set_ylabel(f'y ({self.topo._grid.qlat.units})')
@@ -160,11 +163,12 @@ class TopoEditor(widgets.HBox):
             self.im.set_clim(vmin = self.topo.min_depth, vmax = self.topo.depth.max(skipna=True).item())
             self.im.set_array(self.topo.depth.data)
             self.im.set_clim(vmin = self.topo.min_depth, vmax = self.topo.depth.max(skipna=True).item()) # For some reason, this needs to be set twice to get the correct minimum bound
+            
             self.cbar.set_label(f'Depth ({self.topo.depth.units})')
         elif mode == 'mask':
             self.im.set_array(self.topo.tmask.data)
             self.im.set_clim((0, 1))
-            self.cbar.set_label('Mask')
+            self.cbar.set_label('Land Mask')
         elif mode == 'basinmask':
             self.im.set_array(self.topo.basintmask.data)
             self.im.set_clim((0,self.topo.basintmask.data.max()))
