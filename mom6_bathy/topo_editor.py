@@ -157,8 +157,9 @@ class TopoEditor(widgets.HBox):
         mode = change['new']
 
         if mode == 'depth':
+            self.im.set_clim(vmin = self.topo.min_depth, vmax = self.topo.depth.max(skipna=True).item())
             self.im.set_array(self.topo.depth.data)
-            self.im.set_clim((self.topo.min_depth, self.topo.depth.data.max()))
+            self.im.set_clim(vmin = self.topo.min_depth, vmax = self.topo.depth.max(skipna=True).item()) # For some reason, this needs to be set twice to get the correct minimum bound
             self.cbar.set_label(f'Depth ({self.topo.depth.units})')
         elif mode == 'mask':
             self.im.set_array(self.topo.tmask.data)
@@ -170,14 +171,16 @@ class TopoEditor(widgets.HBox):
             self.cbar.set_label('Basin Mask')
         else:
             raise ValueError(f"Unknown display mode: {mode}")
+
                 
+    def trigger_refresh(self):
+        self.refresh_display_mode({'new': self._display_mode_toggle.value})
 
     def _select_cell(self, i, j):
 
         # If a cell was previously selected, remove the patch
         if self._selected_cell is not None:
             self._selected_cell[2].remove()
-
         # Create a patch to highlight the selected cell
         vertices = np.array([
             [self.topo._grid.qlon.data[j,i], self.topo._grid.qlat.data[j,i]],
@@ -220,15 +223,13 @@ class TopoEditor(widgets.HBox):
                 # Get the coordinates of the click and retrieve the cell indices
                 y, x = event.ydata, event.xdata
                 j, i = self.topo._grid.get_indices(y, x)
-
                 self._select_cell(i, j)
                 
         self.fig.canvas.mpl_connect('button_press_event', on_double_click)
 
         def on_min_depth_change(change):
             self.topo.min_depth = change['new']
-            self.im.set_clim((self.topo.min_depth, self.topo.depth.data.max()))
-            self.cbar.update_normal(self.im)
+            self.trigger_refresh()
 
         self._min_depth_specifier.observe(
             on_min_depth_change,
@@ -241,15 +242,14 @@ class TopoEditor(widgets.HBox):
             names='value',
             type='change'
         )
+
         def erase_disconnected_basins(b):
             if self._selected_cell is not None:
                 
                 i, j, _ = self._selected_cell
                 ocean_mask_changed = np.where(self.topo.basintmask == self.topo.basintmask[j,i], 1, 0)
                 self.topo.depth = np.where(ocean_mask_changed == 0, 0, self.topo.depth)
-                self.im.set_array(self.topo.depth.data)
-                self.im.set_clim((self.topo.min_depth, self.topo.depth.data.max()))
-                self.cbar.update_normal(self.im)
+                self.trigger_refresh()
 
         self._basin_specifier_toggle.on_click(erase_disconnected_basins)
         
@@ -259,9 +259,7 @@ class TopoEditor(widgets.HBox):
                 i, j, _ = self._selected_cell
                 ocean_mask_changed = np.where(self.topo.basintmask == self.topo.basintmask[j,i], 1, 0)
                 self.topo.depth = np.where(ocean_mask_changed == 1, 0, self.topo.depth)
-                self.im.set_array(self.topo.depth.data)
-                self.im.set_clim((self.topo.min_depth, self.topo.depth.data.max()))
-                self.cbar.update_normal(self.im)
+                self.trigger_refresh()
                 
         self._basin_specifier_delete_selected.on_click(erase_selected_basin)
         
@@ -269,9 +267,7 @@ class TopoEditor(widgets.HBox):
             if self._selected_cell is not None:
                 i, j, _ = self._selected_cell
                 self.topo.depth.data[j, i] = change['new']
-                self.im.set_array(self.topo.depth.data)
-                self.im.set_clim((self.topo.min_depth, self.topo.depth.data.max()))
-                self.cbar.update_normal(self.im)
+                self.trigger_refresh()
 
         self._depth_specifier.observe(
             on_depth_change,
