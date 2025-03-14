@@ -64,7 +64,7 @@ class TopoEditor(widgets.HBox):
         self.ax.set_title('Double click on a cell to change its depth.')
 
         # colorbar
-        self.cbar = plt.colorbar(self.im)
+        self.cbar = self.fig.colorbar(self.im)
 
         # colorbar title
         self.cbar.set_label(f'Depth ({self.topo.depth.units})')
