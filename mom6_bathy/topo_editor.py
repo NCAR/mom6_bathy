@@ -90,7 +90,7 @@ class TopoEditor(widgets.HBox):
         self._min_depth_specifier = widgets.BoundedFloatText(
             value=self.topo.min_depth,
             min=-1000.0,
-            max=self.topo.depth.data.max(),
+            max=self.topo.depth.max(skipna=True).item(),
             step=10.0,
             description='Min depth (m):',
             disabled=False,
