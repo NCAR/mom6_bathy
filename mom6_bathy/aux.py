@@ -1,6 +1,59 @@
 """Auxiliary functions for grid property computations."""
 
+from pathlib import Path
+import xarray as xr
 import numpy as np
+
+
+def get_mesh_dimensions(mesh):
+    """Given an ESMF mesh where the grid metrics are stored in 1D (flattened) arrays,
+    compute the dimensions of the 2D grid and return them as nx, ny.
+
+    Parameters
+    ----------
+    mesh : xr.Dataset or str or Path
+        The ESMF mesh dataset or the path to the mesh file.
+    
+    Returns
+    -------
+    nx : int
+        Number of points in the x-direction.
+    ny : int
+        Number of points in the y-direction.
+    """
+
+    if not isinstance(mesh, xr.Dataset):
+        assert isinstance(mesh, (Path, str)) and Path(mesh).exists(), "mesh must be a path to an existing file"
+        mesh = xr.open_dataset(mesh)
+
+    centerCoords = mesh['centerCoords'].values
+
+    x0, y0 = centerCoords[0]  # First coordinate
+    x0 = (x0 + 360) % 360  # Normalize longitude
+
+    coords = centerCoords[:, :2]
+    x, y = coords[:, 0], coords[:, 1]
+
+    # Compute distances in bulk
+    dists = (np.mod(x + 360 - x0, 360)) ** 2 + (y - y0) ** 2
+
+    # Diff of distances
+    diff = np.diff(dists)
+    
+    # Index of the first decrease in distances:
+    i = np.where(diff < 0)[0][0]
+    # Index of the first increase after the first decrease:
+    i = np.where(diff[i:] > 0)[0][0] + i 
+
+    nx = i
+    ny = len(centerCoords) // nx
+
+    # Check that nx is indeed nx and not ny, and if not, swap them
+    if np.abs(np.mod(coords[nx//2, 0] - x0, 360)) < np.abs(coords[nx//2, 1] - y0):
+        nx, ny = ny, nx
+
+    assert nx * ny == len(centerCoords), "nx*ny must match the number of points in the mesh"
+    return nx, ny
 
 
 def gc_dist(lat1, lon1, lat2, lon2, radius=1.0):
