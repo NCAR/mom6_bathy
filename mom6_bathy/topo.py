@@ -117,6 +117,73 @@ class Topo:
             attrs={"name": "T mask"},
         )
         return tmask_da
+    
+    @property
+    def umask(self):
+        """
+        Ocean domain mask on U grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        umask_da = xr.DataArray(
+            np.ones(self._grid.ulat.shape, dtype=int),
+            dims = ['yh','xq'],
+            attrs={"name": "U mask"})
+        
+        # Fill umask with mask values
+        umask_da[:,:-1] &= tmask.values # h-point translates to the left u-point
+        umask_da[:,1:] &= tmask.values # h-point translates to the right u-point
+
+        return umask_da
+    
+    @property
+    def vmask(self):
+        """
+        Ocean domain mask on U grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        vmask = xr.DataArray(
+            np.ones(self._grid.vlat.shape, dtype=int),
+            dims = ['yq','xh'],
+            attrs={"name": "U mask"})
+        
+        # Fill umask with mask values
+        vmask[:-1,:] &= tmask.values # h-point translates to the bottom v-point
+        vmask[1:,:] &= tmask.values # h-point translates to the top v-point
+
+        return vmask
+    
+    @property
+    def qmask(self):
+        """
+        Ocean domain mask on q grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        qmask = xr.DataArray(
+            np.ones(self._grid.qlat.shape, dtype=int),
+            dims = ['yq','xq'],
+            attrs={"name": "U mask"})
+        
+        # Fill umask with mask values
+        qmask[:-1, :-1] &= tmask.values    # top-left of h goes to top-left q
+        qmask[:-1, 1:]  &= tmask.values     # top-right
+        qmask[1:, :-1]  &= tmask.values   # bottom-left
+        qmask[1:, 1:]   &= tmask.values     # bottom-right 
+
+        # Corners of the Qmask are always land -> regional cases
+        qmask[0, 0] = 0
+        qmask[0, -1] = 0
+        qmask[-1, 0] = 0
+        qmask[-1, -1] = 0
+
+        return qmask
+
+
         
     @property
     def basintmask(self):
