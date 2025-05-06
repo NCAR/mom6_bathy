@@ -182,7 +182,7 @@ class Topo:
         qmask[-1, -1] = 0
 
         return qmask
-
+          
 
         
     @property
@@ -193,6 +193,31 @@ class Topo:
         res, num_features = label(self.tmask)
         
         return xr.DataArray(res)
+    
+    def point_is_ocean(self, lon,lat):
+        """
+        Returns true if point is ocean, false if point is land
+        """
+
+        
+        grid_info = {
+            "q": [self._grid.qlat,self._grid.qlon,self.qmask],
+            "u": [self._grid.ulat,self._grid.ulon,self.umask],
+            "v": [self._grid.vlat,self._grid.vlon,self.vmask],
+            "t": [self._grid.tlat,self._grid.tlon,self.tmask],
+        }
+
+        for key in grid_info:
+            lat_arr = grid_info[key][0]
+            lon_arr = grid_info[key][1]
+            mask = grid_info[key][2]
+            if np.isin(lat, lat_arr) and np.isin(lon, lon_arr):
+                match = np.where((lat_arr == lat) & (lon_arr == lon))
+                y, x = match[0][0], match[1][0]
+                return (mask[y,x] == 1).item()
+
+
+
 
     def set_flat(self, D):
         """
@@ -612,7 +637,17 @@ class Topo:
                 "coordinates": "ULON ULAT",
             },
         )
-
+        ds["anglet"] = xr.DataArray(
+            np.deg2rad(
+                self._grid.angle.data
+            ),
+            dims=["nj", "ni"],
+            attrs={
+                "long_name": "angle grid makes with latitude line on U grid",
+                "units": "radians",
+                "coordinates": "ULON ULAT",
+            },
+        )
         ds["kmt"] = xr.DataArray(
             self.tmask.astype(np.float32),
             dims=["nj", "ni"],
