@@ -44,6 +44,8 @@ class Grid:
         y-distance between t points, centered at v
     angle: xr.DataArray
         angle grid makes with latitude line
+    popangle: xr.DataArray
+        angle pop u-grid makes with latitude line
     tarea: xr.DataArray
         T-cell area
 
@@ -376,7 +378,7 @@ class Grid:
     def _compute_MOM6_grid_metrics(self):
         """Compute the MOM6 grid metrics from the supergrid metrics. These 
         include the tlon, tlat, ulon, ulat, vlon, vlat, qlon, qlat, dxt, dyt,
-        dxCv, dyCu, dxCu, dyCv, angle, and tarea."""
+        dxCv, dyCu, dxCu, dyCv, angle, popangle, and tarea."""
 
         sg = self._supergrid
         sg_units = sg.dict["axis_units"]
@@ -505,6 +507,12 @@ class Grid:
             attrs={"name": "angle grid makes with latitude line", "units": "degrees"},
         )
 
+        # POP angle
+        self.popangle = xr.DataArray(
+            sg.angle_dx[2::2, 2::2],
+            dims=["ny", "nx"],
+            attrs={"name": "angle POP u-grid makes with latitude line", "units": "degrees"},
+        )
         # T area
         self.tarea = xr.DataArray(
             sg.area[::2, ::2]

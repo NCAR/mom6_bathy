@@ -536,13 +536,25 @@ class Topo:
 
         ds["angle"] = xr.DataArray(
             np.deg2rad(
-                self._grid.angle.data
+                self._grid.popangle.data
             ),
             dims=["nj", "ni"],
             attrs={
                 "long_name": "angle grid makes with latitude line on U grid",
                 "units": "radians",
                 "coordinates": "ULON ULAT",
+            },
+        )
+
+        ds["anglet"] = xr.DataArray(
+            np.deg2rad(
+                self._grid.angle.data
+            ),
+            dims=["nj", "ni"],
+            attrs={
+                "long_name": "angle grid makes with latitude line on T grid",
+                "units": "radians",
+                "coordinates": "TLON TLAT",
             },
         )
 
