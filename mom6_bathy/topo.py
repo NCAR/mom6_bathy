@@ -194,30 +194,24 @@ class Topo:
         
         return xr.DataArray(res)
     
+    @property
+    def supergridmask(self):
+        mask_da = xr.DataArray(np.zeros(self._grid._supergrid.x.shape, dtype=int),dims=["nyp", "nxp"])
+        mask_da[::2, ::2] = self.qmask.values
+        mask_da[::2, 1::2] = self.vmask.values
+        mask_da[ 1::2,::2] = self.umask.values
+        mask_da[ 1::2,1::2] = self.tmask.values
+        return mask_da
+
     def point_is_ocean(self, lon,lat):
         """
         Returns true if point is ocean, false if point is land
         """
-
-        
-        grid_info = {
-            "q": [self._grid.qlat,self._grid.qlon,self.qmask],
-            "u": [self._grid.ulat,self._grid.ulon,self.umask],
-            "v": [self._grid.vlat,self._grid.vlon,self.vmask],
-            "t": [self._grid.tlat,self._grid.tlon,self.tmask],
-        }
-
-        for key in grid_info:
-            lat_arr = grid_info[key][0]
-            lon_arr = grid_info[key][1]
-            mask = grid_info[key][2]
-            if np.isin(lat, lat_arr) and np.isin(lon, lon_arr):
-                match = np.where((lat_arr == lat) & (lon_arr == lon))
-                y, x = match[0][0], match[1][0]
-                return (mask[y,x] == 1).item()
-
-
-
+        res=[]
+        for i in range(len(lon)):
+            match = np.where((self._grid._supergrid.x == lon[i]) & (self._grid._supergrid.y == lat[i]))
+            res.append(self.supergridmask[match[0],match[1]].item())
+        return res
 
     def set_flat(self, D):
         """
