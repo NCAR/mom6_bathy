@@ -507,11 +507,11 @@ class Grid:
             attrs={"name": "angle grid makes with latitude line", "units": "degrees"},
         )
 
-        # POP angle
+        # q angle
         self.angle_q = xr.DataArray(
-            sg.angle_dx[2::2, 2::2],
+            sg.angle_dx[::2, ::2],
             dims=["ny", "nx"],
-            attrs={"name": "angle POP u-grid makes with latitude line", "units": "degrees"},
+            attrs={"name": "angle q-grid makes with latitude line", "units": "degrees"},
         )
         # T area
         self.tarea = xr.DataArray(
