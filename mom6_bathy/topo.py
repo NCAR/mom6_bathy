@@ -203,15 +203,17 @@ class Topo:
         mask_da[ 1::2,1::2] = self.tmask.values
         return mask_da
 
-    def point_is_ocean(self, lon,lat):
+    def point_is_ocean(self, lons,lats):
         """
-        Returns true if point is ocean, false if point is land
+        Given a list of coordinates, return a list of booleans indicating if the coordinates are in the ocean or land
         """
-        res=[]
-        for i in range(len(lon)):
-            match = np.where((self._grid._supergrid.x == lon[i]) & (self._grid._supergrid.y == lat[i]))
-            res.append(self.supergridmask[match[0],match[1]].item())
-        return res
+        assert len(lons) == len(lats), "Lons & Lats must be the same length, they describe a set of points"
+
+        is_ocean=[]
+        for i in range(len(lons)):
+            match = np.where((self._grid._supergrid.x == lons[i]) & (self._grid._supergrid.y == lats[i]))
+            is_ocean.append(self.supergridmask[match[0],match[1]].item())
+        return is_ocean
 
     def set_flat(self, D):
         """
