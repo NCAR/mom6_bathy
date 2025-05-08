@@ -631,7 +631,7 @@ class Topo:
 
         ds["angle"] = xr.DataArray(
             np.deg2rad(
-                self._grid.angle.data
+                self._grid.angle_q.data[1:,1:] # Slice the q-grid from MOM6 (which is u-grid in CICE/POP) to CICE/POP convention, the top right of the t points
             ),
             dims=["nj", "ni"],
             attrs={
@@ -640,7 +640,19 @@ class Topo:
                 "coordinates": "ULON ULAT",
             },
         )
-        
+
+        ds["anglet"] = xr.DataArray(
+            np.deg2rad(
+                self._grid.angle.data
+            ),
+            dims=["nj", "ni"],
+            attrs={
+                "long_name": "angle grid makes with latitude line on T grid",
+                "units": "radians",
+                "coordinates": "TLON TLAT",
+            },
+        )
+
         ds["kmt"] = xr.DataArray(
             self.tmask.astype(np.float32),
             dims=["nj", "ni"],
