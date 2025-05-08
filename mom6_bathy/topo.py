@@ -640,17 +640,6 @@ class Topo:
                 "coordinates": "ULON ULAT",
             },
         )
-        ds["anglet"] = xr.DataArray(
-            np.deg2rad(
-                self._grid.angle.data
-            ),
-            dims=["nj", "ni"],
-            attrs={
-                "long_name": "angle grid makes with latitude line on U grid",
-                "units": "radians",
-                "coordinates": "ULON ULAT",
-            },
-        )
         ds["kmt"] = xr.DataArray(
             self.tmask.astype(np.float32),
             dims=["nj", "ni"],
