@@ -536,7 +536,7 @@ class Topo:
 
         ds["angle"] = xr.DataArray(
             np.deg2rad(
-                self._grid.popangle.data
+                self._grid.angle_q.data
             ),
             dims=["nj", "ni"],
             attrs={
