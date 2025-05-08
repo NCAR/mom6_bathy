@@ -117,15 +117,110 @@ class Topo:
             attrs={"name": "T mask"},
         )
         return tmask_da
+    
+    @property
+    def umask(self):
+        """
+        Ocean domain mask on U grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        umask = xr.DataArray(
+            np.ones(self._grid.ulat.shape, dtype=int),
+            dims = ['yh','xq'],
+            attrs={"name": "U mask"})
+        
+        # Fill umask with mask values
+        umask[:,:-1] &= tmask.values # h-point translates to the left u-point
+        umask[:,1:] &= tmask.values # h-point translates to the right u-point
+
+        return umask
+    
+    @property
+    def vmask(self):
+        """
+        Ocean domain mask on V grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        vmask = xr.DataArray(
+            np.ones(self._grid.vlat.shape, dtype=int),
+            dims = ['yq','xh'],
+            attrs={"name": "V mask"})
+        
+        # Fill vmask with mask values
+        vmask[:-1,:] &= tmask.values # h-point translates to the bottom v-point
+        vmask[1:,:] &= tmask.values # h-point translates to the top v-point
+
+        return vmask
+    
+    @property
+    def qmask(self):
+        """
+        Ocean domain mask on Q grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        qmask = xr.DataArray(
+            np.ones(self._grid.qlat.shape, dtype=int),
+            dims = ['yq','xq'],
+            attrs={"name": "Q mask"})
+        
+        # Fill qmask with mask values
+        qmask[:-1, :-1] &= tmask.values    # top-left of h goes to top-left q
+        qmask[:-1, 1:]  &= tmask.values     # top-right
+        qmask[1:, :-1]  &= tmask.values   # bottom-left
+        qmask[1:, 1:]   &= tmask.values     # bottom-right 
+
+        # Corners of the qmask are always land -> regional cases
+        qmask[0, 0] = 0
+        qmask[0, -1] = 0
+        qmask[-1, 0] = 0
+        qmask[-1, -1] = 0
+
+        return qmask
+          
+
         
     @property
     def basintmask(self):
         """
-        Ocean domain mask at T grid. seperate number for each connected water cell, 0 if land.
+        Ocean domain mask at T grid. Seperate number for each connected water cell, 0 if land.
         """
         res, num_features = label(self.tmask)
         
         return xr.DataArray(res)
+    
+    @property
+    def supergridmask(self):
+        """
+        Ocean domain mask on supergrid. 1 if ocean, 0 if land.
+        """
+
+        supergridmask = xr.DataArray(
+            np.zeros(self._grid._supergrid.x.shape, dtype=int),
+            dims=["nyp", "nxp"],
+            attrs={"name": "supergrid mask"})
+        supergridmask[::2, ::2] = self.qmask.values
+        supergridmask[::2, 1::2] = self.vmask.values
+        supergridmask[ 1::2,::2] = self.umask.values
+        supergridmask[ 1::2,1::2] = self.tmask.values
+        return supergridmask
+
+    def point_is_ocean(self, lons,lats):
+        """
+        Given a list of coordinates, return a list of booleans indicating if the coordinates are in the ocean (True) or land (False)
+        """
+        assert len(lons) == len(lats), "Lons & Lats must be the same length, they describe a set of points"
+
+        is_ocean=[]
+        for i in range(len(lons)):
+            match = np.where((self._grid._supergrid.x == lons[i]) & (self._grid._supergrid.y == lats[i]))
+            is_ocean.append(self.supergridmask[match[0],match[1]].item())
+        return is_ocean
 
     def set_flat(self, D):
         """
