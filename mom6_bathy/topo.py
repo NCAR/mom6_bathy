@@ -536,7 +536,7 @@ class Topo:
 
         ds["angle"] = xr.DataArray(
             np.deg2rad(
-                self._grid.angle_q.data[1:,1:] # Slice the q-grid from MOM6 (which is u-grid in POP) to POP convention, the top right of the t points
+                self._grid.angle_q.data[1:,1:] # Slice the q-grid from MOM6 (which is u-grid in CICE/POP) to CICE/POP convention, the top right of the t points
             ),
             dims=["nj", "ni"],
             attrs={
