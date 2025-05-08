@@ -45,7 +45,7 @@ class Grid:
     angle: xr.DataArray
         angle grid makes with latitude line
     angle_q: xr.DataArray
-        angle pop u-grid makes with latitude line
+        angle q-grid makes with latitude line
     tarea: xr.DataArray
         T-cell area
 
