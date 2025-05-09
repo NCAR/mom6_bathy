@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
 import os
+import argparse
 import xesmf as xe
 import xarray as xr
-from pathlib import Path
 import numpy as np
-import argparse
-from mom6_bathy.aux import get_mesh_dimensions, gc_qarea
+from pathlib import Path
+from scipy.spatial import cKDTree
+from scipy.sparse import coo_matrix
 
+from mom6_bathy.aux import get_mesh_dimensions, gc_qarea
 
 def grid_from_esmf_mesh(mesh: xr.Dataset | str | Path) -> "Grid":
     """Given an ESMF mesh where the grid metrics are stored in 1D (flattened) arrays,
@@ -520,6 +522,63 @@ def generate_ESMF_map_via_esmpy(src_mesh_path, dst_mesh_path, mapping_file, meth
         area_normalization=area_normalization
     )
 
+
+def compute_smoothing_weights(mesh_ds, rmax, fold=1.0):
+    """Compute smoothing weights for a given mesh dataset, taking into account the maximum
+    distance and fold factor.
+    
+    Parameters
+    ----------
+    mesh_ds : xr.Dataset
+        The ESMF mesh dataset.
+    rmax : float
+        Maximum distance for smoothing weights. (same units as mesh coordinates)
+    fold : float
+        Fold factor determining the strength of smoothing based on distance. A higher value results
+        in less decay of weights with distance (and, hence, higher weights at larger distances).
+        Suggested values are between 0.5 and 2.0.
+        
+    Returns
+    -------
+    weights : scipy.sparse.coo_matrix
+        The computed smoothing weights in coordinate (COO) format.
+    """
+
+    if not isinstance(mesh_ds, xr.Dataset):
+        raise ValueError("mesh_ds must be an xarray Dataset.")
+
+    # Extract coordinates and mask
+    coords = mesh_ds['centerCoords'].values
+    mask = mesh_ds['elementMask'].values
+    mask_bool = mask != 0
+
+    # Create a KDTree for efficient nearest neighbor search
+    tree = cKDTree(coords)
+    # Query the tree for neighbors within the maximum distance
+    indices = tree.query_ball_tree(tree, rmax)
+
+    row_indices, col_indices, data = [], [], []
+
+    # Compute weights for valid points
+    for i, neighbors in enumerate(indices):
+        if not mask_bool[i]:
+            continue
+        neighbors = np.array(neighbors)
+        # Filter out masked neighbors
+        neighbors = neighbors[mask_bool[neighbors]]
+        # Compute distances and weights
+        distances_sq = np.sum((coords[i] - coords[neighbors])**2, axis=1)
+        weights_data = np.exp(-distances_sq / (fold * rmax))
+        row_indices.extend([i] * len(neighbors))
+        col_indices.extend(neighbors)
+        # Normalize weights
+        weights_data /= np.sum(weights_data)
+        # Append to data
+        data.extend(weights_data)
+    
+    # Create a COO sparse matrix for weights
+    weights = coo_matrix((data, (row_indices, col_indices)), shape=(len(coords), len(coords)))
+    return weights
 
 
 def main(args):
