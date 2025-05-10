@@ -355,20 +355,17 @@ def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=
         w = weights.data.copy()
         col_data = w.coords[1, :] + 1
         row_data = w.coords[0, :] + 1
-        if area_normalization:
-            w.data *= area_a.data[w.coords[1, :]] / area_b.data[w.coords[0, :]]
     elif weights_esmpy is not None: # esmpy weights
         w = weights_esmpy.S.copy()
         col_data = weights_esmpy.col.data
         row_data = weights_esmpy.row.data
-        if area_normalization:
-            w.data *= area_a.data[col_data - 1] / area_b.data[row_data - 1]
     elif weights_coo is not None: # scipy sparse COO matrix
         w = weights_coo.data
         col_data = weights_coo.col + 1
         row_data = weights_coo.row + 1
-        if area_normalization:
-            w.data *= area_a.data[col_data - 1] / area_b.data[row_data - 1]
+
+    if area_normalization:
+        w.data *= area_a.data[col_data - 1] / area_b.data[row_data - 1]
 
     S = xr.DataArray(
         w.data,
@@ -561,6 +558,7 @@ def compute_smoothing_weights(mesh_ds, rmax, fold=1.0):
 
     # Extract coordinates and mask
     coords = mesh_ds['centerCoords'].values
+    areas = mesh_ds['elementArea'].values
     mask = mesh_ds['elementMask'].values
     mask_bool = mask != 0
 
@@ -584,8 +582,8 @@ def compute_smoothing_weights(mesh_ds, rmax, fold=1.0):
         # Compute distances and weights
         distances_sq = np.sum((coords[i] - coords[neighbors])**2, axis=1)
         weights_data = np.exp(-distances_sq / (fold * rmax))
-        # Normalization:
-        weights_data /= np.sum(weights_data)
+        # Normalization (taking into account the area of the cells)
+        weights_data /= np.sum(weights_data * areas[neighbors]) / areas[i]
         # Append to data
         data.extend(weights_data)
     
