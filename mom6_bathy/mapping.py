@@ -126,7 +126,7 @@ def _construct_vertex_coords(mesh):
     
     return xv_data, yv_data
 
-def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=None, area_normalization=False):
+def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=None, weights_coo=None, area_normalization=False):
     """Based on a given source mesh, destination mesh, and weights, generate an ESMF map file.
     
     Parameters
@@ -141,6 +141,8 @@ def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=
         xESMF-generated weights to be used for the regridding.
     weights_esmpy:
         esmpy-generated weights to be used for the regridding.
+    weights_coo : scipy.sparse.coo_matrix
+        COO format sparse matrix containing the weights.
     regrid_method : str, optional
         Regridding method, by default 'bilinear'.
     area_normalization : bool, optional
@@ -156,17 +158,21 @@ def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=
     if isinstance(dst_mesh, str):
         dst_mesh = xr.open_dataset(dst_mesh)
     
-    if weights is None and weights_esmpy is None:
-        raise ValueError("Either weights or weights_esmpy must be provided.")
+    if weights is weights_esmpy is weights_coo is None:
+        raise ValueError("At least one of weights, weights_esmpy, or weights_coo must be provided.")
     if weights is not None:
         assert weights_esmpy is None, "Cannot provide both weights and weights_esmpy"
+        assert weights_coo is None, "Cannot provide both weights and weights_coo"
         assert isinstance(weights, xr.DataArray), "weights must be an xarray DataArray"
     if weights_esmpy is not None:
-        assert weights is None, "Cannot provide both weights and weights_esmpy"
+        assert weights_coo is None, "Cannot provide both weights and weights_coo"
         assert isinstance(weights_esmpy, (xr.Dataset, str)), "weights_esmpy must be an xarray Dataset or a path to a file"
         if isinstance(weights_esmpy, str):
             weights_esmpy = xr.open_dataset(weights_esmpy)
-        assert {'S', 'row', 'col'}.issubset(weights_esmpy), "weights_esmpy must contain 'S', 'row', and 'col'"
+        if not isinstance(weights_esmpy, coo_matrix):
+            assert {'S', 'row', 'col'}.issubset(weights_esmpy), "weights_esmpy must contain 'S', 'row', and 'col'"
+    if weights_coo is not None:
+        assert isinstance(weights_coo, coo_matrix), "weights_coo must be a scipy sparse COO matrix"
 
     # From 1D ESMF mesh to 2D grid
     src_grid = grid_from_esmf_mesh(src_mesh)
@@ -355,6 +361,12 @@ def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=
         w = weights_esmpy.S.copy()
         col_data = weights_esmpy.col.data
         row_data = weights_esmpy.row.data
+        if area_normalization:
+            w.data *= area_a.data[col_data - 1] / area_b.data[row_data - 1]
+    elif weights_coo is not None: # scipy sparse COO matrix
+        w = weights_coo.data
+        col_data = weights_coo.col + 1
+        row_data = weights_coo.row + 1
         if area_normalization:
             w.data *= area_a.data[col_data - 1] / area_b.data[row_data - 1]
 
@@ -566,12 +578,13 @@ def compute_smoothing_weights(mesh_ds, rmax, fold=1.0):
         neighbors = np.array(neighbors)
         # Filter out masked neighbors
         neighbors = neighbors[mask_bool[neighbors]]
+        # row and col indices for the sparse matrix
+        row_indices.extend([i] * len(neighbors))
+        col_indices.extend(neighbors)
         # Compute distances and weights
         distances_sq = np.sum((coords[i] - coords[neighbors])**2, axis=1)
         weights_data = np.exp(-distances_sq / (fold * rmax))
-        row_indices.extend([i] * len(neighbors))
-        col_indices.extend(neighbors)
-        # Normalize weights
+        # Normalization:
         weights_data /= np.sum(weights_data)
         # Append to data
         data.extend(weights_data)
