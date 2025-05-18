@@ -9,7 +9,7 @@ from pathlib import Path
 from scipy.spatial import cKDTree
 from scipy.sparse import coo_matrix
 
-from mom6_bathy.aux import get_mesh_dimensions, gc_qarea
+from mom6_bathy.aux import get_mesh_dimensions, cell_area_rad
 
 def grid_from_esmf_mesh(mesh: xr.Dataset | str | Path) -> "Grid":
     """Given an ESMF mesh where the grid metrics are stored in 1D (flattened) arrays,
@@ -228,7 +228,7 @@ def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=
     )
 
     area_a = xr.DataArray(
-        gc_qarea(yv_a, xv_a),
+        cell_area_rad(xv_a, yv_a),
         dims=['n_a'],
         attrs={
             'long_name': 'area of cell (input)',
@@ -313,7 +313,7 @@ def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=
     )
 
     area_b = xr.DataArray(
-        gc_qarea(yv_b, xv_b),
+        cell_area_rad(xv_b, yv_b),
         dims=['n_b'],
         attrs={
             'long_name': 'area of cell (output)',
