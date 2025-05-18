@@ -532,21 +532,22 @@ def generate_ESMF_map_via_esmpy(src_mesh_path, dst_mesh_path, mapping_file, meth
     )
 
 
-def compute_smoothing_weights(mesh_ds, rmax, fold=1.0):
-    """Compute smoothing weights for a given mesh dataset, taking into account the maximum
-    distance and fold factor.
-    
+def compute_smoothing_weights(mesh_ds, rmax, fold=1.0, xv_data=None, yv_data=None):
+    """Compute smoothing weights for a given mesh dataset, using a radius in kilometers.
+
     Parameters
     ----------
     mesh_ds : xr.Dataset
         The ESMF mesh dataset.
     rmax : float
-        Maximum distance for smoothing weights. (same units as mesh coordinates)
+        Maximum distance for smoothing weights, in kilometers.
     fold : float
-        Fold factor determining the strength of smoothing based on distance. A higher value results
-        in less decay of weights with distance (and, hence, higher weights at larger distances).
-        Suggested values are between 0.5 and 2.0.
-        
+        Fold factor (km) determining the strength of smoothing based on distance.
+    xv_data : np.ndarray, optional
+        The x-coordinates of the vertices. If not provided, they will be computed from the mesh dataset.
+    yv_data : np.ndarray, optional
+        The y-coordinates of the vertices. If not provided, they will be computed from the mesh dataset.
+
     Returns
     -------
     weights : scipy.sparse.coo_matrix
@@ -558,36 +559,49 @@ def compute_smoothing_weights(mesh_ds, rmax, fold=1.0):
 
     # Extract coordinates and mask
     coords = mesh_ds['centerCoords'].values
-    areas = mesh_ds['elementArea'].values
+    if xv_data is None or yv_data is None:
+        xv_data, yv_data = _construct_vertex_coords(mesh_ds)
+    areas = cell_area_rad(xv_data, yv_data)
     mask = mesh_ds['elementMask'].values
     mask_bool = mask != 0
 
-    # Create a KDTree for efficient nearest neighbor search
-    tree = cKDTree(coords)
-    # Query the tree for neighbors within the maximum distance
+    # Convert lon/lat (degrees) to radians
+    lon = np.deg2rad(coords[:, 0])
+    lat = np.deg2rad(coords[:, 1])
+
+    # Earth's radius in kilometers
+    R_earth = 6371.0
+
+    # Convert lon/lat to 3D Cartesian coordinates for great-circle distance calculation
+    x = R_earth * np.cos(lat) * np.cos(lon)
+    y = R_earth * np.cos(lat) * np.sin(lon)
+    z = R_earth * np.sin(lat)
+    xyz = np.stack([x, y, z], axis=1)
+
+    # Build KDTree in 3D Cartesian space
+    tree = cKDTree(xyz)
     indices = tree.query_ball_tree(tree, rmax)
 
     row_indices, col_indices, data = [], [], []
 
-    # Compute weights for valid points
     for i, neighbors in enumerate(indices):
         if not mask_bool[i]:
             continue
         neighbors = np.array(neighbors)
-        # Filter out masked neighbors
         neighbors = neighbors[mask_bool[neighbors]]
-        # row and col indices for the sparse matrix
         row_indices.extend([i] * len(neighbors))
         col_indices.extend(neighbors)
-        # Compute distances and weights
-        distances_sq = np.sum((coords[i] - coords[neighbors])**2, axis=1)
-        weights_data = np.exp(-distances_sq / (fold * rmax))
-        # Normalization (taking into account the area of the cells)
-        weights_data /= np.sum(weights_data * areas[neighbors]) / areas[i]
-        # Append to data
+        # Compute great-circle distances in km
+        d_xyz = xyz[i] - xyz[neighbors]
+        # Chord length
+        chord = np.linalg.norm(d_xyz, axis=1)
+        # Convert chord length to arc length (distance on sphere)
+        arc = 2 * R_earth * np.arcsin(np.clip(chord / (2 * R_earth), 0, 1))
+        weights_data = np.exp(-arc / fold)
+        # Normalize by area
+        weights_data /= np.sum(weights_data * (areas[neighbors] / areas[i]))
         data.extend(weights_data)
-    
-    # Create a COO sparse matrix for weights
+
     weights = coo_matrix((data, (row_indices, col_indices)), shape=(len(coords), len(coords)))
     return weights
 
