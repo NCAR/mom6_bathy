@@ -4,7 +4,11 @@ import xarray as xr
 import numpy as np
 from datetime import datetime
 from pathlib import Path
-from .ocean_fill_and_grid_interp import super_interp, fill_missing_data, super_sample_grid
+from .ocean_fill_and_grid_interp import (
+    super_interp,
+    fill_missing_data,
+    super_sample_grid,
+)
 
 
 def gen_chl_empty_dataset(output_path, lon, lat):
@@ -102,28 +106,32 @@ def interpolate_and_fill_seawifs(
     grid: Grid,
     topo: Topo,
     processed_seawifs_path: Path | str,
+    output_dir: Path | str = None,
 ):
-    
+    if grid.name is None:
+        grid.name = "UnknownGridName"
     ocn_mask = topo.tmask
     ocn_nj, ocn_ni = ocn_mask.shape
-
     src_nc = xr.open_dataset(processed_seawifs_path)
     src_data = src_nc["chlor_a"]
     src_nj, src_ni = src_data.shape[-2], src_data.shape[-1]
+
     src_lon = src_nc[src_data.dims[-1]]
     src_lat = ((np.arange(src_nj) + 0.5) / src_nj - 0.5) * 180.0  # Recompute as doubles
     src_x0 = int((src_lon[0] + src_lon[-1]) / 2 + 0.5) - 180.0
     src_lon = (
         (np.arange(src_ni) + 0.5) / src_ni
     ) * 360.0 + src_x0  # Recompute as doubles
-
     spr_lat, spr_lon = super_sample_grid(grid.qlat, grid.qlon, ocn_mask, src_nj, src_ni)
-    
-    output_path = (
-        processed_seawifs_path.parent
-        / f"seawifs-clim-1997-2010-{grid.name}.nc"
+
+    if output_dir is None:
+        output_dir = Path(processed_seawifs_path).parent
+    output_path = output_dir / f"seawifs-clim-1997-2010-{grid.name}.nc"
+    chla_tx06 = gen_chl_empty_dataset(
+        output_path,
+        grid.tlon[int(grid.ny / 2), :].values,
+        grid.tlat[:, int(grid.nx / 2)].values,
     )
-    chla_tx06 = gen_chl_empty_dataset(output_path, grid.tlon[int(grid.ny/2),:].values, grid.tlat[:,int(grid.nx/2)].values)
     chlor_a = chla_tx06["CHL_A"]
 
     for t in range(src_data.shape[0]):
@@ -138,13 +146,14 @@ def interpolate_and_fill_seawifs(
         q_masked = np.ma.masked_where(ocn_mask == 0, q_int)
         chlor_a[t, :] = fill_missing_data(q_masked, ocn_mask)
 
-
     # Global attributes
     chla_tx06.attrs["title"] = (
         "Chlorophyll Concentration, OCI Algorithm, interpolated and objectively filled to "
         + grid.name
     )
-    chla_tx06.attrs["repository"] = "https://github.com/NCAR/SeaWIFS_MOM6"
+    chla_tx06.attrs["repository"] = (
+        "https://github.com/NCAR/SeaWIFS_MOM6 and https://github.com/NCAR/mom6_bathy"
+    )
     chla_tx06.attrs["authors"] = (
         "Gustavo Marques (gmarques@ucar.edu) and Frank Bryan (bryan@ucar.edu)"
     )
@@ -152,12 +161,14 @@ def interpolate_and_fill_seawifs(
 
     # Assign variable data
     chla_tx06["CHL_A"].data[:] = chlor_a
-    chla_tx06["LON"].data[:] = grid.tlon[0,:]
-    chla_tx06["LAT"].data[:] = grid.tlat[:,0]
+    chla_tx06["LON"].data[:] = grid.tlon[0, :]
+    chla_tx06["LAT"].data[:] = grid.tlat[:, 0]
 
     # Write to NetCDF
     chla_tx06.to_netcdf(output_path)
+    print(f"Wrote interpolated and filled SeaWiFS data to:\n{output_path}")
 
+    return chla_tx06
 
 
 if __name__ == "__main__":
