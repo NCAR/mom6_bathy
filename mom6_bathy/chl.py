@@ -126,6 +126,8 @@ def interpolate_and_fill_seawifs(
 
     if output_dir is None:
         output_dir = Path(processed_seawifs_path).parent
+    else:
+        output_dir = Path(output_dir)
     output_path = output_dir / f"seawifs-clim-1997-2010-{grid.name}.nc"
     chla_tx06 = gen_chl_empty_dataset(
         output_path,
