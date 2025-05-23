@@ -106,8 +106,35 @@ def interpolate_and_fill_seawifs(
     grid: Grid,
     topo: Topo,
     processed_seawifs_path: Path | str,
-    output_dir: Path | str = None,
+    output_path: Path | str = None,
 ):
+    """
+    Interpolate and fill SeaWiFS chlorophyll data to a model grid and save to NetCDF.
+
+    This function takes gridded SeaWiFS chlorophyll data, interpolates it onto a 
+    super-sampled model grid, applies ocean masking, fills missing values, and writes 
+    the processed data to a NetCDF file. Global attributes are added to the output 
+    dataset to document provenance and authorship.
+
+    Parameters
+    ----------
+    grid : Grid
+        Model grid object containing tracer longitude and latitude arrays (`grid.tlon`, `grid.tlat`)
+        and other grid arrays (`grid.qlon`, `grid.qlat`, `grid.nx`, `grid.ny`).
+    topo : Topo
+        Topography object containing the ocean mask (`topo.tmask`).
+    processed_seawifs_path : Path or str
+        Path to the preprocessed SeaWiFS chlorophyll dataset.
+    output_path : Path or str, optional
+        Path to save the output NetCDF file. If not provided, it is created in the same
+        directory as `processed_seawifs_path` using the grid name.
+
+    Returns
+    -------
+    xarray.Dataset
+        A dataset containing the interpolated and filled chlorophyll concentration with
+        appropriate global attributes and coordinate variables.
+    """
     if grid.name is None:
         grid.name = "UnknownGridName"
     ocn_mask = topo.tmask
