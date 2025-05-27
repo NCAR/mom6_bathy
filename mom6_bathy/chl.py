@@ -151,11 +151,11 @@ def interpolate_and_fill_seawifs(
     ) * 360.0 + src_x0  # Recompute as doubles
     spr_lat, spr_lon = super_sample_grid(grid.qlat, grid.qlon, ocn_mask, src_nj, src_ni)
 
-    if output_dir is None:
-        output_dir = Path(processed_seawifs_path).parent
+    if output_path is None:
+        output_path = Path(processed_seawifs_path).parent
     else:
-        output_dir = Path(output_dir)
-    output_path = output_dir / f"seawifs-clim-1997-2010-{grid.name}.nc"
+        output_path = Path(output_path)
+    output_path = output_path / f"seawifs-clim-1997-2010-{grid.name}.nc"
     chla_tx06 = gen_chl_empty_dataset(
         output_path,
         grid.tlon[int(grid.ny / 2), :].values,
