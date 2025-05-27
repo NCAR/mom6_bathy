@@ -11,7 +11,7 @@ from .ocean_fill_and_grid_interp import (
 )
 
 
-def gen_chl_empty_dataset(output_path, lon, lat):
+def gen_chl_empty_dataset(output_path, lon, lat, fill_value=-1.0e34):
     """
     Generate an empty NetCDF dataset for SeaWiFS chlorophyll climatology and save it to disk.
 
@@ -51,7 +51,7 @@ def gen_chl_empty_dataset(output_path, lon, lat):
     )
 
     # === Placeholder data for CHL_A (all fill values) ===
-    fill_value = -1.0e34
+    fill_value = np.float32(-1.0e34)
     chl_a_data = np.empty((len(time), len(lat), len(lon)), dtype=np.float32)
 
     # === xarray Dataset ===
@@ -64,7 +64,6 @@ def gen_chl_empty_dataset(output_path, lon, lat):
                 attrs={
                     "long_name": "CHL_A = monthly mean",
                     "units": "mg/m^3",
-                    "_FillValue": fill_value,
                     "missing_value": fill_value,
                 },
             )
@@ -158,11 +157,12 @@ def interpolate_and_fill_seawifs(
         )
     else:
         output_path = Path(output_path)
-
+    fill_value = np.float32(-1.0e34)
     chla_tx06 = gen_chl_empty_dataset(
         output_path,
         grid.tlon[int(grid.ny / 2), :].values,
         grid.tlat[:, int(grid.nx / 2)].values,
+        fill_value
     )
     chlor_a = chla_tx06["CHL_A"]
 
@@ -197,7 +197,11 @@ def interpolate_and_fill_seawifs(
     chla_tx06["LAT"].data[:] = grid.tlat[:, 0]
 
     # Write to NetCDF
-    chla_tx06.to_netcdf(output_path)
+    chla_tx06.to_netcdf(output_path, unlimited_dims=["TIME"],encoding={
+        "CHL_A": {
+            "_FillValue": fill_value,
+        }
+    })
     print(f"Wrote interpolated and filled SeaWiFS data to:\n{output_path}")
 
     return chla_tx06
