@@ -111,9 +111,9 @@ def interpolate_and_fill_seawifs(
     """
     Interpolate and fill SeaWiFS chlorophyll data to a model grid and save to NetCDF.
 
-    This function takes gridded SeaWiFS chlorophyll data, interpolates it onto a 
-    super-sampled model grid, applies ocean masking, fills missing values, and writes 
-    the processed data to a NetCDF file. Global attributes are added to the output 
+    This function takes gridded SeaWiFS chlorophyll data, interpolates it onto a
+    super-sampled model grid, applies ocean masking, fills missing values, and writes
+    the processed data to a NetCDF file. Global attributes are added to the output
     dataset to document provenance and authorship.
 
     Parameters
@@ -152,10 +152,13 @@ def interpolate_and_fill_seawifs(
     spr_lat, spr_lon = super_sample_grid(grid.qlat, grid.qlon, ocn_mask, src_nj, src_ni)
 
     if output_path is None:
-        output_path = Path(processed_seawifs_path).parent
+        output_path = (
+            Path(processed_seawifs_path).parent
+            / f"seawifs-clim-1997-2010-{grid.name}.nc"
+        )
     else:
         output_path = Path(output_path)
-    output_path = output_path / f"seawifs-clim-1997-2010-{grid.name}.nc"
+
     chla_tx06 = gen_chl_empty_dataset(
         output_path,
         grid.tlon[int(grid.ny / 2), :].values,
