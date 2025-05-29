@@ -162,7 +162,7 @@ def interpolate_and_fill_seawifs(
         output_path,
         grid.tlon[int(grid.ny / 2), :].values,
         grid.tlat[:, int(grid.nx / 2)].values,
-        fill_value
+        fill_value,
     )
     chlor_a = chla_tx06["CHL_A"]
 
@@ -175,7 +175,7 @@ def interpolate_and_fill_seawifs(
             .mean(axis=-1)
         )
         q = q_int * ocn_mask
-        q_masked = np.ma.masked_where(ocn_mask == 0, q_int)
+        q_masked = np.ma.masked_where((q == 0) | np.isnan(q), q)
         chlor_a[t, :] = fill_missing_data(q_masked, ocn_mask)
 
     # Global attributes
@@ -197,11 +197,15 @@ def interpolate_and_fill_seawifs(
     chla_tx06["LAT"].data[:] = grid.tlat[:, 0]
 
     # Write to NetCDF
-    chla_tx06.to_netcdf(output_path, unlimited_dims=["TIME"],encoding={
-        "CHL_A": {
-            "_FillValue": fill_value,
-        }
-    })
+    chla_tx06.to_netcdf(
+        output_path,
+        unlimited_dims=["TIME"],
+        encoding={
+            "CHL_A": {
+                "_FillValue": fill_value,
+            }
+        },
+    )
     print(f"Wrote interpolated and filled SeaWiFS data to:\n{output_path}")
 
     return chla_tx06
