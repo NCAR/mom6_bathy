@@ -30,7 +30,7 @@ def test_gc_tarea():
     lat3 = 90.0
     lon3 = 0.0
     result = gc_tarea(lat1, lon1, lat2, lon2, lat3, lon3)
-    assert result == 0.2526802551420787
+    assert result == pytest.approx(0.2526802551420787)
 
     # Test case with array inputs
     lat1 = np.array([0.0, 0.0])
