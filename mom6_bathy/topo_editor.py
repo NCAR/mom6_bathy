@@ -68,7 +68,7 @@ class TopoEditor(widgets.HBox):
         shape = [int(v) for v in self.topo.depth.data.shape]
         return {"grid_name": grid_name, "shape": shape}
     
-    def ensure_golden_topo(self):
+    def _ensure_golden_topo(self):
         topo_id = self.get_topo_id()
         grid_name = topo_id['grid_name']
         shape = topo_id['shape']
