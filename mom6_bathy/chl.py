@@ -4,7 +4,7 @@ import xarray as xr
 import numpy as np
 from datetime import datetime
 from pathlib import Path
-from .ocean_fill_and_grid_interp import (
+from mom6_bathy.fill_interp import (
     super_interp,
     fill_missing_data,
     super_sample_grid,
@@ -94,10 +94,7 @@ def gen_chl_empty_dataset(output_path, lon, lat, fill_value=-1.0e34):
             "history": "Created for demonstration",
         },
     )
-    # === Save to NetCDF with TIME as unlimited ===
-    ds.to_netcdf(output_path, unlimited_dims=["TIME"])
 
-    print(f"Wrote emptyNetCDF file to:\n{output_path}")
     return ds
 
 
@@ -158,13 +155,13 @@ def interpolate_and_fill_seawifs(
     else:
         output_path = Path(output_path)
     fill_value = np.float32(-1.0e34)
-    chla_tx06 = gen_chl_empty_dataset(
+    chla = gen_chl_empty_dataset(
         output_path,
         grid.tlon[int(grid.ny / 2), :].values,
         grid.tlat[:, int(grid.nx / 2)].values,
         fill_value,
     )
-    chlor_a = chla_tx06["CHL_A"]
+    chlor_a = chla["CHL_A"]
 
     for t in range(src_data.shape[0]):
         # for t in range(1):
@@ -179,25 +176,25 @@ def interpolate_and_fill_seawifs(
         chlor_a[t, :] = fill_missing_data(q_masked, ocn_mask)
 
     # Global attributes
-    chla_tx06.attrs["title"] = (
+    chla.attrs["title"] = (
         "Chlorophyll Concentration, OCI Algorithm, interpolated and objectively filled to "
         + grid.name
     )
-    chla_tx06.attrs["repository"] = (
+    chla.attrs["repository"] = (
         "https://github.com/NCAR/SeaWIFS_MOM6 and https://github.com/NCAR/mom6_bathy"
     )
-    chla_tx06.attrs["authors"] = (
+    chla.attrs["authors"] = (
         "Gustavo Marques (gmarques@ucar.edu) and Frank Bryan (bryan@ucar.edu)"
     )
-    chla_tx06.attrs["date"] = datetime.now().isoformat()
+    chla.attrs["date"] = datetime.now().isoformat()
 
     # Assign variable data
-    chla_tx06["CHL_A"].data[:] = chlor_a
-    chla_tx06["LON"].data[:] = grid.tlon[0, :]
-    chla_tx06["LAT"].data[:] = grid.tlat[:, 0]
+    chla["CHL_A"].data[:] = chlor_a
+    chla["LON"].data[:] = grid.tlon[0, :]
+    chla["LAT"].data[:] = grid.tlat[:, 0]
 
     # Write to NetCDF
-    chla_tx06.to_netcdf(
+    chla.to_netcdf(
         output_path,
         unlimited_dims=["TIME"],
         encoding={
@@ -208,7 +205,7 @@ def interpolate_and_fill_seawifs(
     )
     print(f"Wrote interpolated and filled SeaWiFS data to:\n{output_path}")
 
-    return chla_tx06
+    return chla
 
 
 if __name__ == "__main__":
