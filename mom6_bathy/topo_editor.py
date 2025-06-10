@@ -2,28 +2,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as patches
 import ipywidgets as widgets
+import os
+import json
 from matplotlib.ticker import MaxNLocator
-from edit_command import CellEditCommand, ScalarEditCommand, COMMAND_REGISTRY
-from history_manager import EditHistory
-
-class SetDepthCommand(CellEditCommand):
-
-    def _get_value(self, topo, j, i):
-        return topo.depth.data[j, i]
-    
-    def _set_value(self, topo, j, i, value):
-        topo.depth.data[j, i] = value
-
-class SetMinDepthCommand(ScalarEditCommand):
-    pass
-
-class EraseSelectedBasinCommand(SetDepthCommand):
-    # We are just setting the depth of many indices to zero.
-    pass
-
-class EraseDisconnectedBasinsCommand(SetDepthCommand):
-    # We are just setting the depth of many indices to zero.
-    pass
+from mom6_bathy.edit_command import COMMAND_REGISTRY
+from mom6_bathy.history_manager import EditHistory
+from mom6_bathy.topo_editor_commands import SetDepthCommand, SetMinDepthCommand, EraseDisconnectedBasinsCommand, EraseSelectedBasinCommand
 
 class TopoEditor(widgets.HBox):
     
@@ -32,7 +16,7 @@ class TopoEditor(widgets.HBox):
         self.ny = self.topo.depth.data.shape[0]
         self.nx = self.topo.depth.data.shape[1]
 
-        self.history = EditHistory(domain_id_func=self.get_topo_id)
+        self.history = EditHistory(domain_id=self.get_topo_id)
 
         self._selected_cell = None
 
@@ -67,26 +51,59 @@ class TopoEditor(widgets.HBox):
         grid_name = getattr(grid, "name", getattr(grid, "_name", None))
         shape = [int(v) for v in self.topo.depth.data.shape]
         return {"grid_name": grid_name, "shape": shape}
-    
+
     def _ensure_golden_topo(self):
         topo_id = self.get_topo_id()
         grid_name = topo_id['grid_name']
         shape = topo_id['shape']
         shape_str = f"{shape[0]}x{shape[1]}"
+        
+        # Disk-based original array/min_depth storage
+        golden_dir = "original_topo"
+        os.makedirs(golden_dir, exist_ok=True)
+        golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
+        golden_min_depth_path = os.path.join(golden_dir, f"golden_min_depth_{grid_name}_{shape_str}.json")
+        if not os.path.exists(golden_topo_path):
+            np.save(golden_topo_path, self.topo.depth.data)
+            with open(golden_min_depth_path, "w") as f:
+                json.dump({"min_depth": float(self.topo.min_depth)}, f)
+
+        # Command-pattern-based golden snapshot for undo/redo
         golden_name = f"golden_{grid_name}_{shape_str}"
         try:
             self.history.load_snapshot(golden_name, COMMAND_REGISTRY)
         except FileNotFoundError:
             self.history.save_snapshot(golden_name)
-    
+
     def reset_topo(self):
         topo_id = self.get_topo_id()
         grid_name = topo_id['grid_name']
         shape = topo_id['shape']
         shape_str = f"{shape[0]}x{shape[1]}"
+        golden_dir = "original_topo"
+        golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
+        golden_min_depth_path = os.path.join(golden_dir, f"golden_min_depth_{grid_name}_{shape_str}.json")
+
+        if os.path.exists(golden_topo_path):
+            self.topo.depth.data[:] = np.load(golden_topo_path)
+            if os.path.exists(golden_min_depth_path):
+                with open(golden_min_depth_path, "r") as f:
+                    d = json.load(f)
+                    self.topo.min_depth = d.get("min_depth", self.topo.min_depth)
+            print(f"Topo reset to golden/original topo for {grid_name} {shape_str} from disk.")
+        else:
+            self.topo.depth.data[:] = np.copy(self._original_depth)
+            self.topo.min_depth = self._original_min_depth
+            print("Topo reset to first-in-memory state.")
+
         golden_name = f"golden_{grid_name}_{shape_str}"
-        self.history.load_snapshot(golden_name, COMMAND_REGISTRY)
-        self.history.replay(self.topo)
+        from mom6_bathy.edit_command import COMMAND_REGISTRY
+        try:
+            self.history.load_snapshot(golden_name, COMMAND_REGISTRY)
+        except FileNotFoundError:
+            print("Golden command snapshot not found, edit history not reset.")
+
+        self._min_depth_specifier.value = self.topo.min_depth
         self.trigger_refresh()
     
     def save_snapshot(self, _btn=None):

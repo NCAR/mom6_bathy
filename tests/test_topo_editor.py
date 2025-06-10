@@ -5,7 +5,10 @@ import pytest
 
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
+from mom6_bathy.topo_editor_commands import SetDepthCommand
 from mom6_bathy.topo_editor import TopoEditor
+from mom6_bathy.edit_command import COMMAND_REGISTRY
+
 
 @pytest.fixture
 def minimal_grid_and_topo():
@@ -53,17 +56,13 @@ def patch_all_widgets(editor):
         setattr(editor, attr, Dummy(value=value))
 
 def setup_depth(editor, i=2, j=2, new_depth=777.0):
-    """Helper to perform a depth change and register it in undo_history."""
     orig_depth = float(editor.topo.depth.data[j, i])
     editor._select_cell(i, j)
-    edit = {
-        'action': 'depth_change',
-        'i': i,
-        'j': j,
-        'old_value': orig_depth,
-        'new_value': new_depth,
-        "timestamp": "now",
-    }
+    edit = SetDepthCommand(
+        affected_indices=[(j, i)],
+        new_values=[new_depth],
+        old_values=[orig_depth],
+    )
     editor.apply_edit(edit)
     editor.undo_last_edit()
     return orig_depth, new_depth, i, j
@@ -76,10 +75,9 @@ def test_undo(minimal_grid_and_topo):
     orig_depth, new_depth, i, j = setup_depth(editor)
     assert float(topo.depth.data[j, i]) == orig_depth
 
-    # Test for undo when there are no more edits to undo
     editor.undo_last_edit()
     assert float(topo.depth.data[j, i]) == orig_depth
-    assert not editor._undo_history
+    assert not editor.history._undo_history
 
 def test_redo(minimal_grid_and_topo):
     topo = minimal_grid_and_topo
@@ -90,10 +88,9 @@ def test_redo(minimal_grid_and_topo):
     editor.redo_last_edit()
     assert float(topo.depth.data[j, i]) == new_depth
 
-    # Test for redo when there are no more edits to redo
     editor.redo_last_edit()
     assert float(topo.depth.data[j, i]) == new_depth
-    assert not editor._redo_history
+    assert not editor.history._redo_history
 
 def test_undo_redo_interleaving(minimal_grid_and_topo):
     topo = minimal_grid_and_topo
@@ -103,37 +100,13 @@ def test_undo_redo_interleaving(minimal_grid_and_topo):
     i, j = 2, 2
     orig = float(editor.topo.depth.data[j, i])
 
-    # First change: 100
-    edit_100 = {
-        'action': 'depth_change',
-        'i': i,
-        'j': j,
-        'old_value': orig,
-        'new_value': 100.0,
-        "timestamp": "now",
-    }
+    edit_100 = SetDepthCommand([(j, i)], [100.0], old_values=[orig])
     editor.apply_edit(edit_100)
 
-    # Second change: 200
-    edit_200 = {
-        'action': 'depth_change',
-        'i': i,
-        'j': j,
-        'old_value': 100.0,
-        'new_value': 200.0,
-        "timestamp": "now",
-    }
+    edit_200 = SetDepthCommand([(j, i)], [200.0], old_values=[100.0])
     editor.apply_edit(edit_200)
 
-    # Third change: 300
-    edit_300 = {
-        'action': 'depth_change',
-        'i': i,
-        'j': j,
-        'old_value': 200.0,
-        'new_value': 300.0,
-        "timestamp": "now",
-    }
+    edit_300 = SetDepthCommand([(j, i)], [300.0], old_values=[200.0])
     editor.apply_edit(edit_300)
 
     # Undo twice (should go from 300 -> 200 -> 100)
@@ -143,26 +116,12 @@ def test_undo_redo_interleaving(minimal_grid_and_topo):
     assert float(editor.topo.depth.data[j, i]) == 100.0
 
     # Make a new edit (should clear redo)
-    edit_999 = {
-        'action': 'depth_change',
-        'i': i,
-        'j': j,
-        'old_value': 100.0,
-        'new_value': 999.0,
-        "timestamp": "now",
-    }
+    edit_999 = SetDepthCommand([(j, i)], [999.0], old_values=[100.0])
     editor.apply_edit(edit_999)
     assert float(editor.topo.depth.data[j, i]) == 999.0
 
-    # Redo should do nothing now
     editor.redo_last_edit()
     assert float(editor.topo.depth.data[j, i]) == 999.0
-
-    import json
-import os
-
-import json
-import os
 
 def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
@@ -174,25 +133,18 @@ def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_pat
     editor.redo_last_edit()
     assert float(topo.depth.data[j, i]) == new_depth
 
-    # Save histories to a file
-    save_path = tmp_path / "edit_history_test.json"
-    editor.save_histories(str(save_path))
+    editor.history.snapshot_dir = str(tmp_path) 
+    editor.history.save_snapshot("test_snapshot")
 
-    # Create a new editor instance and load the histories
     topo2 = minimal_grid_and_topo
     editor2 = TopoEditor(topo2, build_ui=False)
     patch_all_widgets(editor2)
-    editor2.load_histories(str(save_path))
-
-    # Check that the history was loaded correctly
-    with open(save_path) as f:
-        data = json.load(f)
-        assert data["undo_history"] == editor2._undo_history
-        assert data["redo_history"] == editor2._redo_history
-        assert data["topo_id"] == editor2.get_topo_id()
+    editor2.history.snapshot_dir = str(tmp_path)
+    print("COMMAND_REGISTRY keys:", list(COMMAND_REGISTRY.keys()))
+    editor2.history.load_snapshot("test_snapshot", COMMAND_REGISTRY) 
+    editor2.history.replay(editor2.topo)
 
     # After replaying the edit history, topo2 should have new_depth at (j, i)
-    editor2.replay_edit_history()
     assert float(editor2.topo.depth.data[j, i]) == new_depth
 
     # If you undo, you should get back to the original depth

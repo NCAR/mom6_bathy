@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
+import numpy as np
 
 class EditCommand(ABC):
-
     @abstractmethod
     def execute(self, topo):
         pass
@@ -19,19 +19,25 @@ class EditCommand(ABC):
     def deserialize(cls, data: dict):
         pass
 
+def to_native(val):
+    # Converts numpy scalars to Python native types, otherwise returns as-is.
+    return val.item() if isinstance(val, (np.generic,)) else val
+
+def to_native_tuple(t):
+    # Converts a tuple of numpy ints to native ints
+    return tuple(int(x) for x in t)
+
 class CellEditCommand(EditCommand):
     """Define any edit that affects one or more elements of an array"""
     def __init__(self, affected_indices, new_values, old_values=None):
-        self.affected_indices = affected_indices 
-        self.new_values = new_values            
-        self.old_values = old_values             
+        # Convert indices and values to native types for consistency and serialization
+        self.affected_indices = [to_native_tuple(idx) for idx in affected_indices]
+        self.new_values = [to_native(v) for v in new_values]
+        self.old_values = [to_native(v) for v in old_values] if old_values is not None else None
 
     def execute(self, topo):
         if self.old_values is None:
-            self.old_values = []
-            self.old_values.extend(
-                self._get_value(topo, j, i) for j, i in self.affected_indices
-            )
+            self.old_values = [to_native(self._get_value(topo, j, i)) for j, i in self.affected_indices]
         for idx, (j, i) in enumerate(self.affected_indices):
             self._set_value(topo, j, i, self.new_values[idx])
 
@@ -42,15 +48,15 @@ class CellEditCommand(EditCommand):
     def serialize(self):
         return {
             'type': self.__class__.__name__,
-            'affected_indices': self.affected_indices,
-            'new_values': self.new_values,
-            'old_values': self.old_values
+            'affected_indices': [to_native_tuple(idx) for idx in self.affected_indices],
+            'new_values': [to_native(v) for v in self.new_values],
+            'old_values': [to_native(v) for v in self.old_values] if self.old_values is not None else None
         }
 
     @classmethod
     def deserialize(cls, data):
         return cls(
-            affected_indices=data['affected_indices'],
+            affected_indices=[tuple(idx) for idx in data['affected_indices']],
             new_values=data['new_values'],
             old_values=data['old_values']
         )
@@ -66,12 +72,12 @@ class ScalarEditCommand(EditCommand):
     """Define any edit that affects a single scalar attribute of an object"""
     def __init__(self, attr, new_value, old_value=None):
         self.attr = attr
-        self.new_value = new_value
-        self.old_value = old_value
+        self.new_value = to_native(new_value)
+        self.old_value = to_native(old_value) if old_value is not None else None
 
     def execute(self, topo):
         if self.old_value is None:
-            self.old_value = getattr(topo, self.attr)
+            self.old_value = to_native(getattr(topo, self.attr))
         setattr(topo, self.attr, self.new_value)
 
     def undo(self, topo):
@@ -81,8 +87,8 @@ class ScalarEditCommand(EditCommand):
         return {
             'type': self.__class__.__name__,
             'attr': self.attr,
-            'new_value': self.new_value,
-            'old_value': self.old_value,
+            'new_value': to_native(self.new_value),
+            'old_value': to_native(self.old_value),
         }
 
     @classmethod
@@ -98,3 +104,8 @@ COMMAND_REGISTRY = {}
 def register_command(cls):
     COMMAND_REGISTRY[cls.__name__] = cls
     return cls
+
+try:
+    import mom6_bathy.topo_editor_commands
+except Exception as e:
+    print("Forced command registration import failed:", e)
