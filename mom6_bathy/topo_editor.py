@@ -120,6 +120,7 @@ class TopoEditor(widgets.HBox):
             print("Enter the name of a snapshot to load!")
             return
         try:
+            self.reset_topo()
             self.history.load_snapshot(name, COMMAND_REGISTRY)
             self.history.replay(self.topo)
             self.update_undo_redo_buttons()
