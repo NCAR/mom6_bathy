@@ -4,7 +4,7 @@ import xarray as xr
 from datetime import datetime
 from scipy import interpolate
 from scipy.ndimage import label
-from mom6_bathy.aux import gc_qarea
+from mom6_bathy.aux import cell_area_rad
 
 
 class Topo:
@@ -738,7 +738,7 @@ class Topo:
         ), axis=-1)
 
         ds["grid_area"] = xr.DataArray(
-            gc_qarea(ds.grid_corner_lat.data, ds.grid_corner_lon.data, radius=1.0),
+            cell_area_rad(ds.grid_corner_lon.data, ds.grid_corner_lat.data),
             dims=["grid_size"],
             attrs={"units": "radians^2"},
         )
