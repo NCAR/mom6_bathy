@@ -281,6 +281,17 @@ class Topo:
             )
             cj, ci = np.unravel_index(indices, geolon.shape)
 
+            assert 0 <= cj < geolat.shape[0] - self._grid.ny, (
+                f"Topography data in {topog_file_path} appears to only contain a subregion "
+                f"of the grid, and does not contain enough rows to accommodate the grid size "
+                f"({self._grid.ny}). "
+            )
+            assert 0 <= ci < geolon.shape[1] - self._grid.nx, (
+                f"Topography data in {topog_file_path} appears to only contain a subregion "
+                f"of the grid, and does not contain enough columns to accommodate the grid size "
+                f"({self._grid.nx}). "
+            )
+
             # Compare the coords of grid with the coords of the subregion of the topog
             # data where it may overlap with the grid
             grid_overlaps_topo = (
