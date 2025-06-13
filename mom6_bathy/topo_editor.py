@@ -4,19 +4,24 @@ import matplotlib.patches as patches
 import ipywidgets as widgets
 import os
 import json
+import git
 from matplotlib.ticker import MaxNLocator
-from mom6_bathy.edit_command import COMMAND_REGISTRY
-from mom6_bathy.history_manager import EditHistory
+from CrocoDash.edit_command import COMMAND_REGISTRY
+from mom6_bathy.history_manager import TopoEditHistory
 from mom6_bathy.topo_editor_commands import SetDepthCommand, SetMinDepthCommand, EraseDisconnectedBasinsCommand, EraseSelectedBasinCommand
+from CrocoDash.git_utils import git_commit_snapshot, git_checkout_branch, git_create_branch_and_switch, git_delete_branch_and_switch, git_list_branches
+
+CROCODASH_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
 
 class TopoEditor(widgets.HBox):
     
     def __init__(self, topo, build_ui=True):
+
         self.topo = topo
         self.ny = self.topo.depth.data.shape[0]
         self.nx = self.topo.depth.data.shape[1]
 
-        self.history = EditHistory(domain_id=self.get_topo_id)
+        self.history = TopoEditHistory(domain_id=self.get_topo_id)
 
         self._selected_cell = None
 
@@ -25,7 +30,9 @@ class TopoEditor(widgets.HBox):
         self._original_min_depth = self.topo.min_depth
 
         # Directory for saving snapshots
-        self.SNAPSHOT_DIR = "topo_snapshots"
+        self.SNAPSHOT_DIR = "snapshots"
+        os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
+        self.repo = git.Repo(CROCODASH_REPO_ROOT)
 
         # Ensure golden/original topo exists for resets
         self._ensure_golden_topo()
@@ -39,7 +46,6 @@ class TopoEditor(widgets.HBox):
             super().__init__([self._control_panel, self._interactive_plot])
         else:
             super().__init__([])
-
 
     def initialize_history(self):
         self.history.load_histories(COMMAND_REGISTRY)
@@ -71,9 +77,9 @@ class TopoEditor(widgets.HBox):
         # Command-pattern-based golden snapshot for undo/redo
         golden_name = f"golden_{grid_name}_{shape_str}"
         try:
-            self.history.load_snapshot(golden_name, COMMAND_REGISTRY)
+            self.history.load_commit(golden_name, COMMAND_REGISTRY)
         except FileNotFoundError:
-            self.history.save_snapshot(golden_name)
+            self.history.save_commit(golden_name)
 
     def reset_topo(self):
         topo_id = self.get_topo_id()
@@ -97,31 +103,31 @@ class TopoEditor(widgets.HBox):
             print("Topo reset to first-in-memory state.")
 
         golden_name = f"golden_{grid_name}_{shape_str}"
-        from mom6_bathy.edit_command import COMMAND_REGISTRY
+        from CrocoDash.edit_command import COMMAND_REGISTRY
         try:
-            self.history.load_snapshot(golden_name, COMMAND_REGISTRY)
+            self.history.load_commit(golden_name, COMMAND_REGISTRY)
         except FileNotFoundError:
             print("Golden command snapshot not found, edit history not reset.")
 
         self._min_depth_specifier.value = self.topo.min_depth
         self.trigger_refresh()
-    
-    def save_snapshot(self, _btn=None):
+
+    def save_commit(self, _btn=None):
         name = self._snapshot_name.value.strip()
         if not name:
             print("Enter a name!")
             return
-        self.history.save_snapshot(name)
+        self.history.save_commit(name)
         print(f"Saved snapshot '{name}'.")
 
-    def load_snapshot(self, _btn=None):
+    def load_commit(self, _btn=None):
         name = self._snapshot_name.value.strip()
         if not name:
             print("Enter the name of a snapshot to load!")
             return
         try:
             self.reset_topo()
-            self.history.load_snapshot(name, COMMAND_REGISTRY)
+            self.history.load_commit(name, COMMAND_REGISTRY)
             self.history.replay(self.topo)
             self.update_undo_redo_buttons()
             self.trigger_refresh()
@@ -239,10 +245,10 @@ class TopoEditor(widgets.HBox):
             disabled=False,
             tooltips=['Display depth values', 'Display mask values', 'Display Basins'],
             layout={'width': '90%', 'display': 'flex'},
-            style={'description_width': '100px', 'button_width': '90px'}
+            style={'description_width': '40px', 'button_width': '85px'}
         )
 
-        self._selected_cell_label = widgets.Label("Selected cell: None (double click on canvas to select a cell).")
+        self._selected_cell_label = widgets.Label("Selected cell: None (double click to select a cell).")
 
         self._depth_specifier = widgets.FloatText(
             value=None,
@@ -283,26 +289,101 @@ class TopoEditor(widgets.HBox):
         self._snapshot_name = widgets.Text(value='', placeholder='Enter snapshot name', description='Snapshot:', layout={'width': '90%'})
         self._save_button = widgets.Button(description='Save State', layout={'width': '44%'})
         self._load_button = widgets.Button(description='Load State', layout={'width': '44%'})
+        # Git Version Control
+        self._git_commit_msg = widgets.Text(
+            value='',
+            placeholder='Enter Git commit message',
+            description='Git Msg:',
+            layout={'width': '90%'}
+        )
+        self._git_commit_button = widgets.Button(description='Git Commit', layout={'width': '44%'})
+        self._git_branch_name = widgets.Text(
+            value='',
+            placeholder='New branch name',
+            description='Branch:',
+            layout={'width': '90%'}
+        )
+        self._git_create_branch_button = widgets.Button(description='Create Branch', layout={'width': '44%'})
+        self._git_delete_branch_button = widgets.Button(
+            description='Delete Branch',
+            layout={'width': '44%'},
+            button_style='danger'  # Makes it red
+        )
+        self._git_branch_dropdown = widgets.Dropdown(
+            options=git_list_branches(CROCODASH_REPO_ROOT),
+            description='Checkout:',
+            layout={'width': '90%'}
+        )
+        self._git_checkout_button = widgets.Button(description='Checkout', layout={'width': '44%'})
 
-        self._control_panel = widgets.VBox([
-            widgets.HTML("<h2>Topo Editor</h2>"),
-            widgets.HTML("<hr><h3>Display</h3>"),
+         # Group related controls
+        display_section = widgets.VBox([
+            widgets.HTML("<h3>Display</h3>"),
             self._display_mode_toggle,
-            widgets.HTML("<hr><h3>Global Settings</h3>"),
+        ])
+
+        global_settings_section = widgets.VBox([
+            widgets.HTML("<h3>Global Settings</h3>"),
             self._min_depth_specifier,
-            widgets.HTML("<hr><h3>Cell Editing</h3>"),
+        ])
+
+        cell_editing_section = widgets.VBox([
+            widgets.HTML("<h3>Cell Editing</h3>"),
             self._selected_cell_label,
             self._depth_specifier,
-            widgets.HTML("<hr><h3>Basin Selector</h3>"),
+        ])
+
+        basin_section = widgets.VBox([
+            widgets.HTML("<h3>Basin Selector</h3>"),
             self._basin_specifier,
-            self._basin_specifier_toggle,
-            self._basin_specifier_delete_selected,
-            widgets.HTML("<hr><h3>Edit History</h3>"),
+            self._basin_specifier_toggle,      
+            self._basin_specifier_delete_selected,  
+        ])
+
+        history_section = widgets.VBox([
+            widgets.HTML("<h3>Edit History</h3>"),
             widgets.HBox([self._undo_button, self._redo_button, self._reset_button]),
-            widgets.HTML("<hr><h3>Snapshots</h3>"),
-            widgets.HBox([self._snapshot_name]),
+        ])
+
+        snapshot_section = widgets.VBox([
+            self._snapshot_name,
             widgets.HBox([self._save_button, self._load_button]),
-            ], layout= {'width': '30%', 'height': '100%'})
+        ])
+
+        git_section = widgets.VBox([
+            self._git_commit_msg,
+            self._git_commit_button,
+            self._git_branch_name,
+            widgets.HBox([self._git_create_branch_button, self._git_delete_branch_button]),
+            self._git_branch_dropdown,
+            self._git_checkout_button,
+        ])
+
+        # Always-visible controls
+        main_controls = widgets.VBox([
+            display_section,
+            global_settings_section,
+            cell_editing_section,
+            basin_section,
+            history_section,
+        ])
+
+        # Each advanced section in its own Accordion (so both can be open at once)
+        snapshot_accordion = widgets.Accordion(children=[snapshot_section])
+        snapshot_accordion.set_title(0, 'Snapshots')
+        snapshot_accordion.selected_index = None  # collapsed by default
+
+        git_accordion = widgets.Accordion(children=[git_section])
+        git_accordion.set_title(0, 'Git Version Control')
+        git_accordion.selected_index = None  # collapsed by default
+
+        # Combine everything
+        self._control_panel = widgets.VBox([
+            widgets.HTML("<h2>Topo Editor</h2>"),
+            main_controls,
+            snapshot_accordion,
+            git_accordion,
+        ], layout={'width': '30%', 'height': '100%', 'overflow_y': 'auto'})
 
     def refresh_display_mode(self, change):
         mode = change['new']
@@ -367,6 +448,36 @@ class TopoEditor(widgets.HBox):
                     self._basin_specifier_delete_selected.disabled = True
 
     def construct_observances(self):
+        # Display mode toggle
+        self._display_mode_toggle.observe(self.refresh_display_mode, names='value', type='change')
+
+        # Double click event
+        self.fig.canvas.mpl_connect('button_press_event', self.on_double_click)
+
+        # Min depth change
+        self._min_depth_specifier.observe(self.on_min_depth_change, names='value', type='change')
+
+        # Basin erase buttons
+        self._basin_specifier_toggle.on_click(self.erase_disconnected_basins)
+        self._basin_specifier_delete_selected.on_click(self.erase_selected_basin)
+
+        # Depth change
+        self._depth_specifier.observe(self.on_depth_change, names='value', type='change')
+
+        # Undo/Redo/Reset
+        self._undo_button.on_click(self.undo_last_edit)
+        self._redo_button.on_click(self.redo_last_edit)
+        self._reset_button.on_click(self.on_reset)
+
+        # Snapshots
+        self._save_button.on_click(self.save_commit)
+        self._load_button.on_click(self.load_commit)
+
+        # Git
+        self._git_commit_button.on_click(self.on_git_commit)
+        self._git_create_branch_button.on_click(self.on_git_create_branch)
+        self._git_delete_branch_button.on_click(self.on_git_delete_branch)
+        self._git_checkout_button.on_click(self.on_git_checkout)
 
         self._display_mode_toggle.observe(
             self.refresh_display_mode,
@@ -374,83 +485,129 @@ class TopoEditor(widgets.HBox):
             type='change'
         )
 
-        def on_double_click(event):
-            if event.dblclick:
-                y, x = event.ydata, event.xdata
-                j, i = self.topo._grid.get_indices(y, x)
-                self._select_cell(i, j)
-                
-        self.fig.canvas.mpl_connect('button_press_event', on_double_click)
+    # --- UI Callback Methods ---
 
-        def on_min_depth_change(change):
-            old_val = self.topo.min_depth
-            new_val = change['new']
-            if old_val != new_val:
-                cmd = SetMinDepthCommand(attr='min_depth', new_value=new_val, old_value=old_val)
-                self.apply_edit(cmd)
-                self.update_undo_redo_buttons()
-        
-        self._min_depth_specifier.observe(
-            on_min_depth_change,
-            names='value',
-            type='change'
-        )
+    def on_double_click(self, event):
+        if event.dblclick:
+            y, x = event.ydata, event.xdata
+            j, i = self.topo._grid.get_indices(y, x)
+            self._select_cell(i, j)
 
-        def erase_disconnected_basins(b):
-            if self._selected_cell is None:
-                return
-            i, j, _ = self._selected_cell
-            label = self.topo.basintmask.data[j, i]
-            affected = np.where(self.topo.basintmask.data != label)
-            indices = list(zip(affected[0], affected[1]))
-            if not indices:
-                return
-            old_values = [self.topo.depth.data[jj, ii] for jj, ii in indices]
-            new_values = [0] * len(indices)
-            cmd = EraseDisconnectedBasinsCommand(indices, new_values, old_values=old_values)
+    def on_min_depth_change(self, change):
+        old_val = self.topo.min_depth
+        new_val = change['new']
+        if old_val != new_val:
+            cmd = SetMinDepthCommand(attr='min_depth', new_value=new_val, old_value=old_val)
             self.apply_edit(cmd)
             self.update_undo_redo_buttons()
 
-        self._basin_specifier_toggle.on_click(erase_disconnected_basins)
-        
-        def erase_selected_basin(b):
-            if self._selected_cell is None:
-                return
-            i, j, _ = self._selected_cell
-            label = self.topo.basintmask.data[j, i]
-            affected = np.where(self.topo.basintmask.data == label)
-            indices = list(zip(affected[0], affected[1]))
-            if not indices:
-                return
-            old_values = [self.topo.depth.data[jj, ii] for jj, ii in indices]
-            new_values = [0] * len(indices)
-            cmd = EraseSelectedBasinCommand(indices, new_values, old_values=old_values)
-            self.apply_edit(cmd)
-            self.update_undo_redo_buttons()
-        
-        self._basin_specifier_delete_selected.on_click(erase_selected_basin)
+    def erase_disconnected_basins(self, b):
+        if self._selected_cell is None:
+            return
+        i, j, _ = self._selected_cell
+        label = self.topo.basintmask.data[j, i]
+        affected = np.where(self.topo.basintmask.data != label)
+        indices = list(zip(affected[0], affected[1]))
+        if not indices:
+            return
+        old_values = [self.topo.depth.data[jj, ii] for jj, ii in indices]
+        new_values = [0] * len(indices)
+        cmd = EraseDisconnectedBasinsCommand(indices, new_values, old_values=old_values)
+        self.apply_edit(cmd)
+        self.update_undo_redo_buttons()
+    
+    def erase_selected_basin(self, b):
+        if self._selected_cell is None:
+            return
+        i, j, _ = self._selected_cell
+        label = self.topo.basintmask.data[j, i]
+        affected = np.where(self.topo.basintmask.data == label)
+        indices = list(zip(affected[0], affected[1]))
+        if not indices:
+            return
+        old_values = [self.topo.depth.data[jj, ii] for jj, ii in indices]
+        new_values = [0] * len(indices)
+        cmd = EraseSelectedBasinCommand(indices, new_values, old_values=old_values)
+        self.apply_edit(cmd)
+        self.update_undo_redo_buttons()
 
-        def on_depth_change(change):
-            if self._selected_cell is None:
-                return
-            i, j, _ = self._selected_cell
-            old_val = self.topo.depth.data[j, i]
-            new_val = change['new']
-            if old_val == new_val:
-                return
-            cmd = SetDepthCommand([(j, i)], [new_val], old_values=[old_val])
-            self.apply_edit(cmd)
-            self.update_undo_redo_buttons()
-       
-        self._depth_specifier.observe(
-            on_depth_change,
-            names='value',
-            type='change'
-        )
+    def on_depth_change(self, change):
+        if self._selected_cell is None:
+            return
+        i, j, _ = self._selected_cell
+        old_val = self.topo.depth.data[j, i]
+        new_val = change['new']
+        if old_val == new_val:
+            return
+        cmd = SetDepthCommand([(j, i)], [new_val], old_values=[old_val])
+        self.apply_edit(cmd)
+        self.update_undo_redo_buttons()
 
-        # Callback connections
-        self._undo_button.on_click(self.undo_last_edit)
-        self._redo_button.on_click(self.redo_last_edit)
-        self._reset_button.on_click(self.on_reset)
-        self._save_button.on_click(self.save_snapshot)
-        self._load_button.on_click(self.load_snapshot)
+    # --- Git Callbacks ---
+
+    def on_git_commit(self, b):
+        msg = self._git_commit_msg.value.strip()
+        name = self._snapshot_name.value.strip()
+        if not msg:
+            print("Enter a Git commit message!")
+            return
+        if not name:
+            print("Enter a snapshot name to commit!")
+            return
+        snapshot_path = os.path.join(self.history.snapshot_dir, f"{name}.json")
+        try:
+            result = git_commit_snapshot(snapshot_path, msg, CROCODASH_REPO_ROOT)
+            print(result)
+        except Exception as e:
+            print(f"Git commit failed: {e}")
+
+    def on_git_create_branch(self, b):
+        branch = self._git_branch_name.value.strip()
+        if not branch:
+            print("Enter a branch name!")
+            return
+        try:
+            current = git_create_branch_and_switch(branch, CROCODASH_REPO_ROOT)
+            self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
+            self._git_branch_dropdown.value = current
+            print(f"Created and switched to branch: {branch}")
+        except Exception as e:
+            print(f"Git branch creation failed: {e}")
+
+    def on_git_delete_branch(self, b):
+        branch = self._git_branch_dropdown.value
+        if not branch:
+            print("Select a branch to delete!")
+            return
+        try:
+            current = git_delete_branch_and_switch(branch, CROCODASH_REPO_ROOT)
+            self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
+            self._git_branch_dropdown.value = current
+            print(f"Deleted branch: {branch}")
+        except Exception as e:
+            print(f"Git branch deletion failed: {e}")
+
+    def on_git_checkout(self, b):
+        branch = self._git_branch_dropdown.value
+        if not branch:
+            print("Select a branch to checkout!")
+            return
+        try:
+            current = git_checkout_branch(branch, CROCODASH_REPO_ROOT)
+            print(f"Checked out branch: {branch}")
+            self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
+            self._git_branch_dropdown.value = current
+            # --- Load latest snapshot after checkout ---
+            snapshot_dir = self.history.snapshot_dir
+            snapshots = [f for f in os.listdir(snapshot_dir) if f.endswith('.json')]
+            if not snapshots:
+                print("No snapshots found in this branch.")
+                return
+            snapshots.sort(key=lambda f: os.path.getmtime(os.path.join(snapshot_dir, f)), reverse=True)
+            latest_snapshot = snapshots[0]
+            latest_name = os.path.splitext(latest_snapshot)[0]
+            self._snapshot_name.value = latest_name
+            self.load_commit()
+            print(f"Automatically loaded latest snapshot: {latest_name}")
+        except Exception as e:
+            print(f"Git checkout failed: {e}")

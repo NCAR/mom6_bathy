@@ -7,7 +7,7 @@ from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
 from mom6_bathy.topo_editor_commands import SetDepthCommand
 from mom6_bathy.topo_editor import TopoEditor
-from mom6_bathy.edit_command import COMMAND_REGISTRY
+from CrocoDash.edit_command import COMMAND_REGISTRY
 
 
 @pytest.fixture
@@ -134,14 +134,14 @@ def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_pat
     assert float(topo.depth.data[j, i]) == new_depth
 
     editor.history.snapshot_dir = str(tmp_path) 
-    editor.history.save_snapshot("test_snapshot")
+    editor.history.save_commit("test_snapshot")
 
     topo2 = minimal_grid_and_topo
     editor2 = TopoEditor(topo2, build_ui=False)
     patch_all_widgets(editor2)
     editor2.history.snapshot_dir = str(tmp_path)
     print("COMMAND_REGISTRY keys:", list(COMMAND_REGISTRY.keys()))
-    editor2.history.load_snapshot("test_snapshot", COMMAND_REGISTRY) 
+    editor2.history.load_commit("test_snapshot", COMMAND_REGISTRY) 
     editor2.history.replay(editor2.topo)
 
     # After replaying the edit history, topo2 should have new_depth at (j, i)

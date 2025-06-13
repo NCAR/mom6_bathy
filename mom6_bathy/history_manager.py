@@ -1,20 +1,24 @@
 import json
 import os
-from abc import ABC, abstractmethod
+from CrocoDash.history_manager import EditHistory
 
-class EditHistory:
+class TopoEditHistory(EditHistory):
     def __init__(self, domain_id, snapshot_dir="snapshots"):
+        super().__init__(domain_id, snapshot_dir)
         self._undo_history = []
         self._redo_history = []
         self.snapshot_dir = snapshot_dir
-        self.domain_id = domain_id  # Should return a unique dict for the current domain
+        self.domain_id = domain_id
 
     def get_domain_id(self):
-        return self.domain_id()
+        return self.domain_id() if callable(self.domain_id) else self.domain_id
 
     def get_history_path(self):
         dom_id = self.get_domain_id()
-        id_str = "_".join(f"{k}-{v}" for k, v in dom_id.items())
+        if isinstance(dom_id, dict):
+            id_str = "_".join(f"{k}-{v}" for k, v in dom_id.items())
+        else:
+            id_str = str(dom_id)
         return os.path.join("edit_histories", f"history_{id_str}.json")
 
     def push(self, command):
@@ -53,7 +57,7 @@ class EditHistory:
                 ]
                 self._redo_history = []
 
-    def save_snapshot(self, name):
+    def save_commit(self, name):
         os.makedirs(self.snapshot_dir, exist_ok=True)
         fname = os.path.join(self.snapshot_dir, f"{name}.json")
         data = {
@@ -64,7 +68,7 @@ class EditHistory:
         with open(fname, "w") as f:
             json.dump(data, f)
 
-    def load_snapshot(self, name, command_registry):
+    def load_commit(self, name, command_registry):
         fname = os.path.join(self.snapshot_dir, f"{name}.json")
         if not os.path.exists(fname):
             raise FileNotFoundError(f"No snapshot named {name}")
