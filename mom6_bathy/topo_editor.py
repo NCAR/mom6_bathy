@@ -252,7 +252,7 @@ class TopoEditor(widgets.HBox):
                 
                 i, j, _ = self._selected_cell
                 ocean_mask_changed = np.where(self.topo.basintmask == self.topo.basintmask[j,i], 1, 0)
-                self.topo.depth = np.where(ocean_mask_changed == 0, 0, self.topo.depth)
+                self.topo.depth = self.topo.depth.where(ocean_mask_changed != 0, 0)
                 self.trigger_refresh()
 
         self._basin_specifier_toggle.on_click(erase_disconnected_basins)
