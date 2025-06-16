@@ -101,7 +101,7 @@ def plot_esmf_mesh(
         # Mark the cells
         for cell_index, color in cells_to_mark.items():
             j, i = divmod(cell_index, nx)
-            if 0 <= i < ny and 0 <= j < nx:
+            if 0 <= i < nx and 0 <= j < ny:
                 ax.add_patch(
                     plt.Rectangle(
                         (lon_2d[j, i] - dx / 2, lat_2d[j, i] - dy / 2),
