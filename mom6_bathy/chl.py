@@ -7,7 +7,6 @@ from pathlib import Path
 from mom6_bathy.fill_interp import (
     super_interp,
     fill_missing_data,
-    super_sample_grid,
 )
 
 
@@ -145,8 +144,11 @@ def interpolate_and_fill_seawifs(
     src_lon = (
         (np.arange(src_ni) + 0.5) / src_ni
     ) * 360.0 + src_x0  # Recompute as doubles
-    spr_lat, spr_lon = super_sample_grid(grid.qlat, grid.qlon, ocn_mask, src_nj, src_ni)
 
+    factor = 1
+    while factor * grid.ny < src_nj and factor * grid.nx < src_ni:
+        factor += 1
+    spr_lat, spr_lon = grid.refine(factor=factor)
     if output_path is None:
         output_path = (
             Path(processed_seawifs_path).parent
@@ -164,8 +166,9 @@ def interpolate_and_fill_seawifs(
     chlor_a = chla["CHL_A"]
 
     for t in range(src_data.shape[0]):
-        # for t in range(1):
-        q_int = super_interp(src_lat, src_lon, src_data[t, ::-1, :], spr_lat, spr_lon)
+        # adj lon to -180 to 180
+        adj_lon = spr_lon - 360
+        q_int = super_interp(src_lat, src_lon, src_data[t, ::-1, :], spr_lat, adj_lon)
         q_int = (
             q_int.swapaxes(1, 2)
             .reshape((ocn_nj, ocn_ni, q_int.shape[3] * q_int.shape[-1]))

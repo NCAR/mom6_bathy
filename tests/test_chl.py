@@ -12,11 +12,12 @@ def test_chl():
         pytest.skip("This test is only for the derecho and casper machines")
     # attempt to create a regional grid object from scratch
     grid = Grid(
-        nx=100,  # Number of grid points in x direction
-        ny=50,  # Number of grid points in y direction
-        lenx=10.0,  # grid length in x direction, e.g., 360.0 (degrees)
-        leny=5.0,  # grid length in y direction
-        cyclic_x=False,  # non-reentrant, rectangular domain
+        resolution=0.01,
+        xstart=278.0,
+        lenx=1.0,
+        ystart=7.0,
+        leny=1.0,
+        name="panama1",
     )
 
     grid.name = "rand"
