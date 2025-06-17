@@ -5,7 +5,7 @@ import pytest
 
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
-from mom6_bathy.topo_editor_commands import SetDepthCommand
+from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.topo_edit_command import SetDepthCommand
 from mom6_bathy.topo_editor import TopoEditor
 from CrocoDash.edit_command import COMMAND_REGISTRY
 

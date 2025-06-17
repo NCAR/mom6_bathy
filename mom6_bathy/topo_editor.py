@@ -7,10 +7,18 @@ import json
 import git
 from matplotlib.ticker import MaxNLocator
 from CrocoDash.edit_command import COMMAND_REGISTRY
-from mom6_bathy.history_manager import TopoEditHistory
-from mom6_bathy.topo_editor_commands import SetDepthCommand, SetMinDepthCommand, EraseDisconnectedBasinsCommand, EraseSelectedBasinCommand
-from CrocoDash.git_utils import git_commit_snapshot, git_checkout_branch, git_create_branch_and_switch, git_delete_branch_and_switch, git_list_branches
-
+from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.topo_command_manager import TopoCommandManager
+from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.topo_edit_command import (
+    UndoCommand, RedoCommand, 
+    SaveCommitCommand, LoadCommitCommand, 
+    ResetCommand, InitializeHistoryCommand, 
+    DepthEditCommand, MinDepthEditCommand
+)
+from CrocoDash.git_utils import (
+    git_commit_snapshot, git_checkout_branch, 
+    git_create_branch_and_switch, git_delete_branch_and_switch, 
+    git_list_branches
+)
 CROCODASH_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
 
 class TopoEditor(widgets.HBox):
@@ -21,7 +29,7 @@ class TopoEditor(widgets.HBox):
         self.ny = self.topo.depth.data.shape[0]
         self.nx = self.topo.depth.data.shape[1]
 
-        self.history = TopoEditHistory(domain_id=self.get_topo_id)
+        self.command_manager = TopoCommandManager(domain_id=self.get_topo_id)
 
         self._selected_cell = None
 
@@ -48,8 +56,7 @@ class TopoEditor(widgets.HBox):
             super().__init__([])
 
     def initialize_history(self):
-        self.history.load_histories(COMMAND_REGISTRY)
-        self.history.replay(self.topo)
+        self.command_manager.execute(InitializeHistoryCommand(self.command_manager, COMMAND_REGISTRY, self.topo))
         self.update_undo_redo_buttons()
 
     def get_topo_id(self):
@@ -77,47 +84,16 @@ class TopoEditor(widgets.HBox):
         # Command-pattern-based golden snapshot for undo/redo
         golden_name = f"golden_{grid_name}_{shape_str}"
         try:
-            self.history.load_commit(golden_name, COMMAND_REGISTRY)
+            self.command_manager.execute(LoadCommitCommand(self.command_manager, golden_name, COMMAND_REGISTRY, self.topo))
         except FileNotFoundError:
-            self.history.save_commit(golden_name)
-
-    def reset_topo(self):
-        topo_id = self.get_topo_id()
-        grid_name = topo_id['grid_name']
-        shape = topo_id['shape']
-        shape_str = f"{shape[0]}x{shape[1]}"
-        golden_dir = "original_topo"
-        golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
-        golden_min_depth_path = os.path.join(golden_dir, f"golden_min_depth_{grid_name}_{shape_str}.json")
-
-        if os.path.exists(golden_topo_path):
-            self.topo.depth.data[:] = np.load(golden_topo_path)
-            if os.path.exists(golden_min_depth_path):
-                with open(golden_min_depth_path, "r") as f:
-                    d = json.load(f)
-                    self.topo.min_depth = d.get("min_depth", self.topo.min_depth)
-            print(f"Topo reset to golden/original topo for {grid_name} {shape_str} from disk.")
-        else:
-            self.topo.depth.data[:] = np.copy(self._original_depth)
-            self.topo.min_depth = self._original_min_depth
-            print("Topo reset to first-in-memory state.")
-
-        golden_name = f"golden_{grid_name}_{shape_str}"
-        from CrocoDash.edit_command import COMMAND_REGISTRY
-        try:
-            self.history.load_commit(golden_name, COMMAND_REGISTRY)
-        except FileNotFoundError:
-            print("Golden command snapshot not found, edit history not reset.")
-
-        self._min_depth_specifier.value = self.topo.min_depth
-        self.trigger_refresh()
+            self.command_manager.execute(SaveCommitCommand(self.command_manager, golden_name))
 
     def save_commit(self, _btn=None):
         name = self._snapshot_name.value.strip()
         if not name:
             print("Enter a name!")
             return
-        self.history.save_commit(name)
+        self.command_manager.execute(SaveCommitCommand(self.command_manager, name))
         print(f"Saved snapshot '{name}'.")
 
     def load_commit(self, _btn=None):
@@ -126,9 +102,7 @@ class TopoEditor(widgets.HBox):
             print("Enter the name of a snapshot to load!")
             return
         try:
-            self.reset_topo()
-            self.history.load_commit(name, COMMAND_REGISTRY)
-            self.history.replay(self.topo)
+            self.command_manager.execute(LoadCommitCommand(self.command_manager, name, COMMAND_REGISTRY, self.topo))
             self.update_undo_redo_buttons()
             self.trigger_refresh()
             print(f"Loaded snapshot '{name}'.")
@@ -136,36 +110,38 @@ class TopoEditor(widgets.HBox):
             print(f"No snapshot found with name '{name}'.")
 
     def apply_edit(self, cmd, record_history=True):
-        cmd.execute(self.topo)
-        if record_history:
-            self.history.push(cmd)
-            self.history.save_histories()
+        self.command_manager.execute(cmd)
         self.update_undo_redo_buttons()
         self.trigger_refresh()
 
     def undo_last_edit(self, b=None):
-        self.history.undo(self.topo)
-        self.history.save_histories()
+        self.command_manager.execute(UndoCommand(self.command_manager))
         self.update_undo_redo_buttons()
         self.trigger_refresh()
     
     def redo_last_edit(self, b=None):
-        self.history.redo(self.topo)
-        self.history.save_histories()
+        self.command_manager.execute(RedoCommand(self.command_manager))
         self.update_undo_redo_buttons()
         self.trigger_refresh()
 
     def on_reset(self, b=None):
-        self.reset_topo()
-        self.history.save_histories()
+        self.command_manager.execute(ResetCommand(
+            self.command_manager,
+            self.topo,
+            self._original_depth,
+            self._original_min_depth,
+            self.get_topo_id,
+            min_depth_specifier=self._min_depth_specifier,
+            trigger_refresh=self.trigger_refresh
+        ))
         self.update_undo_redo_buttons()
         print("Topo reset to original state.")
 
     def update_undo_redo_buttons(self):
         if hasattr(self, "_undo_button"):
-            self._undo_button.disabled = not bool(self.history._undo_history)
+            self._undo_button.disabled = not bool(self.command_manager._undo_history)
         if hasattr(self, "_redo_button"):
-            self._redo_button.disabled = not bool(self.history._redo_history)
+            self._redo_button.disabled = not bool(self.command_manager._redo_history)
 
     def construct_interactive_plot(self):
         # Ensure we are in interactive mode
@@ -497,7 +473,7 @@ class TopoEditor(widgets.HBox):
         old_val = self.topo.min_depth
         new_val = change['new']
         if old_val != new_val:
-            cmd = SetMinDepthCommand(attr='min_depth', new_value=new_val, old_value=old_val)
+            cmd = MinDepthEditCommand(self.topo, attr='min_depth', new_value=new_val, old_value=old_val)
             self.apply_edit(cmd)
             self.update_undo_redo_buttons()
 
@@ -512,7 +488,7 @@ class TopoEditor(widgets.HBox):
             return
         old_values = [self.topo.depth.data[jj, ii] for jj, ii in indices]
         new_values = [0] * len(indices)
-        cmd = EraseDisconnectedBasinsCommand(indices, new_values, old_values=old_values)
+        cmd = DepthEditCommand(self.topo, indices, new_values, old_values=old_values)
         self.apply_edit(cmd)
         self.update_undo_redo_buttons()
     
@@ -527,7 +503,7 @@ class TopoEditor(widgets.HBox):
             return
         old_values = [self.topo.depth.data[jj, ii] for jj, ii in indices]
         new_values = [0] * len(indices)
-        cmd = EraseSelectedBasinCommand(indices, new_values, old_values=old_values)
+        cmd = DepthEditCommand(self.topo, indices, new_values, old_values=old_values)
         self.apply_edit(cmd)
         self.update_undo_redo_buttons()
 
@@ -539,7 +515,7 @@ class TopoEditor(widgets.HBox):
         new_val = change['new']
         if old_val == new_val:
             return
-        cmd = SetDepthCommand([(j, i)], [new_val], old_values=[old_val])
+        cmd = DepthEditCommand(self.topo, [(j, i)], [new_val], old_values=[old_val])
         self.apply_edit(cmd)
         self.update_undo_redo_buttons()
 
@@ -554,7 +530,7 @@ class TopoEditor(widgets.HBox):
         if not name:
             print("Enter a snapshot name to commit!")
             return
-        snapshot_path = os.path.join(self.history.snapshot_dir, f"{name}.json")
+        snapshot_path = os.path.join(self.command_manager.snapshot_dir, f"{name}.json")
         try:
             result = git_commit_snapshot(snapshot_path, msg, CROCODASH_REPO_ROOT)
             print(result)
@@ -598,7 +574,7 @@ class TopoEditor(widgets.HBox):
             self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
             self._git_branch_dropdown.value = current
             # --- Load latest snapshot after checkout ---
-            snapshot_dir = self.history.snapshot_dir
+            snapshot_dir = self.command_manager.snapshot_dir
             snapshots = [f for f in os.listdir(snapshot_dir) if f.endswith('.json')]
             if not snapshots:
                 print("No snapshots found in this branch.")
