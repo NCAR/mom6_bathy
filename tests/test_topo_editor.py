@@ -5,10 +5,12 @@ import pytest
 
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
-from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.topo_edit_command import SetDepthCommand
+from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.topo_edit_command import (
+    DepthEditCommand, MinDepthEditCommand, UndoCommand, RedoCommand,
+    SaveCommitCommand, LoadCommitCommand, ResetCommand, InitializeHistoryCommand
+)
 from mom6_bathy.topo_editor import TopoEditor
 from CrocoDash.edit_command import COMMAND_REGISTRY
-
 
 @pytest.fixture
 def minimal_grid_and_topo():
@@ -34,11 +36,9 @@ class Dummy:
             self.value = value
 
     def __getattr__(self, name):
-        # Return self so any attribute access works
         return self
 
     def __call__(self, *args, **kwargs):
-        # Dummy is callable, returns self or None as needed
         return self
 
 def patch_all_widgets(editor):
@@ -51,14 +51,14 @@ def patch_all_widgets(editor):
         'im', 'cbar', 'ax', 'fig'
     ]
     for attr in dummy_attrs:
-        # Some widgets expect an initial value; set depth for display_mode_toggle
         value = "depth" if attr == '_display_mode_toggle' else None
         setattr(editor, attr, Dummy(value=value))
 
 def setup_depth(editor, i=2, j=2, new_depth=777.0):
     orig_depth = float(editor.topo.depth.data[j, i])
     editor._select_cell(i, j)
-    edit = SetDepthCommand(
+    edit = DepthEditCommand(
+        editor.topo,
         affected_indices=[(j, i)],
         new_values=[new_depth],
         old_values=[orig_depth],
@@ -77,7 +77,7 @@ def test_undo(minimal_grid_and_topo):
 
     editor.undo_last_edit()
     assert float(topo.depth.data[j, i]) == orig_depth
-    assert not editor.history._undo_history
+    assert not editor.command_manager._undo_history
 
 def test_redo(minimal_grid_and_topo):
     topo = minimal_grid_and_topo
@@ -90,7 +90,7 @@ def test_redo(minimal_grid_and_topo):
 
     editor.redo_last_edit()
     assert float(topo.depth.data[j, i]) == new_depth
-    assert not editor.history._redo_history
+    assert not editor.command_manager._redo_history
 
 def test_undo_redo_interleaving(minimal_grid_and_topo):
     topo = minimal_grid_and_topo
@@ -100,13 +100,13 @@ def test_undo_redo_interleaving(minimal_grid_and_topo):
     i, j = 2, 2
     orig = float(editor.topo.depth.data[j, i])
 
-    edit_100 = SetDepthCommand([(j, i)], [100.0], old_values=[orig])
+    edit_100 = DepthEditCommand(editor.topo, [(j, i)], [100.0], old_values=[orig])
     editor.apply_edit(edit_100)
 
-    edit_200 = SetDepthCommand([(j, i)], [200.0], old_values=[100.0])
+    edit_200 = DepthEditCommand(editor.topo, [(j, i)], [200.0], old_values=[100.0])
     editor.apply_edit(edit_200)
 
-    edit_300 = SetDepthCommand([(j, i)], [300.0], old_values=[200.0])
+    edit_300 = DepthEditCommand(editor.topo, [(j, i)], [300.0], old_values=[200.0])
     editor.apply_edit(edit_300)
 
     # Undo twice (should go from 300 -> 200 -> 100)
@@ -116,7 +116,7 @@ def test_undo_redo_interleaving(minimal_grid_and_topo):
     assert float(editor.topo.depth.data[j, i]) == 100.0
 
     # Make a new edit (should clear redo)
-    edit_999 = SetDepthCommand([(j, i)], [999.0], old_values=[100.0])
+    edit_999 = DepthEditCommand(editor.topo, [(j, i)], [999.0], old_values=[100.0])
     editor.apply_edit(edit_999)
     assert float(editor.topo.depth.data[j, i]) == 999.0
 
@@ -133,16 +133,16 @@ def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_pat
     editor.redo_last_edit()
     assert float(topo.depth.data[j, i]) == new_depth
 
-    editor.history.snapshot_dir = str(tmp_path) 
-    editor.history.save_commit("test_snapshot")
+    editor.command_manager.snapshot_dir = str(tmp_path)
+    editor.command_manager.save_commit("test_snapshot")
 
     topo2 = minimal_grid_and_topo
     editor2 = TopoEditor(topo2, build_ui=False)
     patch_all_widgets(editor2)
-    editor2.history.snapshot_dir = str(tmp_path)
+    editor2.command_manager.snapshot_dir = str(tmp_path)
     print("COMMAND_REGISTRY keys:", list(COMMAND_REGISTRY.keys()))
-    editor2.history.load_commit("test_snapshot", COMMAND_REGISTRY) 
-    editor2.history.replay(editor2.topo)
+    editor2.command_manager.load_commit("test_snapshot", COMMAND_REGISTRY, editor2.topo)
+    editor2.command_manager.replay()
 
     # After replaying the edit history, topo2 should have new_depth at (j, i)
     assert float(editor2.topo.depth.data[j, i]) == new_depth
