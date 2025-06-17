@@ -60,7 +60,7 @@ def lateral_fill(
     attrs = da_in.attrs
     encoding = da_in.encoding
     coords = da_in.coords
-    
+
     da_in, isvalid_mask = xr.broadcast(da_in, isvalid_mask)
 
     if len(non_lateral_dims) > 0:
@@ -84,7 +84,13 @@ def lateral_fill(
     else:
         da_out = xr.full_like(da_in, fill_value=np.nan)
         da_out[:, :] = lateral_fill_np_array(
-            da_in.data, isvalid_mask.values.astype(bool), ltripole, tol, use_sor, rc, max_iter
+            da_in.data,
+            isvalid_mask.values.astype(bool),
+            ltripole,
+            tol,
+            use_sor,
+            rc,
+            max_iter,
         )
 
     da_out.attrs = attrs
@@ -175,8 +181,7 @@ def _iterative_fill_POP_core(nlat, nlon, var, fillmask, tol, ltripole, max_iter)
         done = True
         iter_cnt += 1
 
-        # assume bottom row is land, so skip it
-        for j in range(1, nlat):
+        for j in range(0, nlat):
             jm1 = j - 1
             jp1 = j + 1
 
@@ -278,8 +283,7 @@ def _iterative_fill_sor(nlat, nlon, var, fillmask, tol, rc, max_iter, ltripole):
     while iter_cnt < max_iter and res_max >= tol:
         res[:] = 0.0  # reset the residual to zero for this iteration
 
-        # assume bottom row is all land, leave it set to zonal average
-        # deal with top row separately below
+        # deal with top and bottom row separately below
         for j in range(1, nlat - 1):
             jm1 = j - 1
             jp1 = j + 1
@@ -323,6 +327,19 @@ def _iterative_fill_sor(nlat, nlon, var, fillmask, tol, rc, max_iter, ltripole):
                     else:  # do a 1D smooth on pole row
                         res[j, i] = var[j, ip1] + var[j, im1] - 2.0 * var[j, i]
                         var[j, i] = var[j, i] + rc * 0.5 * res[j, i]
+        # do the bottom row if there was some valid data there in the input
+        # otherwise leave it set to zonal average of northernmost row with valid data
+        if zoncnt[0] > 1:
+            j = 0
+            jm1 = j
+            jp1 = j + 1
+            for i in range(0, nlon):
+                if fillmask[j, i]:
+                    im1 = (i - 1) % nlon
+                    ip1 = (i + 1) % nlon
+                    # 1D Smooth
+                    res[j, i] = var[j, ip1] + var[j, im1] - 2.0 * var[j, i]
+                    var[j, i] = var[j, i] + rc * 0.5 * res[j, i]
 
         res_max = np.max(np.fabs(res)) / np.max(np.fabs(var))
         iter_cnt += 1
