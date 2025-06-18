@@ -19,7 +19,8 @@ from mom6_bathy.git_utils import (
     git_create_branch_and_switch, git_delete_branch_and_switch, 
     git_list_branches
 )
-CROCODASH_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
+
+CROCODASH_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 class TopoEditor(widgets.HBox):
     
