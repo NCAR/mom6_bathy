@@ -587,3 +587,4 @@ class TopoEditor(widgets.HBox):
             print(f"Automatically loaded latest snapshot: {latest_name}")
         except Exception as e:
             print(f"Git checkout failed: {e}")
+            
