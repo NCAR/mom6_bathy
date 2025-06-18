@@ -5,12 +5,12 @@ import pytest
 
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
-from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.topo_edit_command import (
+from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.edit_command import (
     DepthEditCommand, MinDepthEditCommand, UndoCommand, RedoCommand,
     SaveCommitCommand, LoadCommitCommand, ResetCommand, InitializeHistoryCommand
 )
 from mom6_bathy.topo_editor import TopoEditor
-from CrocoDash.edit_command import COMMAND_REGISTRY
+from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.edit_command import COMMAND_REGISTRY
 
 @pytest.fixture
 def minimal_grid_and_topo():

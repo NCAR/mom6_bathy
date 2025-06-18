@@ -6,15 +6,15 @@ import os
 import json
 import git
 from matplotlib.ticker import MaxNLocator
-from CrocoDash.edit_command import COMMAND_REGISTRY
-from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.topo_command_manager import TopoCommandManager
-from CrocoDash.visualCaseGen.external.mom6_bathy.mom6_bathy.topo_edit_command import (
+from mom6_bathy.command_manager import TopoCommandManager
+from mom6_bathy.edit_command import (
     UndoCommand, RedoCommand, 
     SaveCommitCommand, LoadCommitCommand, 
     ResetCommand, InitializeHistoryCommand, 
-    DepthEditCommand, MinDepthEditCommand
+    DepthEditCommand, MinDepthEditCommand,
+    COMMAND_REGISTRY
 )
-from CrocoDash.git_utils import (
+from mom6_bathy.git_utils import (
     git_commit_snapshot, git_checkout_branch, 
     git_create_branch_and_switch, git_delete_branch_and_switch, 
     git_list_branches
