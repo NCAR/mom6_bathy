@@ -4,7 +4,8 @@ import xarray as xr
 from datetime import datetime
 from scipy import interpolate
 from scipy.ndimage import label
-from mom6_bathy.aux import gc_qarea
+from mom6_bathy.aux import cell_area_rad
+from scipy.spatial import cKDTree
 
 
 class Topo:
@@ -117,15 +118,110 @@ class Topo:
             attrs={"name": "T mask"},
         )
         return tmask_da
+    
+    @property
+    def umask(self):
+        """
+        Ocean domain mask on U grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        umask = xr.DataArray(
+            np.ones(self._grid.ulat.shape, dtype=int),
+            dims = ['yh','xq'],
+            attrs={"name": "U mask"})
+        
+        # Fill umask with mask values
+        umask[:,:-1] &= tmask.values # h-point translates to the left u-point
+        umask[:,1:] &= tmask.values # h-point translates to the right u-point
+
+        return umask
+    
+    @property
+    def vmask(self):
+        """
+        Ocean domain mask on V grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        vmask = xr.DataArray(
+            np.ones(self._grid.vlat.shape, dtype=int),
+            dims = ['yq','xh'],
+            attrs={"name": "V mask"})
+        
+        # Fill vmask with mask values
+        vmask[:-1,:] &= tmask.values # h-point translates to the bottom v-point
+        vmask[1:,:] &= tmask.values # h-point translates to the top v-point
+
+        return vmask
+    
+    @property
+    def qmask(self):
+        """
+        Ocean domain mask on Q grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        qmask = xr.DataArray(
+            np.ones(self._grid.qlat.shape, dtype=int),
+            dims = ['yq','xq'],
+            attrs={"name": "Q mask"})
+        
+        # Fill qmask with mask values
+        qmask[:-1, :-1] &= tmask.values    # top-left of h goes to top-left q
+        qmask[:-1, 1:]  &= tmask.values     # top-right
+        qmask[1:, :-1]  &= tmask.values   # bottom-left
+        qmask[1:, 1:]   &= tmask.values     # bottom-right 
+
+        # Corners of the qmask are always land -> regional cases
+        qmask[0, 0] = 0
+        qmask[0, -1] = 0
+        qmask[-1, 0] = 0
+        qmask[-1, -1] = 0
+
+        return qmask
+          
+
         
     @property
     def basintmask(self):
         """
-        Ocean domain mask at T grid. seperate number for each connected water cell, 0 if land.
+        Ocean domain mask at T grid. Seperate number for each connected water cell, 0 if land.
         """
         res, num_features = label(self.tmask)
         
         return xr.DataArray(res)
+    
+    @property
+    def supergridmask(self):
+        """
+        Ocean domain mask on supergrid. 1 if ocean, 0 if land.
+        """
+
+        supergridmask = xr.DataArray(
+            np.zeros(self._grid._supergrid.x.shape, dtype=int),
+            dims=["nyp", "nxp"],
+            attrs={"name": "supergrid mask"})
+        supergridmask[::2, ::2] = self.qmask.values
+        supergridmask[::2, 1::2] = self.vmask.values
+        supergridmask[ 1::2,::2] = self.umask.values
+        supergridmask[ 1::2,1::2] = self.tmask.values
+        return supergridmask
+
+    def point_is_ocean(self, lons,lats):
+        """
+        Given a list of coordinates, return a list of booleans indicating if the coordinates are in the ocean (True) or land (False)
+        """
+        assert len(lons) == len(lats), "Lons & Lats must be the same length, they describe a set of points"
+
+        is_ocean=[]
+        for i in range(len(lons)):
+            match = np.where((self._grid._supergrid.x == lons[i]) & (self._grid._supergrid.y == lats[i]))
+            is_ocean.append(self.supergridmask[match[0],match[1]].item())
+        return is_ocean
 
     def set_flat(self, D):
         """
@@ -156,18 +252,79 @@ class Topo:
             topog_file_path
         ), f"Cannot find topog file at {topog_file_path}."
 
-        ds = xr.open_dataset(topog_file_path)
+        ds_topo = xr.open_dataset(topog_file_path)
+        assert "depth" in ds_topo, f"Cannot find the 'depth' field in topog file {topog_file_path}"
+        depth = ds_topo["depth"]
 
-        # sanity checks
-        assert (
-            "depth" in ds
-        ), f"Cannot find the 'depth' field in topog file {topog_file_path}"
-        assert ds.depth.shape == (
-            self._grid.ny,
-            self._grid.nx,
-        ), f"Incompatible depth array shape in topog file {topog_file_path}"
+        if depth.shape[0] < self._grid.ny or depth.shape[1] < self._grid.nx:
+            raise ValueError(
+                f"Topography data in {topog_file_path} is smaller than the grid size "
+                f"({depth.shape[0]}x{depth.shape[1]} < {self._grid.ny}x{self._grid.nx}). "
+            )
+        elif depth.shape[0] > self._grid.ny or depth.shape[1] > self._grid.nx:
+            assert (
+                'geolat' in ds_topo and 'geolon' in ds_topo
+            ), f"Topog file {topog_file_path} does not contain geolat and geolon fields, "
+            "which are required to determine if the grid is a subgrid of the topog file, "
+            "since the topography data is larger than the grid (in index space). "
 
-        self.depth = ds.depth
+            # Determine if the grid is a subgrid of the topog file
+            geolat = ds_topo['geolat']
+            geolon = ds_topo['geolon']
+
+            # find the closest cell in the topog file to the (sub)grid's origin (southwest corner)
+            topog_kdtree =  cKDTree(
+                np.column_stack((geolat.data.flatten(), geolon.data.flatten()))
+            )
+            _, indices = topog_kdtree.query(
+                [self._grid.tlat[0, 0].item(), self._grid.tlon[0, 0].item()]
+            )
+            cj, ci = np.unravel_index(indices, geolon.shape)
+
+            assert 0 <= cj < geolat.shape[0] - self._grid.ny, (
+                f"Topography data in {topog_file_path} appears to only contain a subregion "
+                f"of the grid, and does not contain enough rows to accommodate the grid size "
+                f"({self._grid.ny}). "
+            )
+            assert 0 <= ci < geolon.shape[1] - self._grid.nx, (
+                f"Topography data in {topog_file_path} appears to only contain a subregion "
+                f"of the grid, and does not contain enough columns to accommodate the grid size "
+                f"({self._grid.nx}). "
+            )
+
+            # Compare the coords of grid with the coords of the subregion of the topog
+            # data where it may overlap with the grid
+            grid_overlaps_topo = (
+                np.all(
+                    np.isclose(
+                        geolat[cj:cj + self._grid.ny, ci:ci + self._grid.nx],
+                        self._grid.tlat.data,
+                        rtol=1e-5
+                    )
+                )
+                and np.all(
+                    np.isclose(
+                        geolon[cj:cj + self._grid.ny, ci:ci + self._grid.nx],
+                        self._grid.tlon.data,
+                        rtol=1e-5
+                    )
+                )
+            )
+            if not grid_overlaps_topo:
+                raise ValueError(
+                    f"The topography data in {topog_file_path} is larger than the grid "
+                    f"data which does not appear to be a subgrid of the topography data. "
+                    f"Topography data shape: {depth.shape}, grid shape: "
+                    f"({self._grid.ny}, {self._grid.nx}). "
+                )
+
+            # If the grid is a subgrid of the topog data, extract the subregion
+            depth = depth[cj:cj + self._grid.ny, ci:ci + self._grid.nx]
+        
+        else:
+            pass # the depth array is the right size
+
+        self.depth = depth
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
@@ -536,13 +693,25 @@ class Topo:
 
         ds["angle"] = xr.DataArray(
             np.deg2rad(
-                self._grid.angle.data
+                self._grid.angle_q.data[1:,1:] # Slice the q-grid from MOM6 (which is u-grid in CICE/POP) to CICE/POP convention, the top right of the t points
             ),
             dims=["nj", "ni"],
             attrs={
                 "long_name": "angle grid makes with latitude line on U grid",
                 "units": "radians",
                 "coordinates": "ULON ULAT",
+            },
+        )
+
+        ds["anglet"] = xr.DataArray(
+            np.deg2rad(
+                self._grid.angle.data
+            ),
+            dims=["nj", "ni"],
+            attrs={
+                "long_name": "angle grid makes with latitude line on T grid",
+                "units": "radians",
+                "coordinates": "TLON TLAT",
             },
         )
 
@@ -631,7 +800,7 @@ class Topo:
         ), axis=-1)
 
         ds["grid_area"] = xr.DataArray(
-            gc_qarea(ds.grid_corner_lat.data, ds.grid_corner_lon.data, radius=1.0),
+            cell_area_rad(ds.grid_corner_lon.data, ds.grid_corner_lat.data),
             dims=["grid_size"],
             attrs={"units": "radians^2"},
         )
