@@ -52,9 +52,7 @@ def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
     )
 
 
-def fill_missing_data(
-    idata, mask, verbose=True, maxiter=0, stabilizer=1.0e-14, tripole=False
-):
+def fill_missing_data(idata, mask, maxiter=0, stabilizer=1.0e-14, tripole=False):
     """
     Returns data with masked values objectively interpolated except where mask==0.
 
@@ -65,38 +63,34 @@ def fill_missing_data(
     Returns a np.ma.array.
     """
     nj, ni = idata.shape
-    fdata = idata.filled(
-        0.0
-    )  # Working with an ndarray is faster than working with a masked array
+    # Working with an ndarray is faster than working with a masked array
+    fdata = idata.filled(0.0)
     missing_j, missing_i = np.where(idata.mask & (mask > 0))
     n_missing = missing_i.size
-    if verbose:
-        print(
-            "Data shape: %i x %i = %i with %i missing values"
-            % (nj, ni, nj * ni, np.count_nonzero(idata.mask))
+    print(
+        "Data shape: %i x %i = %i with %i missing values"
+        % (nj, ni, nj * ni, np.count_nonzero(idata.mask))
+    )
+    print(
+        "Mask shape: %i x %i = %i with %i land cells"
+        % (
+            mask.shape[0],
+            mask.shape[1],
+            np.prod(mask.shape),
+            np.count_nonzero(1 - mask),
         )
-        print(
-            "Mask shape: %i x %i = %i with %i land cells"
-            % (
-                mask.shape[0],
-                mask.shape[1],
-                np.prod(mask.shape),
-                np.count_nonzero(1 - mask),
-            )
-        )
-        print("Data has %i missing values in ocean" % (n_missing))
-        print("Data range: %g .. %g " % (idata.min(), idata.max()))
+    )
+    print("Data has %i missing values in ocean" % (n_missing))
+    print("Data range: %g .. %g " % (idata.min(), idata.max()))
     # ind contains column of matrix/row of vector corresponding to point [j,i]
     ind = np.zeros(fdata.shape, dtype=int) - int(1e6)
     ind[missing_j, missing_i] = np.arange(n_missing)
-    if verbose:
-        print("Building matrix")
+    print("Building matrix")
     A = scipy.sparse.lil_matrix((n_missing, n_missing))
     b = np.zeros((n_missing))
     ld = np.zeros((n_missing))
     A[range(n_missing), range(n_missing)] = 0.0
-    if verbose:
-        print("Looping over cells")
+    print("Looping over cells")
     for n in range(n_missing):
         j, i = missing_j[n], missing_i[n]
         im1 = (i + ni - 1) % ni
@@ -142,11 +136,9 @@ def fill_missing_data(
     b[ld >= 0] = 0.0
     A[range(n_missing), range(n_missing)] = ld - stabilizer
 
-    if verbose:
-        print("Matrix constructed")
+    print("Matrix constructed")
     A = scipy.sparse.csr_matrix(A)
-    if verbose:
-        print("Matrix converted")
+    print("Matrix converted")
     new_data = np.ma.array(fdata, mask=(mask == 0))
     if maxiter is None:
         x, info = scipy.sparse.linalg.bicg(A, b)
@@ -154,7 +146,6 @@ def fill_missing_data(
         x = scipy.sparse.linalg.spsolve(A, b)
     else:
         x, info = scipy.sparse.linalg.bicg(A, b, maxiter=maxiter)
-    if verbose:
-        print("Matrix inverted")
+    print("Matrix inverted")
     new_data[missing_j, missing_i] = x
     return new_data

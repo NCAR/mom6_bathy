@@ -10,9 +10,11 @@ from mom6_bathy.fill_interp import (
 )
 
 
-def gen_chl_empty_dataset(output_path, lon, lat, fill_value=-1.0e34):
+def gen_chl_empty_dataset(output_path, lon, lat, fill_value=-1.0e34, no_leap=True):
     """
     Generate an empty NetCDF dataset for SeaWiFS chlorophyll climatology and save it to disk.
+
+    This function assumes a NO_LEAP calendar.
 
     This function creates a synthetic xarray dataset with a CHL_A variable (monthly mean chlorophyll)
     initialized entirely with fill values. The dataset uses the provided longitude and latitude
@@ -45,9 +47,14 @@ def gen_chl_empty_dataset(output_path, lon, lat, fill_value=-1.0e34):
 
     # === Coordinates ===
 
-    time = np.array(
-        [15.5, 45, 74.5, 105, 135.5, 166, 196.5, 227.5, 258, 288.5, 319, 349.5]
-    )
+    if no_leap:
+        time = np.array(
+            [15.5, 45, 74.5, 105, 135.5, 166, 196.5, 227.5, 258, 288.5, 319, 349.5]
+        )
+    else:
+        time = np.array(
+            [15.5, 45.5, 75.5, 106, 136.5, 167, 197.5, 228.5, 259, 289.5, 320, 350.5]
+        )
 
     # === Placeholder data for CHL_A (all fill values) ===
     fill_value = np.float32(-1.0e34)
@@ -105,6 +112,8 @@ def interpolate_and_fill_seawifs(
 ):
     """
     Interpolate and fill SeaWiFS chlorophyll data to a model grid and save to NetCDF.
+
+    This function assumes a NO_LEAP calendar.
 
     This function takes gridded SeaWiFS chlorophyll data, interpolates it onto a
     super-sampled model grid, applies ocean masking, fills missing values, and writes
