@@ -184,8 +184,9 @@ def interpolate_and_fill_seawifs(
             .mean(axis=-1)
         )
         q = q_int * ocn_mask
-        q_masked = np.ma.masked_where((q == 0) | np.isnan(q), q)
-        chlor_a[t, :] = fill_missing_data(q_masked, ocn_mask)
+        q_nan = np.where((q == 0) | np.isnan(q), np.nan, q)
+
+        chlor_a[t, :] = fill_missing_data(q_nan, ocn_mask)
 
     # Global attributes
     chla.attrs["title"] = (

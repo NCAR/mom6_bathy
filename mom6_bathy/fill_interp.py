@@ -17,6 +17,19 @@ def latlon2ji_simple(src_lat, src_lon, lat, lon):
     """
     Assumes the lon and late are in the correct range (no negative lats, same lon format between src_lon  & spr_lon)
     """
+    lat0, lat1 = src_lat[0], src_lat[-1]
+    lon0, lon1 = src_lon[0], src_lon[-1]
+    # Check ranges
+    if np.any(lat < lat0) or np.any(lat > lat1):
+        raise ValueError(
+            f"Latitude values out of bounds: must be between {lat0} and {lat1}"
+        )
+
+    if np.any(lon < lon0) or np.any(lon > lon1):
+        raise ValueError(
+            f"Longitude values out of bounds: must be between {lon0} and {lon1}"
+        )
+
     nj, ni = len(src_lat), len(src_lon)
 
     lat_range = src_lat[-1] - src_lat[0]
@@ -64,12 +77,13 @@ def fill_missing_data(idata, mask, maxiter=0, stabilizer=1.0e-14, tripole=False)
     """
     nj, ni = idata.shape
     # Working with an ndarray is faster than working with a masked array
-    fdata = idata.filled(0.0)
-    missing_j, missing_i = np.where(idata.mask & (mask > 0))
+    fdata = np.nan_to_num(idata, nan=0.0)
+    missing_j, missing_i = np.where(np.isnan(idata) & (mask > 0))
+
     n_missing = missing_i.size
     print(
         "Data shape: %i x %i = %i with %i missing values"
-        % (nj, ni, nj * ni, np.count_nonzero(idata.mask))
+        % (nj, ni, nj * ni, np.count_nonzero(np.isnan(idata)))
     )
     print(
         "Mask shape: %i x %i = %i with %i land cells"
