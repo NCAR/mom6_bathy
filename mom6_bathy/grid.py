@@ -100,12 +100,16 @@ class Grid:
         # default ystart value (centers the domain at the Equator)
         if ystart is None:
             ystart = -0.5 * leny
-        
+
         if nx is not None or ny is not None:
-            assert nx is not None and ny is not None, "nx and ny must be provided together"
+            assert (
+                nx is not None and ny is not None
+            ), "nx and ny must be provided together"
             assert resolution is None, "resolution cannot be provided with nx and ny"
         else:
-            assert resolution is not None, "resolution must be provided if nx and ny are not"
+            assert (
+                resolution is not None
+            ), "resolution must be provided if nx and ny are not"
             nx = int(lenx / resolution)
             ny = int(leny / resolution)
 
@@ -122,7 +126,6 @@ class Grid:
         assert tripolar_n is False, "tripolar not supported yet"
         assert displace_pole is False, "displaced pole not supported yet"
         self.name = name
-
 
         srefine = 2  # supergrid refinement factor
 
@@ -141,7 +144,6 @@ class Grid:
             displace_pole=displace_pole,
         )
 
-
     @property
     def name(self) -> str:
         """Name of the grid."""
@@ -156,7 +158,9 @@ class Grid:
     
     @name.setter
     def name(self, new_name: str) -> None:
-        assert new_name is None or new_name.replace("_", "").isalnum(), "Grid name must be alphanumeric"
+        assert (
+            new_name is None or new_name.replace("_", "").isalnum()
+        ), "Grid name must be alphanumeric"
         self._name = new_name
     
     def __getitem__(self, slices) -> xr.DataArray:
@@ -283,7 +287,7 @@ class Grid:
         supergrid : xarray.Dataset
             MOM6 Supergrid dataset
         """
-        for attr in ["x", "y", "dx", "dy", "area"]: # todo: add angle_dx
+        for attr in ["x", "y", "dx", "dy", "area"]:  # todo: add angle_dx
             assert attr in supergrid, f"Cannot find '{attr}' in supergrid dataset."
         assert (
             "units" in supergrid.x.attrs
@@ -314,7 +318,7 @@ class Grid:
     @staticmethod
     def is_tripolar(supergrid) -> bool:
         """Check if the given supergrid x coordinates form a tripolar grid.
-        
+
         Parameters
         ----------
         supergrid : xr.DataArray or np.array or MidasSupergrid
@@ -341,18 +345,19 @@ class Grid:
         # If there are 3 lines (i.e., 2 or more cells with the same x coordinate),
         # the grid is tripolar
         return nlines == 3
-    
+
     def is_rectangular(self, rtol=1e-3) -> bool:
         """Check if the grid is a rectangular lat-lon grid by comparing the
         first and last rows and columns of the tlon and tlat arrays."""
 
-        if (np.allclose(self.tlon[:, 0], self.tlon[0, 0], rtol=rtol) and
-            np.allclose(self.tlon[:, -1], self.tlon[0, -1], rtol=rtol) and
-            np.allclose(self.tlat[0, :], self.tlat[0, 0], rtol=rtol) and
-            np.allclose(self.tlat[-1, :], self.tlat[-1, 0], rtol=rtol)):
+        if (
+            np.allclose(self.tlon[:, 0], self.tlon[0, 0], rtol=rtol)
+            and np.allclose(self.tlon[:, -1], self.tlon[0, -1], rtol=rtol)
+            and np.allclose(self.tlat[0, :], self.tlat[0, 0], rtol=rtol)
+            and np.allclose(self.tlat[-1, :], self.tlat[-1, 0], rtol=rtol)
+        ):
             return True
         return False
-
 
     @classmethod
     def from_supergrid(cls, path: str, name: Optional[str] = None) -> "Grid":
@@ -409,7 +414,9 @@ class Grid:
         return obj
 
     @classmethod
-    def subgrid_from_supergrid(cls, path: str, llc: tuple[float, float], urc: tuple[float, float], name: str) -> "Grid":
+    def subgrid_from_supergrid(
+        cls, path: str, llc: tuple[float, float], urc: tuple[float, float], name: str
+    ) -> "Grid":
         """Create a Grid instance from a subset of a supergrid file.
 
         Parameters
@@ -439,7 +446,9 @@ class Grid:
         urc_j, urc_i = full_grid.get_indices(urc[0], urc[1])
 
         assert llc_j < urc_j, "Lower left corner must be below upper right corner"
-        assert llc_i < urc_i, "Lower left corner must be to the left of upper right corner"
+        assert (
+            llc_i < urc_i
+        ), "Lower left corner must be to the left of upper right corner"
 
         # create a subgrid from the full grid
         subgrid = full_grid[llc_j:urc_j, llc_i:urc_i]
@@ -470,7 +479,7 @@ class Grid:
         return self.tlon.shape[0]
 
     def _compute_MOM6_grid_metrics(self):
-        """Compute the MOM6 grid metrics from the supergrid metrics. These 
+        """Compute the MOM6 grid metrics from the supergrid metrics. These
         include the tlon, tlat, ulon, ulat, vlon, vlat, qlon, qlat, dxt, dyt,
         dxCv, dyCu, dxCu, dyCv, angle, angle_q, and tarea."""
 
@@ -649,6 +658,51 @@ class Grid:
         dist, indices = self.kdtree.query([tlat, tlon])
         j, i = np.unravel_index(indices, self.tlat.shape)
         return int(j), int(i)
+
+    def refine(self, factor: int) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Super-sample an ocean grid using bilinear interpolation.
+
+        This function refines supergrid coordinates (qlat, qlon)
+        to a finer resolution by subdividing each original grid cell into a higher-resolution
+        `factor x factor` subgrid, where `factor` is automatically determined to match or exceed
+        the target dimensions (`src_nj`, `src_ni`).
+
+        Parameters
+        ----------
+        factor: int
+            The amount by which to make the grid higher resolution
+
+        Returns
+        -------
+        lat : ndarray of shape (nj, factor, ni, factor)
+            Refined latitude field with `factor x factor` points per original cell.
+        lon : ndarray of shape (nj, factor, ni, factor)
+            Refined longitude field with `factor x factor` points per original cell.
+
+        Notes
+        -----
+        The output grids can be reshaped to `(nj * factor, ni * factor)` for use in plotting
+        or remapping. The interpolation uses bilinear weights based on relative position
+        within each original grid cell.
+        """
+
+        lon = np.zeros((self.ny, factor, self.nx, factor))
+        lat = np.zeros((self.ny, factor, self.nx, factor))
+        for j in range(factor):
+            ya = (2 * j + 1) / (2 * factor)
+            yb = 1.0 - ya
+            for i in range(factor):
+                xa = (2 * i + 1) / (2 * factor)
+                xb = 1.0 - xa
+                lon[:, j, :, i] = yb * (
+                    xb * self.qlon[:-1, :-1] + xa * self.qlon[:-1, 1:]
+                ) + ya * (xb * self.qlon[1:, :-1] + xa * self.qlon[1:, 1:])
+                lat[:, j, :, i] = yb * (
+                    xb * self.qlat[:-1, :-1] + xa * self.qlat[:-1, 1:]
+                ) + ya * (xb * self.qlat[1:, :-1] + xa * self.qlat[1:, 1:])
+
+        return lat, lon
 
     def plot(self, property_name):
         """
