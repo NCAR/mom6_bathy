@@ -20,7 +20,7 @@ from mom6_bathy.git_utils import (
     git_list_branches
 )
 
-CROCODASH_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+CROCODASH_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
 
 class TopoEditor(widgets.HBox):
     
@@ -84,10 +84,17 @@ class TopoEditor(widgets.HBox):
 
         # Command-pattern-based golden snapshot for undo/redo
         golden_name = f"golden_{grid_name}_{shape_str}"
+        golden_path = os.path.join(self.SNAPSHOT_DIR, f"{golden_name}.json")
         try:
             self.command_manager.execute(LoadCommitCommand(self.command_manager, golden_name, COMMAND_REGISTRY, self.topo))
         except FileNotFoundError:
             self.command_manager.execute(SaveCommitCommand(self.command_manager, golden_name))
+            # Auto-commit golden snapshot and directory
+            repo = git.Repo(CROCODASH_REPO_ROOT)
+            rel_snapshots_dir = os.path.relpath(self.SNAPSHOT_DIR, CROCODASH_REPO_ROOT)
+            repo.git.add(rel_snapshots_dir)
+            if repo.is_dirty(untracked_files=True):
+                repo.index.commit(f"Add golden snapshot {golden_name}")
 
     def save_commit(self, _btn=None):
         name = self._snapshot_name.value.strip()
@@ -524,68 +531,108 @@ class TopoEditor(widgets.HBox):
 
     def on_git_commit(self, b):
         msg = self._git_commit_msg.value.strip()
-        name = self._snapshot_name.value.strip()
         if not msg:
-            print("Enter a Git commit message!")
+            print("Please enter a Git commit message.")
             return
+        name = self._snapshot_name.value.strip()
         if not name:
-            print("Enter a snapshot name to commit!")
+            print("Please enter a snapshot name to commit.")
             return
-        snapshot_path = os.path.join(self.command_manager.snapshot_dir, f"{name}.json")
-        try:
-            result = git_commit_snapshot(snapshot_path, msg, CROCODASH_REPO_ROOT)
-            print(result)
-        except Exception as e:
-            print(f"Git commit failed: {e}")
+
+        # Save snapshot before commit
+        self.command_manager.execute(SaveCommitCommand(self.command_manager, name))
+        snapshot_path = os.path.join(self.SNAPSHOT_DIR, f"{name}.json")
+        result = git_commit_snapshot(snapshot_path, msg, CROCODASH_REPO_ROOT)
+        print(result)
+
 
     def on_git_create_branch(self, b):
-        branch = self._git_branch_name.value.strip()
-        if not branch:
-            print("Enter a branch name!")
+        name = self._git_branch_name.value.strip()
+        if not name:
+            print("Please enter a branch name.")
             return
         try:
-            current = git_create_branch_and_switch(branch, CROCODASH_REPO_ROOT)
+            branch = git_create_branch_and_switch(name, CROCODASH_REPO_ROOT)
+            print(f"Created and switched to branch '{branch}'.")
             self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
-            self._git_branch_dropdown.value = current
-            print(f"Created and switched to branch: {branch}")
+            self._git_branch_dropdown.value = self.repo.active_branch.name
         except Exception as e:
-            print(f"Git branch creation failed: {e}")
+            print(f"Error creating branch: {str(e)}")
+
 
     def on_git_delete_branch(self, b):
-        branch = self._git_branch_dropdown.value
-        if not branch:
-            print("Select a branch to delete!")
+        name = self._git_branch_name.value.strip()
+        if not name:
+            print("Please enter the branch name to delete.")
             return
         try:
-            current = git_delete_branch_and_switch(branch, CROCODASH_REPO_ROOT)
+            current = self.repo.active_branch.name
+            if current == name:
+                print(f"Cannot delete the currently checked-out branch '{name}'.")
+                return
+            git_delete_branch_and_switch(name, CROCODASH_REPO_ROOT)
+            print(f"Deleted branch '{name}'.")
             self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
-            self._git_branch_dropdown.value = current
-            print(f"Deleted branch: {branch}")
+            self._git_branch_dropdown.value = self.repo.active_branch.name
         except Exception as e:
-            print(f"Git branch deletion failed: {e}")
+            print(f"Error deleting branch: {str(e)}")
 
     def on_git_checkout(self, b):
-        branch = self._git_branch_dropdown.value
-        if not branch:
-            print("Select a branch to checkout!")
+        target = self._git_branch_dropdown.value
+        if not target:
+            print("Please select a branch to checkout.")
             return
         try:
-            current = git_checkout_branch(branch, CROCODASH_REPO_ROOT)
-            print(f"Checked out branch: {branch}")
-            self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
-            self._git_branch_dropdown.value = current
-            # --- Load latest snapshot after checkout ---
-            snapshot_dir = self.command_manager.snapshot_dir
-            snapshots = [f for f in os.listdir(snapshot_dir) if f.endswith('.json')]
-            if not snapshots:
-                print("No snapshots found in this branch.")
+            # Check for unstaged/uncommitted changes in snapshots
+            repo = git.Repo(CROCODASH_REPO_ROOT)
+            snapshot_dir = os.path.abspath(self.SNAPSHOT_DIR)
+            rel_snapshot_dir = os.path.relpath(snapshot_dir, CROCODASH_REPO_ROOT)
+            # Untracked files
+            untracked = [f for f in repo.untracked_files if f.startswith(rel_snapshot_dir)]
+            # Modified but unstaged
+            changed = [item.a_path for item in repo.index.diff(None) if item.a_path.startswith(rel_snapshot_dir)]
+            # Staged but uncommitted
+            staged = [item.a_path for item in repo.index.diff('HEAD') if item.a_path.startswith(rel_snapshot_dir)]
+            if untracked or changed or staged:
+                print("Cannot checkout: You have unsaved or uncommitted changes in 'snapshots'. Please save and commit them before switching branches.")
+                if untracked:
+                    print("Untracked files:", untracked)
+                if changed:
+                    print("Unstaged changes:", changed)
+                if staged:
+                    print("Staged but uncommitted:", staged)
                 return
-            snapshots.sort(key=lambda f: os.path.getmtime(os.path.join(snapshot_dir, f)), reverse=True)
-            latest_snapshot = snapshots[0]
-            latest_name = os.path.splitext(latest_snapshot)[0]
-            self._snapshot_name.value = latest_name
-            self.load_commit()
-            print(f"Automatically loaded latest snapshot: {latest_name}")
+
+            # Checkout the new branch
+            git_checkout_branch(target, CROCODASH_REPO_ROOT)
+            print(f"Checked out to branch '{target}'.")
+
+            # Refresh repo object
+            self.repo = git.Repo(CROCODASH_REPO_ROOT)
+
+            # Update dropdown options and set value to current branch
+            self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
+            self._git_branch_dropdown.value = self.repo.active_branch.name
+
+            # Load latest user snapshot or golden
+            snapshots = [f for f in os.listdir(self.SNAPSHOT_DIR) if f.endswith('.json') and not f.startswith('golden_')]
+            if snapshots:
+                snapshots.sort(key=lambda f: os.path.getmtime(os.path.join(self.SNAPSHOT_DIR, f)), reverse=True)
+                latest_snapshot = snapshots[0]
+                latest_name = latest_snapshot.replace(".json", "")
+                self._snapshot_name.value = latest_name
+                self.load_commit()
+                print(f"Loaded latest snapshot '{latest_name}' from new branch.")
+            else:
+                # No user snapshots, load golden
+                topo_id = self.get_topo_id()
+                grid_name = topo_id['grid_name']
+                shape = topo_id['shape']
+                shape_str = f"{shape[0]}x{shape[1]}"
+                golden_name = f"golden_{grid_name}_{shape_str}"
+                self._snapshot_name.value = golden_name
+                self.load_commit()
+                print(f"No user snapshots found, loaded golden snapshot '{golden_name}'.")
+
         except Exception as e:
-            print(f"Git checkout failed: {e}")
-            
+            print(f"Error checking out branch: {str(e)}")
