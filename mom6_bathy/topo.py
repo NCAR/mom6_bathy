@@ -4,7 +4,8 @@ import xarray as xr
 from datetime import datetime
 from scipy import interpolate
 from scipy.ndimage import label
-from mom6_bathy.aux import gc_qarea
+from mom6_bathy.aux import cell_area_rad
+from scipy.spatial import cKDTree
 
 
 class Topo:
@@ -251,18 +252,79 @@ class Topo:
             topog_file_path
         ), f"Cannot find topog file at {topog_file_path}."
 
-        ds = xr.open_dataset(topog_file_path)
+        ds_topo = xr.open_dataset(topog_file_path)
+        assert "depth" in ds_topo, f"Cannot find the 'depth' field in topog file {topog_file_path}"
+        depth = ds_topo["depth"]
 
-        # sanity checks
-        assert (
-            "depth" in ds
-        ), f"Cannot find the 'depth' field in topog file {topog_file_path}"
-        assert ds.depth.shape == (
-            self._grid.ny,
-            self._grid.nx,
-        ), f"Incompatible depth array shape in topog file {topog_file_path}"
+        if depth.shape[0] < self._grid.ny or depth.shape[1] < self._grid.nx:
+            raise ValueError(
+                f"Topography data in {topog_file_path} is smaller than the grid size "
+                f"({depth.shape[0]}x{depth.shape[1]} < {self._grid.ny}x{self._grid.nx}). "
+            )
+        elif depth.shape[0] > self._grid.ny or depth.shape[1] > self._grid.nx:
+            assert (
+                'geolat' in ds_topo and 'geolon' in ds_topo
+            ), f"Topog file {topog_file_path} does not contain geolat and geolon fields, "
+            "which are required to determine if the grid is a subgrid of the topog file, "
+            "since the topography data is larger than the grid (in index space). "
 
-        self.depth = ds.depth
+            # Determine if the grid is a subgrid of the topog file
+            geolat = ds_topo['geolat']
+            geolon = ds_topo['geolon']
+
+            # find the closest cell in the topog file to the (sub)grid's origin (southwest corner)
+            topog_kdtree =  cKDTree(
+                np.column_stack((geolat.data.flatten(), geolon.data.flatten()))
+            )
+            _, indices = topog_kdtree.query(
+                [self._grid.tlat[0, 0].item(), self._grid.tlon[0, 0].item()]
+            )
+            cj, ci = np.unravel_index(indices, geolon.shape)
+
+            assert 0 <= cj < geolat.shape[0] - self._grid.ny, (
+                f"Topography data in {topog_file_path} appears to only contain a subregion "
+                f"of the grid, and does not contain enough rows to accommodate the grid size "
+                f"({self._grid.ny}). "
+            )
+            assert 0 <= ci < geolon.shape[1] - self._grid.nx, (
+                f"Topography data in {topog_file_path} appears to only contain a subregion "
+                f"of the grid, and does not contain enough columns to accommodate the grid size "
+                f"({self._grid.nx}). "
+            )
+
+            # Compare the coords of grid with the coords of the subregion of the topog
+            # data where it may overlap with the grid
+            grid_overlaps_topo = (
+                np.all(
+                    np.isclose(
+                        geolat[cj:cj + self._grid.ny, ci:ci + self._grid.nx],
+                        self._grid.tlat.data,
+                        rtol=1e-5
+                    )
+                )
+                and np.all(
+                    np.isclose(
+                        geolon[cj:cj + self._grid.ny, ci:ci + self._grid.nx],
+                        self._grid.tlon.data,
+                        rtol=1e-5
+                    )
+                )
+            )
+            if not grid_overlaps_topo:
+                raise ValueError(
+                    f"The topography data in {topog_file_path} is larger than the grid "
+                    f"data which does not appear to be a subgrid of the topography data. "
+                    f"Topography data shape: {depth.shape}, grid shape: "
+                    f"({self._grid.ny}, {self._grid.nx}). "
+                )
+
+            # If the grid is a subgrid of the topog data, extract the subregion
+            depth = depth[cj:cj + self._grid.ny, ci:ci + self._grid.nx]
+        
+        else:
+            pass # the depth array is the right size
+
+        self.depth = depth
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
@@ -738,7 +800,7 @@ class Topo:
         ), axis=-1)
 
         ds["grid_area"] = xr.DataArray(
-            gc_qarea(ds.grid_corner_lat.data, ds.grid_corner_lon.data, radius=1.0),
+            cell_area_rad(ds.grid_corner_lon.data, ds.grid_corner_lat.data),
             dims=["grid_size"],
             attrs={"units": "radians^2"},
         )
