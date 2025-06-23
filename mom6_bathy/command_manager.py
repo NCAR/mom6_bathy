@@ -10,10 +10,75 @@ class CommandManager(ABC):
         self.snapshot_dir = snapshot_dir
         self.domain_id = domain_id
 
-    @abstractmethod
     def get_domain_id(self):
-        """Return a unique identifier for the domain/context."""
-        pass
+        """
+        Return a unique identifier for the domain or context.
+
+        This identifier is used to associate command histories and snapshots with a specific
+        domain (such as a dataset, grid, or other context), and to prevent applying histories
+        to incompatible domains.
+
+        Returns
+        -------
+        domain_id : object
+            A value or data structure (commonly a dict or string) that uniquely identifies
+            the domain. If self.domain_id is callable, this method should call it and return
+            the result; otherwise, it should return self.domain_id as-is.
+        """
+        return self.domain_id() if callable(self.domain_id) else self.domain_id
+    
+    def get_history_path(self):
+        dom_id = self.get_domain_id()
+        if isinstance(dom_id, dict):
+            id_str = "_".join(f"{k}-{v}" for k, v in dom_id.items())
+        else:
+            id_str = str(dom_id)
+        return os.path.join("edit_histories", f"history_{id_str}.json")
+
+    def save_histories(self):
+        path = self.get_history_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump([cmd.serialize() for cmd in self._undo_history], f)
+
+    def load_histories(self, command_registry, *args, **kwargs):
+        path = self.get_history_path()
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                data = json.load(f)
+                self._undo_history = [
+                    command_registry[d['type']].deserialize(d)(*args, **kwargs) for d in data
+                ]
+                self._redo_history = []
+
+    def save_commit(self, name):
+        os.makedirs(self.snapshot_dir, exist_ok=True)
+        fname = os.path.join(self.snapshot_dir, f"{name}.json")
+        data = {
+            "domain_id": self.get_domain_id(),
+            "undo_history": [cmd.serialize() for cmd in self._undo_history],
+            "redo_history": [cmd.serialize() for cmd in self._redo_history]
+        }
+        with open(fname, "w") as f:
+            json.dump(data, f)
+
+    def load_commit(self, name, command_registry, *args, **kwargs):
+        fname = os.path.join(self.snapshot_dir, f"{name}.json")
+        if not os.path.exists(fname):
+            raise FileNotFoundError(f"No snapshot named {name}")
+        with open(fname, "r") as f:
+            data = json.load(f)
+        snapshot_domain = data.get("domain_id", {})
+        current_domain = self.get_domain_id()
+        if snapshot_domain != current_domain:
+            print("WARNING: Loaded snapshot domain does not match current domain!")
+        self._undo_history = [
+            command_registry[d['type']].deserialize(d)(*args, **kwargs) for d in data["undo_history"]
+        ]
+        self._redo_history = [
+            command_registry[d['type']].deserialize(d)(*args, **kwargs) for d in data["redo_history"]
+        ]
+        self.replay()
 
     @abstractmethod
     def execute(self, cmd):
@@ -36,30 +101,6 @@ class CommandManager(ABC):
         pass
 
     @abstractmethod
-    def save_histories(self):
-        """Save the current undo/redo history to disk."""
-        pass
-
-    @abstractmethod
-    def load_histories(self, command_registry, *args, **kwargs):
-        """Load the undo/redo history from disk.
-        *args, **kwargs :
-            Additional context needed for deserialization (if any)."""
-        pass
-
-    @abstractmethod
-    def save_commit(self, name):
-        """Save a named snapshot/commit."""
-        pass
-
-    @abstractmethod
-    def load_commit(self, name, command_registry, *args, **kwargs):
-        """Load a named snapshot/commit.
-        *args, **kwargs :
-            Additional context needed for deserialization (if any)."""
-        pass
-
-    @abstractmethod
     def initialize(self, command_registry, *args, **kwargs):
         """Initialize with a given registry and context."""
         pass
@@ -70,8 +111,10 @@ class CommandManager(ABC):
         pass
 
 class TopoCommandManager(CommandManager):
-    def __init__(self, domain_id, snapshot_dir="snapshots"):
+    def __init__(self, domain_id, topo, command_registry, snapshot_dir="snapshots"):
         super().__init__(domain_id, snapshot_dir)
+        self._topo = topo
+        self._command_registry = command_registry
 
     def execute(self, cmd):
         """
@@ -87,36 +130,12 @@ class TopoCommandManager(CommandManager):
         else:
             cmd()
 
-    def get_domain_id(self):
-        return self.domain_id() if callable(self.domain_id) else self.domain_id
-
-    def get_history_path(self):
-        dom_id = self.get_domain_id()
-        if isinstance(dom_id, dict):
-            id_str = "_".join(f"{k}-{v}" for k, v in dom_id.items())
-        else:
-            id_str = str(dom_id)
-        return os.path.join("edit_histories", f"history_{id_str}.json")
-
     def push(self, command):
         self._undo_history.append(command)
         self._redo_history.clear()
 
-    def save_histories(self):
-        path = self.get_history_path()
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            json.dump([cmd.serialize() for cmd in self._undo_history], f)
-
-    def load_histories(self, command_registry, topo):
-        path = self.get_history_path()
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                data = json.load(f)
-                self._undo_history = [
-                    command_registry[d['type']].deserialize(d)(topo) for d in data
-                ]
-                self._redo_history = []
+    def load_histories(self):
+        super().load_histories(self._command_registry, self._topo)
 
     def replay(self):
         for cmd in self._undo_history:
@@ -140,24 +159,12 @@ class TopoCommandManager(CommandManager):
         self.save_histories()
         return True
 
-    def save_commit(self, name):
-        os.makedirs(self.snapshot_dir, exist_ok=True)
-        fname = os.path.join(self.snapshot_dir, f"{name}.json")
-        data = {
-            "domain_id": self.get_domain_id(),
-            "undo_history": [cmd.serialize() for cmd in self._undo_history],
-            "redo_history": [cmd.serialize() for cmd in self._redo_history]
-        }
-        with open(fname, "w") as f:
-            json.dump(data, f)
-
     def load_commit(self, name, command_registry, topo, reset_to_golden=False):
+        """ Golden (or golden state) refers to the original, reference, or baseline state of the (topo) data before 
+        any user edits or modifications have been applied.
         """
-        Loads a named snapshot/commit.
-        If reset_to_golden is True, resets topo to golden/original state before applying undo history.
-        If False (default), applies undo/redo history on top of current in-memory topo.
-        """
-        if reset_to_golden:
+        if reset_to_golden: 
+            # If true, topo is reset to the original state. If false, in-memory state is used.
             topo_id = self.get_domain_id()
             grid_name = topo_id['grid_name']
             shape = topo_id['shape']
@@ -175,25 +182,8 @@ class TopoCommandManager(CommandManager):
             else:
                 print("Warning: golden topo not found, cannot reset before loading snapshot.")
 
-        fname = os.path.join(self.snapshot_dir, f"{name}.json")
-        if not os.path.exists(fname):
-            raise FileNotFoundError(f"No snapshot named {name}")
-        with open(fname, "r") as f:
-            data = json.load(f)
-        # --- Domain check ---
-        snapshot_domain = data.get("domain_id", {})
-        current_domain = self.get_domain_id()
-        if (snapshot_domain.get("grid_name") != current_domain.get("grid_name") or
-            snapshot_domain.get("shape") != current_domain.get("shape")):
-            print("WARNING: Loaded snapshot domain does not match current topo domain!")
-
-        self._undo_history = [
-            command_registry[d['type']].deserialize(d)(topo) for d in data["undo_history"]
-        ]
-        self._redo_history = [
-            command_registry[d['type']].deserialize(d)(topo) for d in data["redo_history"]
-        ]
-        self.replay()
+        # Call the base class implementation for the rest
+        super().load_commit(name, command_registry, topo)
 
     def reset(self, topo, original_depth, original_min_depth, get_topo_id, min_depth_specifier=None, trigger_refresh=None):
         topo_id = get_topo_id()
@@ -232,6 +222,6 @@ class TopoCommandManager(CommandManager):
         self._redo_history.clear()
         self.save_histories()
 
-    def initialize(self, command_registry, topo):
-        self.load_histories(command_registry, topo)
+    def initialize(self):
+        self.load_histories()
         self.replay()

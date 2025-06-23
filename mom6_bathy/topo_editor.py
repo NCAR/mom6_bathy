@@ -7,11 +7,7 @@ import json
 from matplotlib.ticker import MaxNLocator
 from mom6_bathy.command_manager import TopoCommandManager
 from mom6_bathy.edit_command import (
-    UndoCommand, RedoCommand, 
-    SaveCommitCommand, LoadCommitCommand, 
-    ResetCommand, InitializeHistoryCommand, 
-    DepthEditCommand, MinDepthEditCommand,
-    COMMAND_REGISTRY
+    DepthEditCommand, MinDepthEditCommand, COMMAND_REGISTRY
 )
 from mom6_bathy.git_utils import (
     git_snapshot_action, git_commit_info, git_get_current_branch, git_list_branches,
@@ -22,24 +18,25 @@ CROCODASH_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".
 
 class TopoEditor(widgets.HBox):
     
-    def __init__(self, topo, build_ui=True):
+    def __init__(self, topo, build_ui=True, snapshot_dir="snapshots", golden_dir="original_topo"):
 
         self.topo = topo
         self.ny = self.topo.depth.data.shape[0]
         self.nx = self.topo.depth.data.shape[1]
 
-        self.command_manager = TopoCommandManager(domain_id=self.get_topo_id)
+        self.SNAPSHOT_DIR = snapshot_dir
+        self.GOLDEN_DIR = golden_dir
+
+        os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
+        os.makedirs(self.GOLDEN_DIR, exist_ok=True)
+        self.current_branch = git_get_current_branch(CROCODASH_REPO_ROOT)
+
+        self.command_manager = TopoCommandManager(domain_id=self.get_topo_id, topo=self.topo, command_registry=COMMAND_REGISTRY)
 
         self._selected_cell = None
 
-        # Save original state for resetting
         self._original_depth = self.topo.depth.data.copy()
         self._original_min_depth = self.topo.min_depth
-
-        # Directory for saving snapshots
-        self.SNAPSHOT_DIR = "snapshots"
-        os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
-        self.current_branch = git_get_current_branch(CROCODASH_REPO_ROOT)
 
         # Ensure golden/original topo exists for resets
         self._ensure_golden_topo()
@@ -56,7 +53,7 @@ class TopoEditor(widgets.HBox):
             super().__init__([])
 
     def initialize_history(self):
-        self.command_manager.execute(InitializeHistoryCommand(self.command_manager, COMMAND_REGISTRY, self.topo))
+        self.command_manager.initialize()
         self.update_undo_redo_buttons()
 
     def get_topo_id(self):
@@ -71,7 +68,7 @@ class TopoEditor(widgets.HBox):
         shape = topo_id['shape']
         shape_str = f"{shape[0]}x{shape[1]}"
         
-        golden_dir = "original_topo"
+        golden_dir = self.GOLDEN_DIR
         os.makedirs(golden_dir, exist_ok=True)
         golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
         golden_min_depth_path = os.path.join(golden_dir, f"golden_min_depth_{grid_name}_{shape_str}.json")
@@ -83,9 +80,9 @@ class TopoEditor(widgets.HBox):
         golden_name = f"golden_{grid_name}_{shape_str}"
         golden_path = os.path.join(self.SNAPSHOT_DIR, f"{golden_name}.json")
         try:
-            self.command_manager.execute(LoadCommitCommand(self.command_manager, golden_name, COMMAND_REGISTRY, self.topo))
+            self.command_manager.load_commit(golden_name, COMMAND_REGISTRY, self.topo)
         except FileNotFoundError:
-            self.command_manager.execute(SaveCommitCommand(self.command_manager, golden_name))
+            self.command_manager.save_commit(golden_name)
 
         status = git_snapshot_action('ensure_tracked', CROCODASH_REPO_ROOT, 
                                      file_path=golden_path, commit_msg=f"Update golden snapshot {golden_name}")
@@ -95,7 +92,7 @@ class TopoEditor(widgets.HBox):
         if not name:
             print("Enter a name!")
             return
-        self.command_manager.execute(SaveCommitCommand(self.command_manager, name))
+        self.command_manager.save_commit(name)
         print(f"Saved snapshot '{name}'.")
         self.refresh_commit_dropdown()
 
@@ -119,7 +116,7 @@ class TopoEditor(widgets.HBox):
                 print(f"Failed to load commit: {msg}")
                 return
         self._snapshot_name.value = os.path.splitext(os.path.basename(file_path))[0]
-        self.command_manager.execute(LoadCommitCommand(self.command_manager, self._snapshot_name.value, COMMAND_REGISTRY, self.topo, reset_to_golden=True))
+        self.command_manager.load_commit(self._snapshot_name.value, COMMAND_REGISTRY, self.topo, reset_to_golden=True)
         self.update_undo_redo_buttons()
         self.trigger_refresh()
         print(f"Loaded snapshot '{self._snapshot_name.value}'.")
@@ -130,25 +127,24 @@ class TopoEditor(widgets.HBox):
         self.trigger_refresh()
 
     def undo_last_edit(self, b=None):
-        self.command_manager.execute(UndoCommand(self.command_manager))
+        self.command_manager.undo()
         self.update_undo_redo_buttons()
         self.trigger_refresh()
     
     def redo_last_edit(self, b=None):
-        self.command_manager.execute(RedoCommand(self.command_manager))
+        self.command_manager.redo()
         self.update_undo_redo_buttons()
         self.trigger_refresh()
 
     def on_reset(self, b=None):
-        self.command_manager.execute(ResetCommand(
-            self.command_manager,
+        self.command_manager.reset(
             self.topo,
             self._original_depth,
             self._original_min_depth,
             self.get_topo_id,
             min_depth_specifier=self._min_depth_specifier,
             trigger_refresh=self.trigger_refresh
-        ))
+        )
         self.update_undo_redo_buttons()
         print("Topo reset to original state.")
 
@@ -598,12 +594,11 @@ class TopoEditor(widgets.HBox):
             return
 
         # Save snapshot before commit
-        self.command_manager.execute(SaveCommitCommand(self.command_manager, name))
+        self.command_manager.save_commit(name)
         snapshot_path = os.path.join(self.SNAPSHOT_DIR, f"{name}.json")
         result = git_snapshot_action('commit', CROCODASH_REPO_ROOT, file_path=snapshot_path, commit_msg=msg)
         print(result)
         self.refresh_commit_dropdown()
-
 
     def on_git_create_branch(self, b):
         name = self._git_branch_name.value.strip()

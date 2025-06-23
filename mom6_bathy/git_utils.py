@@ -1,11 +1,26 @@
 import os
 import git
 
+def is_path_within_repo(repo_root, file_path):
+    abs_repo = os.path.abspath(repo_root)
+    abs_file = os.path.abspath(file_path)
+    try:
+        return os.path.commonpath([abs_repo, abs_file]) == abs_repo
+    except ValueError:
+        return False
+
 def git_snapshot_action(action, repo_root, file_path=None, commit_msg=None, commit_sha=None):
     """
     Perform snapshot-related git actions.
     action: 'commit', 'ensure_tracked', 'restore'
     """
+    # SKIP git operations if file_path is outside the repo
+    if file_path is not None and not is_path_within_repo(repo_root, file_path):
+        print(f"[git_utils] Skipping git operation for file outside repo: {file_path}")
+        if action == 'restore':
+            return False, "File is outside repo"
+        return "Skipped git operation (file outside repo)."
+
     repo = git.Repo(repo_root)
     if action == 'commit':
         rel_path = os.path.relpath(file_path, repo_root)
