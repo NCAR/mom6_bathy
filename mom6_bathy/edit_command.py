@@ -168,21 +168,22 @@ class SaveCommitCommand(EditCommand):
         return lambda manager: cls(manager, data['name'])
 
 class LoadCommitCommand(EditCommand):
-    def __init__(self, manager, name, registry, topo):
+    def __init__(self, manager, name, registry, topo, reset_to_golden=False):
         self.manager = manager
         self.name = name
         self.registry = registry
         self.topo = topo
+        self.reset_to_golden = reset_to_golden
     def __call__(self):
-        self.manager.load_commit(self.name, self.registry, self.topo)
+        self.manager.load_commit(self.name, self.registry, self.topo, reset_to_golden=self.reset_to_golden)
     def undo(self):
         pass
     def serialize(self):
-        return {'type': self.__class__.__name__, 'name': self.name}
+        return {'type': self.__class__.__name__, 'name': self.name, 'reset_to_golden': self.reset_to_golden}
     @classmethod
     def deserialize(cls, data):
         # registry and topo must be provided at runtime
-        return lambda manager, registry, topo: cls(manager, data['name'], registry, topo)
+        return lambda manager, registry, topo: cls(manager, data['name'], registry, topo, data.get('reset_to_golden', False))
 
 class ResetCommand(EditCommand):
     def __init__(self, manager, topo, original_depth, original_min_depth, get_topo_id, min_depth_specifier=None, trigger_refresh=None):

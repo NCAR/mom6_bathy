@@ -151,31 +151,42 @@ class TopoCommandManager(CommandManager):
         with open(fname, "w") as f:
             json.dump(data, f)
 
-    def load_commit(self, name, command_registry, topo):
-        # --- Reset topo to golden/original state before applying undo history ---
-        topo_id = self.get_domain_id()
-        grid_name = topo_id['grid_name']
-        shape = topo_id['shape']
-        shape_str = f"{shape[0]}x{shape[1]}"
-        golden_dir = "original_topo"
-        golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
-        golden_min_depth_path = os.path.join(golden_dir, f"golden_min_depth_{grid_name}_{shape_str}.json")
+    def load_commit(self, name, command_registry, topo, reset_to_golden=False):
+        """
+        Loads a named snapshot/commit.
+        If reset_to_golden is True, resets topo to golden/original state before applying undo history.
+        If False (default), applies undo/redo history on top of current in-memory topo.
+        """
+        if reset_to_golden:
+            topo_id = self.get_domain_id()
+            grid_name = topo_id['grid_name']
+            shape = topo_id['shape']
+            shape_str = f"{shape[0]}x{shape[1]}"
+            golden_dir = "original_topo"
+            golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
+            golden_min_depth_path = os.path.join(golden_dir, f"golden_min_depth_{grid_name}_{shape_str}.json")
 
-        if os.path.exists(golden_topo_path):
-            topo.depth.data[:] = np.load(golden_topo_path)
-            if os.path.exists(golden_min_depth_path):
-                with open(golden_min_depth_path, "r") as f:
-                    d = json.load(f)
-                    topo.min_depth = d.get("min_depth", topo.min_depth)
-        else:
-            print("Warning: golden topo not found, cannot reset before loading snapshot.")
+            if os.path.exists(golden_topo_path):
+                topo.depth.data[:] = np.load(golden_topo_path)
+                if os.path.exists(golden_min_depth_path):
+                    with open(golden_min_depth_path, "r") as f:
+                        d = json.load(f)
+                        topo.min_depth = d.get("min_depth", topo.min_depth)
+            else:
+                print("Warning: golden topo not found, cannot reset before loading snapshot.")
 
-        # --- Now load and replay the undo/redo history ---
         fname = os.path.join(self.snapshot_dir, f"{name}.json")
         if not os.path.exists(fname):
             raise FileNotFoundError(f"No snapshot named {name}")
         with open(fname, "r") as f:
             data = json.load(f)
+        # --- Domain check ---
+        snapshot_domain = data.get("domain_id", {})
+        current_domain = self.get_domain_id()
+        if (snapshot_domain.get("grid_name") != current_domain.get("grid_name") or
+            snapshot_domain.get("shape") != current_domain.get("shape")):
+            print("WARNING: Loaded snapshot domain does not match current topo domain!")
+
         self._undo_history = [
             command_registry[d['type']].deserialize(d)(topo) for d in data["undo_history"]
         ]

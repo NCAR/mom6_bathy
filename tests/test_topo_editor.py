@@ -64,8 +64,48 @@ def setup_depth(editor, i=2, j=2, new_depth=777.0):
         old_values=[orig_depth],
     )
     editor.apply_edit(edit)
-    editor.undo_last_edit()
     return orig_depth, new_depth, i, j
+
+def test_save_and_load_histories_with_git(minimal_grid_and_topo, tmp_path):
+    import git
+
+    # Initialize a git repo in the temp directory
+    repo = git.Repo.init(tmp_path)
+    # Add a dummy file and commit so the repo isn't empty
+    dummy_file = tmp_path / "README.md"
+    dummy_file.write_text("dummy")
+    repo.index.add([str(dummy_file)])
+    repo.index.commit("initial commit")
+
+    topo = minimal_grid_and_topo
+    editor = TopoEditor(topo, build_ui=False)
+    patch_all_widgets(editor)
+
+    orig_depth, new_depth, i, j = setup_depth(editor)
+
+    editor.redo_last_edit()
+    assert float(topo.depth.data[j, i]) == new_depth
+
+    # Set the snapshot directory to the repo root
+    editor.command_manager.snapshot_dir = str(tmp_path)
+    editor.command_manager.repo_root = str(tmp_path)  # If needed by your logic
+    editor.command_manager.save_commit("test_snapshot")
+
+    topo2 = minimal_grid_and_topo
+    editor2 = TopoEditor(topo2, build_ui=False)
+    patch_all_widgets(editor2)
+    editor2.command_manager.snapshot_dir = str(tmp_path)
+    editor2.command_manager.repo_root = str(tmp_path)  # If needed by your logic
+    print("COMMAND_REGISTRY keys:", list(COMMAND_REGISTRY.keys()))
+    editor2.command_manager.load_commit("test_snapshot", COMMAND_REGISTRY, editor2.topo)
+    editor2.command_manager.replay()
+
+    # After replaying the edit history, topo2 should have new_depth at (j, i)
+    assert float(editor2.topo.depth.data[j, i]) == new_depth
+
+    # If you undo, you should get back to the original depth
+    editor2.undo_last_edit()
+    assert float(editor2.topo.depth.data[j, i]) == orig_depth
 
 def test_undo(minimal_grid_and_topo):
     topo = minimal_grid_and_topo
@@ -73,10 +113,10 @@ def test_undo(minimal_grid_and_topo):
     patch_all_widgets(editor)
 
     orig_depth, new_depth, i, j = setup_depth(editor)
-    assert float(topo.depth.data[j, i]) == orig_depth
+    assert float(topo.depth.data[j, i]) == new_depth 
 
     editor.undo_last_edit()
-    assert float(topo.depth.data[j, i]) == orig_depth
+    assert float(topo.depth.data[j, i]) == orig_depth 
     assert not editor.command_manager._undo_history
 
 def test_redo(minimal_grid_and_topo):

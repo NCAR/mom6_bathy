@@ -4,7 +4,6 @@ import matplotlib.patches as patches
 import ipywidgets as widgets
 import os
 import json
-import git
 from matplotlib.ticker import MaxNLocator
 from mom6_bathy.command_manager import TopoCommandManager
 from mom6_bathy.edit_command import (
@@ -15,9 +14,8 @@ from mom6_bathy.edit_command import (
     COMMAND_REGISTRY
 )
 from mom6_bathy.git_utils import (
-    git_commit_snapshot, git_checkout_branch, 
-    git_create_branch_and_switch, git_delete_branch_and_switch, 
-    git_list_branches
+    git_snapshot_action, git_commit_info, git_get_current_branch, git_list_branches,
+    git_create_branch_and_switch, git_delete_branch_and_switch, git_merge_branch, git_safe_checkout_branch
 )
 
 CROCODASH_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
@@ -41,7 +39,7 @@ class TopoEditor(widgets.HBox):
         # Directory for saving snapshots
         self.SNAPSHOT_DIR = "snapshots"
         os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
-        self.repo = git.Repo(CROCODASH_REPO_ROOT)
+        self.current_branch = git_get_current_branch(CROCODASH_REPO_ROOT)
 
         # Ensure golden/original topo exists for resets
         self._ensure_golden_topo()
@@ -52,6 +50,7 @@ class TopoEditor(widgets.HBox):
             self.construct_interactive_plot()
             self.construct_observances()
             self.initialize_history()
+            self.refresh_commit_dropdown()
             super().__init__([self._control_panel, self._interactive_plot])
         else:
             super().__init__([])
@@ -72,7 +71,6 @@ class TopoEditor(widgets.HBox):
         shape = topo_id['shape']
         shape_str = f"{shape[0]}x{shape[1]}"
         
-        # Disk-based original array/min_depth storage
         golden_dir = "original_topo"
         os.makedirs(golden_dir, exist_ok=True)
         golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
@@ -82,19 +80,15 @@ class TopoEditor(widgets.HBox):
             with open(golden_min_depth_path, "w") as f:
                 json.dump({"min_depth": float(self.topo.min_depth)}, f)
 
-        # Command-pattern-based golden snapshot for undo/redo
         golden_name = f"golden_{grid_name}_{shape_str}"
         golden_path = os.path.join(self.SNAPSHOT_DIR, f"{golden_name}.json")
         try:
             self.command_manager.execute(LoadCommitCommand(self.command_manager, golden_name, COMMAND_REGISTRY, self.topo))
         except FileNotFoundError:
             self.command_manager.execute(SaveCommitCommand(self.command_manager, golden_name))
-            # Auto-commit golden snapshot and directory
-            repo = git.Repo(CROCODASH_REPO_ROOT)
-            rel_snapshots_dir = os.path.relpath(self.SNAPSHOT_DIR, CROCODASH_REPO_ROOT)
-            repo.git.add(rel_snapshots_dir)
-            if repo.is_dirty(untracked_files=True):
-                repo.index.commit(f"Add golden snapshot {golden_name}")
+
+        status = git_snapshot_action('ensure_tracked', CROCODASH_REPO_ROOT, 
+                                     file_path=golden_path, commit_msg=f"Update golden snapshot {golden_name}")
 
     def save_commit(self, _btn=None):
         name = self._snapshot_name.value.strip()
@@ -103,19 +97,32 @@ class TopoEditor(widgets.HBox):
             return
         self.command_manager.execute(SaveCommitCommand(self.command_manager, name))
         print(f"Saved snapshot '{name}'.")
+        self.refresh_commit_dropdown()
 
-    def load_commit(self, _btn=None):
-        name = self._snapshot_name.value.strip()
-        if not name:
-            print("Enter the name of a snapshot to load!")
+    def load_commit(self, _btn=None, commit_sha=None, file_path=None):
+        if not commit_sha or not file_path:
+            print("No commit or file selected.")
             return
-        try:
-            self.command_manager.execute(LoadCommitCommand(self.command_manager, name, COMMAND_REGISTRY, self.topo))
-            self.update_undo_redo_buttons()
-            self.trigger_refresh()
-            print(f"Loaded snapshot '{name}'.")
-        except FileNotFoundError:
-            print(f"No snapshot found with name '{name}'.")
+        rel_path = file_path
+        abs_path = os.path.join(CROCODASH_REPO_ROOT, rel_path)
+        success, msg = git_snapshot_action('restore', CROCODASH_REPO_ROOT, file_path=rel_path, commit_sha=commit_sha)
+        if success:
+            print(msg)
+        else:
+            if ("does not exist in" in msg or "exists on disk, but not in" in msg) and "golden_" in os.path.basename(file_path):
+                if os.path.exists(abs_path):
+                    print(f"Golden snapshot '{os.path.basename(file_path)}' was never committed, loading from disk.")
+                else:
+                    print(f"Golden snapshot '{os.path.basename(file_path)}' not found on disk.")
+                    return
+            else:
+                print(f"Failed to load commit: {msg}")
+                return
+        self._snapshot_name.value = os.path.splitext(os.path.basename(file_path))[0]
+        self.command_manager.execute(LoadCommitCommand(self.command_manager, self._snapshot_name.value, COMMAND_REGISTRY, self.topo, reset_to_golden=True))
+        self.update_undo_redo_buttons()
+        self.trigger_refresh()
+        print(f"Loaded snapshot '{self._snapshot_name.value}'.")
 
     def apply_edit(self, cmd, record_history=True):
         self.command_manager.execute(cmd)
@@ -150,6 +157,22 @@ class TopoEditor(widgets.HBox):
             self._undo_button.disabled = not bool(self.command_manager._undo_history)
         if hasattr(self, "_redo_button"):
             self._redo_button.disabled = not bool(self.command_manager._redo_history)
+
+    def refresh_commit_dropdown(self):
+        rel_snapshots_dir = os.path.relpath(self.SNAPSHOT_DIR, CROCODASH_REPO_ROOT)
+        options = git_commit_info(CROCODASH_REPO_ROOT, rel_dir=rel_snapshots_dir, mode='list')
+        self._commit_dropdown.options = options
+        if options:
+            self._commit_dropdown.value = options[0][1]
+        self.update_commit_details()
+
+    def update_commit_details(self, change=None):
+        val = self._commit_dropdown.value
+        if not val:
+            self._commit_details.value = ""
+            return
+        commit_sha, file_path = val
+        self._commit_details.value = git_commit_info(CROCODASH_REPO_ROOT, commit_sha=commit_sha, file_path=file_path, mode='details')
 
     def construct_interactive_plot(self):
         # Ensure we are in interactive mode
@@ -271,6 +294,15 @@ class TopoEditor(widgets.HBox):
         self._reset_button = widgets.Button(description='Reset', layout={'width': '44%'}, button_style='danger')
         # Snapshots
         self._snapshot_name = widgets.Text(value='', placeholder='Enter snapshot name', description='Snapshot:', layout={'width': '90%'})
+        self._commit_dropdown = widgets.Dropdown(
+            options=[],
+            description='Commit:',
+            layout={'width': '90%'}
+        )
+        self._commit_details = widgets.HTML(
+            value="",
+            layout={'width': '90%', 'min_height': '2em'}
+        )
         self._save_button = widgets.Button(description='Save State', layout={'width': '44%'})
         self._load_button = widgets.Button(description='Load State', layout={'width': '44%'})
         # Git Version Control
@@ -299,6 +331,13 @@ class TopoEditor(widgets.HBox):
             layout={'width': '90%'}
         )
         self._git_checkout_button = widgets.Button(description='Checkout', layout={'width': '44%'})
+       
+        self._git_merge_source_dropdown = widgets.Dropdown(
+            options=git_list_branches(CROCODASH_REPO_ROOT),
+            description='Merge from:',
+            layout={'width': '90%'}
+        )
+        self._git_merge_button = widgets.Button(description='Merge Branch', layout={'width': '44%'})
 
          # Group related controls
         display_section = widgets.VBox([
@@ -331,6 +370,8 @@ class TopoEditor(widgets.HBox):
 
         snapshot_section = widgets.VBox([
             self._snapshot_name,
+            self._commit_dropdown,
+            self._commit_details,
             widgets.HBox([self._save_button, self._load_button]),
         ])
 
@@ -341,6 +382,8 @@ class TopoEditor(widgets.HBox):
             widgets.HBox([self._git_create_branch_button, self._git_delete_branch_button]),
             self._git_branch_dropdown,
             self._git_checkout_button,
+            self._git_merge_source_dropdown,
+            self._git_merge_button,
         ])
 
         # Always-visible controls
@@ -368,6 +411,10 @@ class TopoEditor(widgets.HBox):
             snapshot_accordion,
             git_accordion,
         ], layout={'width': '30%', 'height': '100%', 'overflow_y': 'auto'})
+
+        current_branch = git_get_current_branch(CROCODASH_REPO_ROOT)
+        if current_branch in self._git_branch_dropdown.options:
+            self._git_branch_dropdown.value = current_branch
 
     def refresh_display_mode(self, change):
         mode = change['new']
@@ -455,13 +502,16 @@ class TopoEditor(widgets.HBox):
 
         # Snapshots
         self._save_button.on_click(self.save_commit)
-        self._load_button.on_click(self.load_commit)
+        self._load_button.on_click(self.on_load_button_clicked)
+        self._snapshot_name.observe(lambda change: self.refresh_commit_dropdown(), names='value')
+        self._commit_dropdown.observe(self.update_commit_details, names='value')
 
         # Git
         self._git_commit_button.on_click(self.on_git_commit)
         self._git_create_branch_button.on_click(self.on_git_create_branch)
         self._git_delete_branch_button.on_click(self.on_git_delete_branch)
         self._git_checkout_button.on_click(self.on_git_checkout)
+        self._git_merge_button.on_click(self.on_git_merge)
 
         self._display_mode_toggle.observe(
             self.refresh_display_mode,
@@ -527,6 +577,14 @@ class TopoEditor(widgets.HBox):
         self.apply_edit(cmd)
         self.update_undo_redo_buttons()
 
+    def on_load_button_clicked(self, b):
+        val = self._commit_dropdown.value
+        if not val:
+            print("No commit selected.")
+            return
+        commit_sha, file_path = val
+        self.load_commit(commit_sha=commit_sha, file_path=file_path)
+        
     # --- Git Callbacks ---
 
     def on_git_commit(self, b):
@@ -542,8 +600,9 @@ class TopoEditor(widgets.HBox):
         # Save snapshot before commit
         self.command_manager.execute(SaveCommitCommand(self.command_manager, name))
         snapshot_path = os.path.join(self.SNAPSHOT_DIR, f"{name}.json")
-        result = git_commit_snapshot(snapshot_path, msg, CROCODASH_REPO_ROOT)
+        result = git_snapshot_action('commit', CROCODASH_REPO_ROOT, file_path=snapshot_path, commit_msg=msg)
         print(result)
+        self.refresh_commit_dropdown()
 
 
     def on_git_create_branch(self, b):
@@ -555,7 +614,8 @@ class TopoEditor(widgets.HBox):
             branch = git_create_branch_and_switch(name, CROCODASH_REPO_ROOT)
             print(f"Created and switched to branch '{branch}'.")
             self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
-            self._git_branch_dropdown.value = self.repo.active_branch.name
+            self._git_branch_dropdown.value = git_get_current_branch(CROCODASH_REPO_ROOT)
+            self._git_merge_source_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
         except Exception as e:
             print(f"Error creating branch: {str(e)}")
 
@@ -566,14 +626,15 @@ class TopoEditor(widgets.HBox):
             print("Please enter the branch name to delete.")
             return
         try:
-            current = self.repo.active_branch.name
+            current = git_get_current_branch(CROCODASH_REPO_ROOT)
             if current == name:
                 print(f"Cannot delete the currently checked-out branch '{name}'.")
                 return
             git_delete_branch_and_switch(name, CROCODASH_REPO_ROOT)
             print(f"Deleted branch '{name}'.")
             self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
-            self._git_branch_dropdown.value = self.repo.active_branch.name
+            self._git_branch_dropdown.value = git_get_current_branch(CROCODASH_REPO_ROOT)
+            self._git_merge_source_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
         except Exception as e:
             print(f"Error deleting branch: {str(e)}")
 
@@ -583,17 +644,9 @@ class TopoEditor(widgets.HBox):
             print("Please select a branch to checkout.")
             return
         try:
-            # Check for unstaged/uncommitted changes in snapshots
-            repo = git.Repo(CROCODASH_REPO_ROOT)
-            snapshot_dir = os.path.abspath(self.SNAPSHOT_DIR)
-            rel_snapshot_dir = os.path.relpath(snapshot_dir, CROCODASH_REPO_ROOT)
-            # Untracked files
-            untracked = [f for f in repo.untracked_files if f.startswith(rel_snapshot_dir)]
-            # Modified but unstaged
-            changed = [item.a_path for item in repo.index.diff(None) if item.a_path.startswith(rel_snapshot_dir)]
-            # Staged but uncommitted
-            staged = [item.a_path for item in repo.index.diff('HEAD') if item.a_path.startswith(rel_snapshot_dir)]
-            if untracked or changed or staged:
+            rel_snapshot_dir = os.path.relpath(os.path.abspath(self.SNAPSHOT_DIR), CROCODASH_REPO_ROOT)
+            success, untracked, changed, staged = git_safe_checkout_branch(CROCODASH_REPO_ROOT, target, rel_snapshot_dir)
+            if not success:
                 print("Cannot checkout: You have unsaved or uncommitted changes in 'snapshots'. Please save and commit them before switching branches.")
                 if untracked:
                     print("Untracked files:", untracked)
@@ -602,19 +655,12 @@ class TopoEditor(widgets.HBox):
                 if staged:
                     print("Staged but uncommitted:", staged)
                 return
-
-            # Checkout the new branch
-            git_checkout_branch(target, CROCODASH_REPO_ROOT)
             print(f"Checked out to branch '{target}'.")
 
-            # Refresh repo object
-            self.repo = git.Repo(CROCODASH_REPO_ROOT)
-
-            # Update dropdown options and set value to current branch
             self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
-            self._git_branch_dropdown.value = self.repo.active_branch.name
+            self._git_branch_dropdown.value = git_get_current_branch(CROCODASH_REPO_ROOT)
+            self._git_merge_source_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
 
-            # Load latest user snapshot or golden
             snapshots = [f for f in os.listdir(self.SNAPSHOT_DIR) if f.endswith('.json') and not f.startswith('golden_')]
             if snapshots:
                 snapshots.sort(key=lambda f: os.path.getmtime(os.path.join(self.SNAPSHOT_DIR, f)), reverse=True)
@@ -636,3 +682,14 @@ class TopoEditor(widgets.HBox):
 
         except Exception as e:
             print(f"Error checking out branch: {str(e)}")
+
+    def on_git_merge(self, b):
+        source = self._git_merge_source_dropdown.value
+        if not source:
+            print("Select a branch to merge from.")
+            return
+        success, msg = git_merge_branch(CROCODASH_REPO_ROOT, source)
+        print(msg)
+        self._git_branch_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
+        self._git_branch_dropdown.value = git_get_current_branch(CROCODASH_REPO_ROOT)
+        self._git_merge_source_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
