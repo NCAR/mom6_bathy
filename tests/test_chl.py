@@ -6,7 +6,7 @@ import pytest
 import os
 
 
-def test_chl():
+def test_chl(tmp_path):
     """Test the creation of chl files."""
     if not on_cisl_machine():
         pytest.skip("This test is only for the derecho and casper machines")
@@ -26,8 +26,7 @@ def test_chl():
         grid,
         topo,
         processed_seawifs_path="/glade/campaign/cesm/cesmdata/cseg/inputdata/ocn/mom/croc/chl/data/SeaWIFS.L3m.MC.CHL.chlor_a.0.25deg.nc",
+        output_path=tmp_path / "seawifs-clim-1997-2010-pan2.nc",
     )
 
-    assert os.path.exists(
-        "/glade/campaign/cesm/cesmdata/cseg/inputdata/ocn/mom/croc/chl/data/seawifs-clim-1997-2010-pan2.nc"
-    )
+    assert os.path.exists(tmp_path / "seawifs-clim-1997-2010-pan2.nc")
