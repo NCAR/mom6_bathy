@@ -96,32 +96,21 @@ class TopoEditor(widgets.HBox):
         print(f"Saved snapshot '{name}'.")
         self.refresh_commit_dropdown()
 
-    def load_commit(self, _btn=None, commit_sha=None, file_path=None):
-        if not commit_sha or not file_path:
-            print("No commit or file selected.")
+    def load_commit(self, name=None):
+        if name is None:
+            name = self._snapshot_name.value
+        if not name:
+            print("No snapshot name specified.")
             return
-        rel_path = file_path
-        abs_path = os.path.join(CROCODASH_REPO_ROOT, rel_path)
-        success, msg = git_snapshot_action('restore', CROCODASH_REPO_ROOT, file_path=rel_path, commit_sha=commit_sha)
-        if success:
-            print(msg)
-        else:
-            if ("does not exist in" in msg or "exists on disk, but not in" in msg) and "golden_" in os.path.basename(file_path):
-                if os.path.exists(abs_path):
-                    print(f"Golden snapshot '{os.path.basename(file_path)}' was never committed, loading from disk.")
-                else:
-                    print(f"Golden snapshot '{os.path.basename(file_path)}' not found on disk.")
-                    return
-            else:
-                print(f"Failed to load commit: {msg}")
-                return
-        self._snapshot_name.value = os.path.splitext(os.path.basename(file_path))[0]
-        self.command_manager.load_commit(self._snapshot_name.value, COMMAND_REGISTRY, self.topo, reset_to_golden=True)
-        self.update_undo_redo_buttons()
-        self.trigger_refresh()
-        print(f"Loaded snapshot '{self._snapshot_name.value}'.")
+        try:
+            self.command_manager.load_commit(name, COMMAND_REGISTRY, self.topo)
+            self.update_undo_redo_buttons()
+            self.trigger_refresh()
+            print(f"Loaded snapshot '{name}'.")
+        except FileNotFoundError:
+            print(f"Snapshot '{name}' not found.")
 
-    def apply_edit(self, cmd, record_history=True):
+    def apply_edit(self, cmd):
         self.command_manager.execute(cmd)
         self.update_undo_redo_buttons()
         self.trigger_refresh()
@@ -156,10 +145,31 @@ class TopoEditor(widgets.HBox):
 
     def refresh_commit_dropdown(self):
         rel_snapshots_dir = os.path.relpath(self.SNAPSHOT_DIR, CROCODASH_REPO_ROOT)
-        options = git_commit_info(CROCODASH_REPO_ROOT, rel_dir=rel_snapshots_dir, mode='list')
-        self._commit_dropdown.options = options
-        if options:
-            self._commit_dropdown.value = options[0][1]
+        current_branch = git_get_current_branch(CROCODASH_REPO_ROOT)
+        options = git_commit_info(
+            CROCODASH_REPO_ROOT,
+            rel_dir=rel_snapshots_dir,
+            mode='list',
+            branch=current_branch
+        )
+        # Only include files that exist in the current working tree
+        existing_files = set(
+            os.path.relpath(os.path.join(rel_snapshots_dir, f), rel_snapshots_dir)
+            for f in os.listdir(self.SNAPSHOT_DIR)
+            if f.endswith('.json')
+        )
+        filtered_options = [
+            (label, value)
+            for (label, value) in options
+            if os.path.basename(value[1]) in existing_files
+        ]
+        self._commit_dropdown.options = filtered_options if filtered_options else []
+        if filtered_options:
+            option_values = [v for (l, v) in filtered_options]
+            if self._commit_dropdown.value not in option_values:
+                self._commit_dropdown.value = filtered_options[0][1]
+        else:
+            self._commit_dropdown.value = None
         self.update_commit_details()
 
     def update_commit_details(self, change=None):
@@ -168,7 +178,9 @@ class TopoEditor(widgets.HBox):
             self._commit_details.value = ""
             return
         commit_sha, file_path = val
-        self._commit_details.value = git_commit_info(CROCODASH_REPO_ROOT, commit_sha=commit_sha, file_path=file_path, mode='details')
+        self._commit_details.value = git_commit_info(
+            CROCODASH_REPO_ROOT, commit_sha=commit_sha, file_path=file_path, mode='details'
+        )
 
     def construct_interactive_plot(self):
         # Ensure we are in interactive mode
@@ -579,7 +591,7 @@ class TopoEditor(widgets.HBox):
             print("No commit selected.")
             return
         commit_sha, file_path = val
-        self.load_commit(commit_sha=commit_sha, file_path=file_path)
+        self.load_commit(name=file_path)
         
     # --- Git Callbacks ---
 
@@ -656,13 +668,15 @@ class TopoEditor(widgets.HBox):
             self._git_branch_dropdown.value = git_get_current_branch(CROCODASH_REPO_ROOT)
             self._git_merge_source_dropdown.options = git_list_branches(CROCODASH_REPO_ROOT)
 
+            self.on_reset()
+
             snapshots = [f for f in os.listdir(self.SNAPSHOT_DIR) if f.endswith('.json') and not f.startswith('golden_')]
             if snapshots:
                 snapshots.sort(key=lambda f: os.path.getmtime(os.path.join(self.SNAPSHOT_DIR, f)), reverse=True)
                 latest_snapshot = snapshots[0]
                 latest_name = latest_snapshot.replace(".json", "")
                 self._snapshot_name.value = latest_name
-                self.load_commit()
+                self.load_commit(latest_name)
                 print(f"Loaded latest snapshot '{latest_name}' from new branch.")
             else:
                 # No user snapshots, load golden
@@ -672,7 +686,7 @@ class TopoEditor(widgets.HBox):
                 shape_str = f"{shape[0]}x{shape[1]}"
                 golden_name = f"golden_{grid_name}_{shape_str}"
                 self._snapshot_name.value = golden_name
-                self.load_commit()
+                self.load_commit(golden_name)
                 print(f"No user snapshots found, loaded golden snapshot '{golden_name}'.")
 
         except Exception as e:

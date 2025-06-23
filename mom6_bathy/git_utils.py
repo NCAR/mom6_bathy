@@ -73,13 +73,15 @@ def git_snapshot_action(action, repo_root, file_path=None, commit_msg=None, comm
     else:
         raise ValueError(f"Unknown action: {action}")
 
-def git_commit_info(repo_root, rel_dir=None, commit_sha=None, file_path=None, mode='list'):
+def git_commit_info(repo_root, rel_dir=None, commit_sha=None, file_path=None, mode='list', branch=None):
     """
     mode: 'list' for listing commits affecting a dir, 'details' for commit details of a file.
     """
     repo = git.Repo(repo_root)
     if mode == 'list':
-        commits = list(repo.iter_commits(paths=rel_dir))
+        if branch is None:
+            branch = repo.active_branch.name
+        commits = list(repo.iter_commits(branch, paths=rel_dir))
         options = []
         for commit in commits:
             files = [f for f in commit.stats.files if f.startswith(rel_dir)]
