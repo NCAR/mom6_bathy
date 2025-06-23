@@ -1,6 +1,7 @@
 import numpy as np
 import xarray as xr
 import scipy
+from mom6_bathy.aux import check_lon_range
 
 
 def latlon2ji(src_lat, src_lon, lat, lon):
@@ -45,21 +46,28 @@ def latlon2ji_simple(src_lat, src_lon, lat, lon):
 
 
 def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
+    """
+    Bilinear Interpolation of data from src_lat, src_lon to spr_lat, spr_lon. Does not assume periodicity.
+    """
+    assert check_lon_range(src_lon) == check_lon_range(
+        spr_lon
+    ), "Longitude ranges must match"
+
     data = data.values
-    nj, ni = data.shape
-    dy, dx = 180.0 / nj, 360.0 / ni
+    dy, dx = np.mean(np.diff(src_lon)), np.mean(np.diff(src_lat))
     j0, i0, j1, i1 = latlon2ji_simple(src_lat, src_lon, spr_lat, spr_lon)
 
     def ydist(lat0, lat1):
         return np.abs(lat1 - lat0)
 
     def xdist(lon0, lon1):
-        return np.abs(np.mod((lon1 - lon0) + 180, 360) - 180)
+        return np.abs(lon1 - lon0)
 
     w_e = xdist(src_lon[i0], spr_lon) / dx
     w_w = 1.0 - w_e
     w_n = ydist(src_lat[j0], spr_lat) / dy
     w_s = 1.0 - w_n
+
     return (w_s * w_w * data[j0, i0] + w_n * w_e * data[j1, i1]) + (
         w_n * w_w * data[j1, i0] + w_s * w_e * data[j0, i1]
     )
@@ -88,11 +96,10 @@ def fill_missing_data(idata, mask, maxiter=0, stabilizer=1.0e-14, tripole=False)
     b = np.zeros((n_missing))
     ld = np.zeros((n_missing))
     A[range(n_missing), range(n_missing)] = 0.0
-    print("Looping over Missing cells")
     for n in range(n_missing):
         j, i = missing_j[n], missing_i[n]
-        im1 = max(i-1,0)
-        ip1 = min(i+1,ni-1)
+        im1 = max(i - 1, 0)
+        ip1 = min(i + 1, ni - 1)
         jm1 = max(j - 1, 0)
         jp1 = min(j + 1, nj - 1)
         if j > 0 and mask[jm1, i] > 0:
@@ -102,14 +109,14 @@ def fill_missing_data(idata, mask, maxiter=0, stabilizer=1.0e-14, tripole=False)
                 A[n, ij] = 1.0
             else:
                 b[n] -= fdata[jm1, i]
-        if i > 0  and mask[j, im1] > 0:
+        if i > 0 and mask[j, im1] > 0:
             ld[n] -= 1.0
             ij = ind[j, im1]
             if ij >= 0:
                 A[n, ij] = 1.0
             else:
                 b[n] -= fdata[j, im1]
-        if i < ni -1 and mask[j, ip1] > 0:
+        if i < ni - 1 and mask[j, ip1] > 0:
             ld[n] -= 1.0
             ij = ind[j, ip1]
             if ij >= 0:

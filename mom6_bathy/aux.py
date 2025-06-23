@@ -13,7 +13,7 @@ def get_mesh_dimensions(mesh):
     ----------
     mesh : xr.Dataset or str or Path
         The ESMF mesh dataset or the path to the mesh file.
-    
+
     Returns
     -------
     nx : int
@@ -23,10 +23,12 @@ def get_mesh_dimensions(mesh):
     """
 
     if not isinstance(mesh, xr.Dataset):
-        assert isinstance(mesh, (Path, str)) and Path(mesh).exists(), "mesh must be a path to an existing file"
+        assert (
+            isinstance(mesh, (Path, str)) and Path(mesh).exists()
+        ), "mesh must be a path to an existing file"
         mesh = xr.open_dataset(mesh)
 
-    centerCoords = mesh['centerCoords'].values
+    centerCoords = mesh["centerCoords"].values
 
     x0, y0 = centerCoords[0]  # First coordinate
     x0 = (x0 + 360) % 360  # Normalize longitude
@@ -39,22 +41,23 @@ def get_mesh_dimensions(mesh):
 
     # Diff of distances
     diff = np.diff(dists)
-    
+
     # Index of the first decrease in distances:
     i = np.where(diff < 0)[0][0]
     # Index of the first increase after the first decrease:
-    i = np.where(diff[i:] > 0)[0][0] + i 
+    i = np.where(diff[i:] > 0)[0][0] + i
 
     nx = i
     ny = len(centerCoords) // nx
 
     # Check that nx is indeed nx and not ny, and if not, swap them
-    if np.abs(np.mod(coords[nx//2, 0] - x0, 360)) < np.abs(coords[nx//2, 1] - y0):
+    if np.abs(np.mod(coords[nx // 2, 0] - x0, 360)) < np.abs(coords[nx // 2, 1] - y0):
         nx, ny = ny, nx
 
-    assert nx * ny == len(centerCoords), "nx*ny must match the number of points in the mesh"
+    assert nx * ny == len(
+        centerCoords
+    ), "nx*ny must match the number of points in the mesh"
     return nx, ny
-
 
 
 def _lonlat_to_unitvec(lon, lat):
@@ -73,8 +76,6 @@ def _lonlat_to_unitvec(lon, lat):
     result : np.ndarray
         Unit vectors (x, y, z)
     """
-    
-
 
 
 def _spherical_angle(a, b):
@@ -99,6 +100,7 @@ def _spherical_angle(a, b):
     cos_angle = np.sum(a * b, axis=-1)
     return np.arctan2(sin_angle, cos_angle)
 
+
 def _tri_area(u, v, w):
     """Vectorized spherical triangle area using L'Huilier's theorem.
 
@@ -116,11 +118,16 @@ def _tri_area(u, v, w):
     c = _spherical_angle(u, v)
     s = 0.5 * (a + b + c)
 
-    t = np.tan(0.5 * s) * np.tan(0.5 * (s - a)) * \
-        np.tan(0.5 * (s - b)) * np.tan(0.5 * (s - c))
+    t = (
+        np.tan(0.5 * s)
+        * np.tan(0.5 * (s - a))
+        * np.tan(0.5 * (s - b))
+        * np.tan(0.5 * (s - c))
+    )
 
     area = np.abs(4.0 * np.arctan(np.sqrt(np.abs(t))))
     return area
+
 
 def _great_circle_area(polygon_unitvecs):
     """
@@ -138,13 +145,13 @@ def _great_circle_area(polygon_unitvecs):
     if n_verts < 3:
         return np.zeros(n_poly)
 
-    pnt0 = polygon_unitvecs[:, 0:1, :]         # shape (n_poly, 1, 3)
-    pnt1 = polygon_unitvecs[:, 1:-1, :]        # shape (n_poly, n_verts-2, 3)
-    pnt2 = polygon_unitvecs[:, 2:, :]          # shape (n_poly, n_verts-2, 3)
+    pnt0 = polygon_unitvecs[:, 0:1, :]  # shape (n_poly, 1, 3)
+    pnt1 = polygon_unitvecs[:, 1:-1, :]  # shape (n_poly, n_verts-2, 3)
+    pnt2 = polygon_unitvecs[:, 2:, :]  # shape (n_poly, n_verts-2, 3)
 
-    u = np.broadcast_to(pnt0, pnt1.shape)      # broadcast pnt0
-    areas = _tri_area(u, pnt1, pnt2)      # shape (n_poly, n_verts-2)
-    return np.sum(areas, axis=1)               # sum over triangles per polygon
+    u = np.broadcast_to(pnt0, pnt1.shape)  # broadcast pnt0
+    areas = _tri_area(u, pnt1, pnt2)  # shape (n_poly, n_verts-2)
+    return np.sum(areas, axis=1)  # sum over triangles per polygon
 
 
 def cell_area_rad(xv_coords, yv_coords):
@@ -172,6 +179,18 @@ def cell_area_rad(xv_coords, yv_coords):
     y = np.cos(yv_rad) * np.sin(xv_rad)
     z = np.sin(yv_rad)
 
-    area = _great_circle_area(np.stack([x, y, z], axis=-1) )
+    area = _great_circle_area(np.stack([x, y, z], axis=-1))
     return area
-    
+
+
+def check_lon_range(lons, name="lon"):
+    lons = np.asarray(lons)
+    if np.all((lons >= -180) & (lons <= 180)):
+        return "[-180, 180]"
+    elif np.all((lons >= 0) & (lons <= 360)):
+        return "[0, 360]"
+    else:
+        raise ValueError(
+            f"{name} values are not consistently in either [-180, 180] or [0, 360] range.\n"
+            f"Min: {lons.min()}, Max: {lons.max()}"
+        )

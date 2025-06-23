@@ -8,6 +8,7 @@ from mom6_bathy.fill_interp import (
     super_interp,
     fill_missing_data,
 )
+import matplotlib.pyplot as plt
 
 
 def gen_chl_empty_dataset(output_path, lon, lat, fill_value=-1.0e34, no_leap=True):
@@ -178,14 +179,16 @@ def interpolate_and_fill_seawifs(
         # adj lon to -180 to 180
         adj_lon = spr_lon - 360
         q_int = super_interp(src_lat, src_lon, src_data[t, ::-1, :], spr_lat, adj_lon)
-        q_int = (
-            q_int.swapaxes(1, 2)
-            .reshape((ocn_nj, ocn_ni, q_int.shape[3] * q_int.shape[-1]))
-            .mean(axis=-1)
+        q_int = np.nanmean(
+            (
+                q_int.swapaxes(1, 2).reshape(
+                    (ocn_nj, ocn_ni, q_int.shape[3] * q_int.shape[-1])
+                )
+            ),
+            axis=-1,
         )
         q = q_int * ocn_mask
         q_nan = np.where((q == 0) | np.isnan(q), np.nan, q)
-
         chlor_a[t, :] = fill_missing_data(q_nan, ocn_mask)
 
     # Global attributes
