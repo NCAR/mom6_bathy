@@ -591,7 +591,9 @@ class TopoEditor(widgets.HBox):
             print("No commit selected.")
             return
         commit_sha, file_path = val
-        self.load_commit(name=file_path)
+        snapshot_name = os.path.splitext(os.path.basename(file_path))[0]
+        self.on_reset()
+        self.load_commit(name=snapshot_name)
         
     # --- Git Callbacks ---
 
