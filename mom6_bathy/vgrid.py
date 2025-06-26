@@ -102,7 +102,7 @@ class VGrid:
             Array of vertical grid spacings (meters)
         """
         
-        assert np.all(dz > 0), "Layer thickness cannot be zero."
+        assert np.all(dz > 0), "Layer thickness cannot be zero or negative."
         
         self.dz = dz
 

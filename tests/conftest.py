@@ -32,18 +32,6 @@ def get_realistic_vgrid_elements():
     return (layer_thickness,cell_center, cell_interface)
 
 @pytest.fixture
-def get_example_vgrid_elements():
-    """Generate all three vgrid elements. Small and arbitrary data."""
-    
-    layer_thickness = np.array([1, 4, 4, 5, 10, 11, 41, 100.5, 10, 3.3, 6, 6.7, 10])
-    
-    cell_center = np.array([0.5, 3, 7, 11.5, 19, 29.5, 55.5, 126.25, 181.5, 188.15, 192.8, 199.15, 207.5])
-    
-    cell_interface = np.array([0, 1, 5, 9, 14, 24, 35, 76, 176.5, 186.5, 189.8, 195.8, 202.5, 212.5])
-    
-    return (layer_thickness, cell_center, cell_interface)
-
-@pytest.fixture
 def get_faulty_vgrid_elements():
     """Generate purposefully faulty vgrid elements. They follow appropriate mathematical rules but violate real world."""
     
