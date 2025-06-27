@@ -1,6 +1,6 @@
 import pytest
-import tempfile
 import socket
+import os
 import numpy as np
 import xarray as xr
 
@@ -65,14 +65,18 @@ def test_cell_interface_to_layer_thickness(get_realistic_vgrid_elements, get_fau
     with pytest.raises(AssertionError):
         dz = _cell_interface_to_layer_thickness(cell_interface)
         
-def test_from_file_layer_thickness(get_realistic_vgrid_elements):
+def test_from_file_layer_thickness(get_realistic_vgrid_elements, tmp_path):
     """Test basic from_file functionality, loading from layer_thickness with different variable names."""
+    
+    # Create temp directory with pytest features
+    tmp_dir = tmp_path / "vgrid_testing"
+    tmp_dir.mkdir(exist_ok = True)
     
     # Default Variable Names/layer thickness
     layer_thickness, cell_center, cell_interface = get_realistic_vgrid_elements
     ds = _create_vgrid_dataset(layer_thickness, cell_center, cell_interface, var_names=("dz", "z", "zi"))
         
-    with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
+    with open(tmp_dir / "temp_vgrid.nc", "w") as tmpfile:
         ds.to_netcdf(tmpfile.name)
         ds.close()
         
@@ -85,7 +89,7 @@ def test_from_file_layer_thickness(get_realistic_vgrid_elements):
     # Different variable name for layer_thickness
     ds = _create_vgrid_dataset(layer_thickness, cell_center, cell_interface)
     
-    with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
+    with open(tmp_dir / "temp_vgrid.nc", "w") as tmpfile:
         ds.to_netcdf(tmpfile.name)
         ds.close()
         
@@ -99,14 +103,18 @@ def test_from_file_layer_thickness(get_realistic_vgrid_elements):
         assert np.allclose(vgrid.zi, cell_interface)
 
     
-def test_from_file_cell_center(get_realistic_vgrid_elements):
+def test_from_file_cell_center(get_realistic_vgrid_elements, tmp_path):
     """Test loading from file with cell center depth information."""
+    
+    # Create temp directory with pytest features
+    tmp_dir = tmp_path / "vgrid_testing"
+    tmp_dir.mkdir(exist_ok = True)
     
     # Conventional variable name test
     layer_thickness, cell_center, cell_interface = get_realistic_vgrid_elements
     ds = _create_vgrid_dataset(layer_thickness, cell_center, cell_interface, var_names=("dz", "z", "zi"))
     
-    with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
+    with open(tmp_dir / "temp_vgrid.nc", "w") as tmpfile:
         ds.to_netcdf(tmpfile.name)
         ds.close()
         
@@ -122,7 +130,7 @@ def test_from_file_cell_center(get_realistic_vgrid_elements):
     # Negative depth from file
     ds = _create_vgrid_dataset(layer_thickness, (-1*cell_center), (-1*cell_interface), var_names=("dz", "z", "zi"))
         
-    with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
+    with open(tmp_dir / "temp_vgrid.nc", "w") as tmpfile:
         ds.to_netcdf(tmpfile.name)
         ds.close()
         
@@ -135,14 +143,18 @@ def test_from_file_cell_center(get_realistic_vgrid_elements):
         assert np.allclose(vgrid.z, cell_center)
         assert np.allclose(vgrid.zi, cell_interface)
     
-def test_from_file_cell_interface(get_realistic_vgrid_elements):
+def test_from_file_cell_interface(get_realistic_vgrid_elements, tmp_path):
     """Test loading from file with cell interface depth data."""
+    
+    # Create temp directory with pytest features
+    tmp_dir = tmp_path / "vgrid_testing"
+    tmp_dir.mkdir(exist_ok = True)
     
     # Realistic
     layer_thickness, cell_center, cell_interface = get_realistic_vgrid_elements
     ds = _create_vgrid_dataset(layer_thickness, cell_center, cell_interface, var_names=("dz", "z", "zi"))
     
-    with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
+    with open(tmp_dir / "temp_vgrid.nc", "w") as tmpfile:
         ds.to_netcdf(tmpfile.name)
         ds.close()
         
@@ -158,7 +170,7 @@ def test_from_file_cell_interface(get_realistic_vgrid_elements):
     # Example
     ds = _create_vgrid_dataset(layer_thickness, (-1*cell_center), (-1*cell_interface), var_names=("dz", "z", "zi"))
         
-    with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
+    with open(tmp_dir / "temp_vgrid.nc", "w") as tmpfile:
         ds.to_netcdf(tmpfile.name)
         ds.close()
         
