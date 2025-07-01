@@ -550,6 +550,32 @@ class Grid:
 
         return lat, lon
 
+    def coarsen(self, data):
+        """
+        Coarsen the data on a refined grid by averaging over a factor x factor block.
+
+        Parameters
+        ----------
+        data: 4D Array
+            The data to be coarsened, with shape (nj, factor, ni, factor).
+
+        Returns
+        -------
+        data : ndarray of shape (nj, ni)
+            Coarsened data field
+        """
+
+        data = np.nanmean(
+            (
+                data.swapaxes(1, 2).reshape(
+                    (self.ny, self.nx, data.shape[3] * data.shape[-1])
+                )
+            ),
+            axis=-1,
+        )
+
+        return data
+
     def plot(self, property_name):
         """
         Plot a given grid property using cartopy.

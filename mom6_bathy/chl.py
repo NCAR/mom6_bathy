@@ -156,15 +156,15 @@ def interpolate_and_fill_seawifs(
         (np.arange(src_ni) + 0.5) / src_ni
     ) * 360.0 + src_x0  # Recompute as doubles
 
-    # 1. Get bounds from your grid
+    # Get bounds from grid
     min_lat, max_lat = grid.qlat.min().item(), grid.qlat.max().item()
     min_lon, max_lon = grid.qlon.min().item(), grid.qlon.max().item()
 
-    # 2. Subset the source latitude and longitude indices
+    # Subset the source latitude and longitude indices
     lat_mask = (src_lat >= min_lat) & (src_lat <= max_lat)
     lon_mask = (src_lon >= min_lon-360) & (src_lon <= max_lon-360)
 
-    # 3. Subset the source data and coordinates
+    # Subset the source data and coordinates
     src_lat_regional = src_lat[lat_mask]
     src_lon_regional = src_lon[lon_mask]
     src_data_regional = src_data[..., lat_mask, :][..., :, lon_mask]
@@ -172,13 +172,13 @@ def interpolate_and_fill_seawifs(
     # 4. Set src_nj and src_ni for the regional subset
     reg_src_nj, reg_src_ni = src_data_regional.shape[-2], src_data_regional.shape[-1]
 
-    """
-    Refines the grid to similar resolution to the source data.
-    """
+    # Refines the grid to similar resolution to the source data.
     factor = 1
     while factor * grid.ny < reg_src_nj and factor * grid.nx < reg_src_ni:
         factor += 1
     spr_lat, spr_lon = grid.refine(factor=factor)
+
+    # Set output path
     if output_path is None:
         output_path = (
             Path(processed_seawifs_path).parent
@@ -186,6 +186,8 @@ def interpolate_and_fill_seawifs(
         )
     else:
         output_path = Path(output_path)
+
+    # Generate empty dataset to fill for chlorophyll
     fill_value = np.float32(-1.0e34)
     chla = gen_chl_empty_dataset(
         output_path,
@@ -195,18 +197,18 @@ def interpolate_and_fill_seawifs(
     )
     chlor_a = chla["CHL_A"]
 
+    # Iterate through time
     for t in range(src_data.shape[0]):
+
+        # Bilinearly interpolate the source data onto the super-sampled grid
         # adj lon to -180 to 180
         adj_lon = spr_lon - 360
         q_int = super_interp(src_lat, src_lon, src_data[t, ::-1, :], spr_lat, adj_lon)
-        q_int = np.nanmean(
-            (
-                q_int.swapaxes(1, 2).reshape(
-                    (ocn_nj, ocn_ni, q_int.shape[3] * q_int.shape[-1])
-                )
-            ),
-            axis=-1,
-        )
+
+        # Average it back to the original grid
+        q_int = grid.coarsen(q_int)
+
+        # Fill any missing data
         q = q_int * ocn_mask
         q_nan = np.where((q == 0) | np.isnan(q), np.nan, q)
         chlor_a[t, :] = fill_missing_data(q_nan, ocn_mask)
