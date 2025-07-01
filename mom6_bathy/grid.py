@@ -533,18 +533,18 @@ class Grid:
         within each original grid cell.
         """
 
-        lon = np.zeros((self.ny, factor, self.nx, factor))
-        lat = np.zeros((self.ny, factor, self.nx, factor))
+        lon = np.zeros((self.ny, self.nx,factor, factor))
+        lat = np.zeros((self.ny, self.nx,factor, factor))
         for j in range(factor):
             ya = (2 * j + 1) / (2 * factor)
             yb = 1.0 - ya
             for i in range(factor):
                 xa = (2 * i + 1) / (2 * factor)
                 xb = 1.0 - xa
-                lon[:, j, :, i] = yb * (
+                lon[:,:, j, i] = yb * (
                     xb * self.qlon[:-1, :-1] + xa * self.qlon[:-1, 1:]
                 ) + ya * (xb * self.qlon[1:, :-1] + xa * self.qlon[1:, 1:])
-                lat[:, j, :, i] = yb * (
+                lat[:,:, j, i] = yb * (
                     xb * self.qlat[:-1, :-1] + xa * self.qlat[:-1, 1:]
                 ) + ya * (xb * self.qlat[1:, :-1] + xa * self.qlat[1:, 1:])
 
@@ -567,7 +567,7 @@ class Grid:
 
         data = np.nanmean(
             (
-                data.swapaxes(1, 2).reshape(
+                data.reshape(
                     (self.ny, self.nx, data.shape[3] * data.shape[-1])
                 )
             ),
