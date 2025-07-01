@@ -150,13 +150,33 @@ def interpolate_and_fill_seawifs(
 
     src_lon = src_nc[src_data.dims[-1]]
     src_lat = ((np.arange(src_nj) + 0.5) / src_nj - 0.5) * 180.0  # Recompute as doubles
+
     src_x0 = int((src_lon[0] + src_lon[-1]) / 2 + 0.5) - 180.0
     src_lon = (
         (np.arange(src_ni) + 0.5) / src_ni
     ) * 360.0 + src_x0  # Recompute as doubles
 
+    # 1. Get bounds from your grid
+    min_lat, max_lat = grid.qlat.min().item(), grid.qlat.max().item()
+    min_lon, max_lon = grid.qlon.min().item(), grid.qlon.max().item()
+
+    # 2. Subset the source latitude and longitude indices
+    lat_mask = (src_lat >= min_lat) & (src_lat <= max_lat)
+    lon_mask = (src_lon >= min_lon-360) & (src_lon <= max_lon-360)
+
+    # 3. Subset the source data and coordinates
+    src_lat_regional = src_lat[lat_mask]
+    src_lon_regional = src_lon[lon_mask]
+    src_data_regional = src_data[..., lat_mask, :][..., :, lon_mask]
+
+    # 4. Set src_nj and src_ni for the regional subset
+    reg_src_nj, reg_src_ni = src_data_regional.shape[-2], src_data_regional.shape[-1]
+
+    """
+    Refines the grid to similar resolution to the source data.
+    """
     factor = 1
-    while factor * grid.ny < src_nj and factor * grid.nx < src_ni:
+    while factor * grid.ny < reg_src_nj and factor * grid.nx < reg_src_ni:
         factor += 1
     spr_lat, spr_lon = grid.refine(factor=factor)
     if output_path is None:

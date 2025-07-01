@@ -175,3 +175,15 @@ def cell_area_rad(xv_coords, yv_coords):
     area = _great_circle_area(np.stack([x, y, z], axis=-1) )
     return area
     
+
+def check_lon_range(lons, name="lon"):
+    lons = np.asarray(lons)
+    if np.all((lons >= -180) & (lons <= 180)):
+        return "[-180, 180]"
+    elif np.all((lons >= 0) & (lons <= 360)):
+        return "[0, 360]"
+    else:
+        raise ValueError(
+            f"{name} values are not consistently in either [-180, 180] or [0, 360] range.\n"
+            f"Min: {lons.min()}, Max: {lons.max()}"
+        )
