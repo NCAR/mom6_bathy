@@ -25,6 +25,7 @@ class TopoEditor(widgets.HBox):
         self.repo = repo_action(self.SNAPSHOT_DIR)
         self.repo_root = self.SNAPSHOT_DIR
 
+        # --- Command Manager ---
         self.current_branch = get_current_branch(self.repo_root)
         self.command_manager = TopoCommandManager(
             domain_id=self.get_topo_id,
@@ -1021,7 +1022,6 @@ class TopoEditor(widgets.HBox):
                 user_snapshots.sort(key=lambda f: os.path.getmtime(os.path.join(self.SNAPSHOT_DIR, f)), reverse=True)
                 latest_snapshot = user_snapshots[0]
                 latest_name = latest_snapshot.replace(".json", "")
-                self._snapshot_name.value = latest_name
                 self.load_commit(latest_name)
                 print(f"Loaded latest snapshot '{latest_name}' from new branch.")
             else:
@@ -1040,3 +1040,4 @@ class TopoEditor(widgets.HBox):
         self._git_branch_dropdown.options = list_branches(self.repo_root)
         self._git_branch_dropdown.value = get_current_branch(self.repo_root)
         self._git_merge_source_dropdown.options = list_branches(self.repo_root)
+        self.refresh_commit_dropdown()

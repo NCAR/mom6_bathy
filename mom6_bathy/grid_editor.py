@@ -1,11 +1,11 @@
 import os
 import re
 import json
+import datetime
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from mom6_bathy.git_utils import *
 
 class GridEditor(widgets.HBox):
 
@@ -14,23 +14,6 @@ class GridEditor(widgets.HBox):
         self.repo_root = repo_root if repo_root is not None else os.getcwd()
         self.grids_dir = os.path.join(self.repo_root, "Grids")
         os.makedirs(self.grids_dir, exist_ok=True)
-        # --- Ensure Grids is a git repo ---
-        if not os.path.isdir(os.path.join(self.grids_dir, ".git")):
-            import git
-            self.repo = git.Repo.init(self.grids_dir)
-            print("Initialized new git repository in Grids/")
-        else:
-            import git
-            self.repo = git.Repo(self.grids_dir)
-        # --- Ensure at least one commit exists ---
-        if not self.repo.head.is_valid():
-            dummy_path = os.path.join(self.grids_dir, ".gitkeep")
-            if not os.path.exists(dummy_path):
-                with open(dummy_path, "w") as f:
-                    f.write("")
-            self.repo.index.add([dummy_path])
-            self.repo.index.commit("Initial commit")
-        self.current_branch = self.repo.active_branch.name
         self._initial_params = {
             "lenx": grid.lenx,
             "leny": grid.leny,
@@ -40,7 +23,6 @@ class GridEditor(widgets.HBox):
             "name": grid.name
         }
 
-        self.initialize_grid()
         self.construct_control_panel()
         self.construct_observances()
 
@@ -60,7 +42,6 @@ class GridEditor(widgets.HBox):
         self.plot_grid()
 
     def _get_grid_folder_and_path(self, grid=None):
-        """Return (folder, json_path) for the given grid (or self.grid if None)."""
         if grid is None:
             grid = self.grid
         sanitized_name = self._sanitize_grid_name(grid.name)
@@ -69,38 +50,8 @@ class GridEditor(widgets.HBox):
         snapfile = f"grid_{sanitized_name}.json"
         json_path = os.path.join(folder, snapfile)
         return folder, json_path
-    
-    def initialize_grid(self):
-        """If no grid JSONs exist anywhere, save and commit this grid as the first snapshot."""
-        folder, json_path = self._get_grid_folder_and_path()
-        os.makedirs(folder, exist_ok=True)
-        # Recursively search for any grid JSONs in Grids/
-        grids_dir = os.path.join(self.repo_root, "Grids")
-        any_grid_jsons = []
-        for root, dirs, files in os.walk(grids_dir):
-            any_grid_jsons.extend([f for f in files if f.endswith('.json')])
-        is_first_grid = len(any_grid_jsons) == 0
-
-        grid_files = [f for f in os.listdir(folder) if f.endswith('.json')]
-        if not grid_files:
-            domain_id = {
-                "name": self.grid.name,
-                "resolution": self.grid.resolution,
-                "xstart": self.grid.xstart,
-                "lenx": self.grid.lenx,
-                "ystart": self.grid.ystart,
-                "leny": self.grid.leny,
-            }
-            with open(json_path, "w") as f:
-                json.dump({"domain_id": domain_id}, f, indent=2)
-            if is_first_grid:
-                print(f"Initialized repo with first grid '{os.path.basename(json_path)}'.")
-            else:
-                print(f"Initialized new grid folder '{os.path.basename(folder)}' with '{os.path.basename(json_path)}'.")
-            git_snapshot_action('commit', self.grids_dir, file_path=json_path, commit_msg="Initial grid commit")
 
     def construct_control_panel(self):
-        # --- UI Controls ---
         self._snapshot_name = widgets.Text(value='', placeholder='Enter grid name', description='Name:', layout={'width': '90%'})
         self._commit_msg = widgets.Text(value='', placeholder='Enter grid message', description='Message:', layout={'width': '90%'})
         self._commit_dropdown = widgets.Dropdown(options=[], description='Grids:', layout={'width': '90%'})
@@ -118,8 +69,8 @@ class GridEditor(widgets.HBox):
         )
         self._xstart_slider = widgets.FloatSlider(
             value=initial_xstart,
-            min=max(initial_xstart - 20, 0),
-            max=min(initial_xstart + 20, 360),
+            min=max(initial_xstart - 30, 0),
+            max=min(initial_xstart + 30, 360),
             step=0.01,
             description="xstart"
         )
@@ -128,8 +79,8 @@ class GridEditor(widgets.HBox):
         )
         self._ystart_slider = widgets.FloatSlider(
             value=initial_ystart,
-            min=max(initial_ystart - 20, -90),
-            max=min(initial_ystart + 20, 90),
+            min=max(initial_ystart - 30, -90),
+            max=min(initial_ystart + 30, 90),
             step=0.01,
             description="ystart"
         )
@@ -183,7 +134,6 @@ class GridEditor(widgets.HBox):
         self.ax.add_feature(cfeature.LAND, facecolor='0.9')
         self.ax.add_feature(cfeature.BORDERS, linewidth=0.5)
 
-        # Plot model grid lines (corners)
         n_jq, n_iq = self.grid.qlon.shape
         for i in range(n_iq):
             self.ax.plot(self.grid.qlon[:, i], self.grid.qlat[:, i], color='k', linewidth=0.5, transform=ccrs.PlateCarree())
@@ -234,17 +184,20 @@ class GridEditor(widgets.HBox):
             "ystart": self.grid.ystart,
             "leny": self.grid.leny,
         }
+        # Save metadata
+        metadata = {
+            "domain_id": domain_id,
+            "message": msg,
+            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "filename": os.path.basename(json_path)
+        }
         with open(json_path, "w") as f:
-            json.dump({"domain_id": domain_id}, f, indent=2)
+            json.dump(metadata, f, indent=2)
         print(f"Saved grid '{os.path.basename(json_path)}' in '{folder}'.")
-
-        result = git_snapshot_action('commit', self.grids_dir, file_path=json_path, commit_msg=msg)
-        print(result)
         self.refresh_commit_dropdown()
         return
 
     def sync_sliders_to_grid(self):
-        """Update all sliders to match the current grid state, without triggering events."""
         try:
             sliders = [
                 self._resolution_slider,
@@ -285,9 +238,9 @@ class GridEditor(widgets.HBox):
     def load_grid(self, b=None):
         val = self._commit_dropdown.value
         if not val:
-            print("No commit selected.")
+            print("No grid selected.")
             return
-        commit_sha, file_path = val
+        file_path = val
         snapshot_path = os.path.join(self.grids_dir, file_path)
         try:
             with open(snapshot_path, "r") as f:
@@ -309,7 +262,6 @@ class GridEditor(widgets.HBox):
             print(f"Failed to load grid: {e}")
 
     def reset_grid(self, b=None):
-        """Reset grid to its initial parameters."""
         from mom6_bathy.grid import Grid
         params = self._initial_params
         name = self._snapshot_name.value.strip() or params["name"]
@@ -333,24 +285,22 @@ class GridEditor(widgets.HBox):
                     rel_dir = os.path.relpath(root, self.grids_dir)
                     rel_path = os.path.join(rel_dir, fname) if rel_dir != "." else fname
                     grid_jsons.append(rel_path)
-
         options = []
         for rel_path in grid_jsons:
-            norm_rel_path = os.path.normpath(rel_path)
-            # Only get the most recent commit for this file
-            repo = git.Repo(self.grids_dir)
+            abs_path = os.path.join(self.grids_dir, rel_path)
             try:
-                commits = list(repo.iter_commits(paths=norm_rel_path, max_count=1))
+                with open(abs_path, "r") as f:
+                    data = json.load(f)
+                msg = data.get("message", "")
+                date = data.get("date", "")
+                label = f"{os.path.basename(rel_path)}"
+                options.append((label, rel_path))
             except Exception as e:
                 continue
-            if commits:
-                commit = commits[0]
-                label = f"{commit.hexsha[:7]} - {os.path.basename(norm_rel_path)} - {commit.message.strip().splitlines()[0]}"
-                options.append((label, (commit.hexsha, rel_path)))
 
         # Sort by file modification time, newest first
         options.sort(
-            key=lambda x: os.path.getmtime(os.path.join(self.grids_dir, x[1][1])),
+            key=lambda x: os.path.getmtime(os.path.join(self.grids_dir, x[1])),
             reverse=True
         )
 
@@ -368,7 +318,19 @@ class GridEditor(widgets.HBox):
         if not val:
             self._commit_details.value = ""
             return
-        commit_sha, file_path = val
-        self._commit_details.value = git_commit_info(
-            self.grids_dir, commit_sha=commit_sha, file_path=file_path, mode='details'
-        )
+        file_path = val
+        abs_path = os.path.join(self.grids_dir, file_path)
+        try:
+            with open(abs_path, "r") as f:
+                data = json.load(f)
+            msg = data.get("message", "")
+            date = data.get("date", "")
+            domain_id = data.get("domain_id", {})
+            details = (
+                f"<b>Name:</b> {domain_id.get('name', '')}<br>"
+                f"<b>Date:</b> {date}<br>"
+                f"<b>Message:</b> {msg}<br>"
+            )
+            self._commit_details.value = details
+        except Exception:
+            self._commit_details.value = ""
