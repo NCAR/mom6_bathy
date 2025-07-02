@@ -125,3 +125,54 @@ class MinDepthEditCommand(EditCommand):
             old_value=data['old_value']
         )
     
+@register_command
+class GridStateCommand(EditCommand):
+    """
+    Command to set all grid parameters (resolution, xstart, lenx, ystart, leny).
+    """
+    def __init__(self, grid, resolution, xstart, lenx, ystart, leny, old_state=None):
+        self.grid = grid
+        self.resolution = resolution
+        self.xstart = xstart
+        self.lenx = lenx
+        self.ystart = ystart
+        self.leny = leny
+        if old_state is None:
+            self.old_state = (
+                grid.resolution, grid.xstart, grid.lenx, grid.ystart, grid.leny
+            )
+        else:
+            self.old_state = old_state
+
+    def __call__(self):
+        self.grid.resolution = self.resolution
+        self.grid.xstart = self.xstart
+        self.grid.lenx = self.lenx
+        self.grid.ystart = self.ystart
+        self.grid.leny = self.leny
+
+    def undo(self):
+        self.grid.resolution, self.grid.xstart, self.grid.lenx, self.grid.ystart, self.grid.leny = self.old_state
+
+    def serialize(self):
+        return {
+            'type': self.__class__.__name__,
+            'resolution': self.resolution,
+            'xstart': self.xstart,
+            'lenx': self.lenx,
+            'ystart': self.ystart,
+            'leny': self.leny,
+            'old_state': self.old_state,
+        }
+
+    @classmethod
+    def deserialize(cls, data):
+        return lambda grid: cls(
+            grid,
+            resolution=data['resolution'],
+            xstart=data['xstart'],
+            lenx=data['lenx'],
+            ystart=data['ystart'],
+            leny=data['leny'],
+            old_state=tuple(data['old_state']),
+        )

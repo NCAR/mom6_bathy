@@ -1,25 +1,45 @@
 import os
 import git
 
-def is_path_within_repo(repo_root, file_path):
-    abs_repo = os.path.abspath(repo_root)
-    abs_file = os.path.abspath(file_path)
-    try:
-        return os.path.commonpath([abs_repo, abs_file]) == abs_repo
-    except ValueError:
-        return False
+def get_null_tree(repo):
+    # Create an empty tree object in memory
+    return repo.tree(repo.git.hash_object('-t', 'tree', '/dev/null'))
 
-def git_snapshot_action(action, repo_root, file_path=None, commit_msg=None, commit_sha=None):
+def get_domain_dir(grid, base_dir="Topos"):
+    """
+    Returns a unique directory path for a given grid object.
+    """
+    shape = f"{int(grid.leny/grid.resolution)}x{int(grid.lenx/grid.resolution)}"
+    name = getattr(grid, "name", "unknown")
+    return os.path.join(base_dir, f"domain_{name}_{shape}")
+
+def list_domain_dirs(base_dir="Topos"):
+    """
+    List all domain directories in the base_dir.
+    """
+    if not os.path.exists(base_dir):
+        return []
+    return [
+        d for d in os.listdir(base_dir)
+        if os.path.isdir(os.path.join(base_dir, d)) and d.startswith("domain_")
+    ]
+
+def repo_action(path):
+    """
+    Ensure a git repository exists at the given path. If not, initialize one.
+    Returns the repo object.
+    """
+    if not os.path.exists(os.path.join(path, ".git")):
+        repo = git.Repo.init(path)
+    else:
+        repo = git.Repo(path)
+    return repo
+
+def snapshot_action(action, repo_root, file_path=None, commit_msg=None, commit_sha=None):
     """
     Perform snapshot-related git actions.
     action: 'commit', 'ensure_tracked', 'restore'
     """
-    # SKIP git operations if file_path is outside the repo
-    if file_path is not None and not is_path_within_repo(repo_root, file_path):
-        print(f"[git_utils] Skipping git operation for file outside repo: {file_path}")
-        if action == 'restore':
-            return False, "File is outside repo"
-        return "Skipped git operation (file outside repo)."
 
     repo = git.Repo(repo_root)
     if action == 'commit':
@@ -73,24 +93,49 @@ def git_snapshot_action(action, repo_root, file_path=None, commit_msg=None, comm
     else:
         raise ValueError(f"Unknown action: {action}")
 
-def git_commit_info(repo_root, rel_dir=None, commit_sha=None, file_path=None, mode='list', branch=None):
+def commit_info(
+    repo_root,
+    file_pattern="*.json",
+    root_only=True,
+    change_types=("D"),
+    commit_sha=None,
+    file_path=None,
+    mode='list',
+    branch=None,
+):
     """
-    mode: 'list' for listing commits affecting a dir, 'details' for commit details of a file.
+    Generalized git commit info for both grid and topo editors.
     """
+    import fnmatch
+    repo_root = os.path.abspath(repo_root)
     repo = git.Repo(repo_root)
+    def get_null_tree(repo):
+        return repo.tree(repo.git.hash_object('-t', 'tree', '/dev/null'))
     if mode == 'list':
         if branch is None:
             branch = repo.active_branch.name
-        commits = list(repo.iter_commits(branch, paths=rel_dir))
         options = []
-        for commit in commits:
-            files = [f for f in commit.stats.files if f.startswith(rel_dir)]
-            for f in files:
-                options.append((
-                    f"{commit.hexsha[:7]} - {os.path.basename(f)} - {commit.message.strip().splitlines()[0]}",
-                    (commit.hexsha, f)
-                ))
-        return options
+        for commit in repo.iter_commits(branch):
+            parents = commit.parents or []
+            if parents:
+                diffs = commit.diff(parents[0])
+            else:
+                diffs = commit.diff(get_null_tree(repo))
+            for diff in diffs:
+                path = diff.b_path
+                if root_only and "/" in path:
+                    continue
+                if diff.change_type in change_types:
+                    if fnmatch.fnmatch(path, file_pattern):
+                        label = f"{commit.hexsha[:7]} - {os.path.basename(path)} - {commit.message.strip().splitlines()[0]}"
+                        options.append((label, (commit.hexsha, path)))
+        # Only keep files that still exist on disk
+        filtered = []
+        for label, (sha, path) in options:
+            abs_path = os.path.abspath(os.path.join(repo_root, path))
+            if os.path.exists(abs_path):
+                filtered.append((label, (sha, path)))
+        return filtered
     elif mode == 'details':
         commit = repo.commit(commit_sha)
         return (
@@ -102,26 +147,26 @@ def git_commit_info(repo_root, rel_dir=None, commit_sha=None, file_path=None, mo
         )
     else:
         raise ValueError(f"Unknown mode: {mode}")
-
-def git_get_current_branch(repo_root):
+    
+def get_current_branch(repo_root):
     return git.Repo(repo_root).active_branch.name
 
-def git_list_branches(repo_root):
+def list_branches(repo_root):
     return [head.name for head in git.Repo(repo_root).heads]
 
-def git_create_branch_and_switch(branch, repo_root):
+def create_branch_and_switch(branch, repo_root):
     repo = git.Repo(repo_root)
     repo.git.checkout('-b', branch)
     return repo.active_branch.name
 
-def git_delete_branch_and_switch(branch, repo_root):
+def delete_branch_and_switch(branch, repo_root):
     repo = git.Repo(repo_root)
     if repo.active_branch.name == branch:
         raise Exception("Cannot delete the currently checked out branch. Please checkout another branch first.")
     repo.git.branch('-D', branch)
     return repo.active_branch.name
 
-def git_merge_branch(repo_root, source_branch):
+def merge_branch(repo_root, source_branch):
     repo = git.Repo(repo_root)
     current = repo.active_branch.name
     if source_branch == current:
@@ -132,12 +177,23 @@ def git_merge_branch(repo_root, source_branch):
     except Exception as e:
         return False, f"Merge failed: {e}"
 
-def git_safe_checkout_branch(repo_root, branch, rel_dir):
+def safe_checkout_branch(repo_root, branch, rel_dir):
     repo = git.Repo(repo_root)
-    untracked = [f for f in repo.untracked_files if f.startswith(rel_dir)]
+    # Ignore .last_domain.json in untracked files
+    untracked = [
+        f for f in repo.untracked_files
+        if f.startswith(rel_dir) and not f.endswith('.last_domain.json')
+    ]
     changed = [item.a_path for item in repo.index.diff(None) if item.a_path.startswith(rel_dir)]
     staged = [item.a_path for item in repo.index.diff('HEAD') if item.a_path.startswith(rel_dir)]
     if untracked or changed or staged:
+        print("Cannot checkout: You have unsaved or uncommitted changes in 'snapshots'. Please save and commit them before switching branches.")
+        if untracked:
+            print("Untracked files:", untracked)
+        if changed:
+            print("Unstaged changes:", changed)
+        if staged:
+            print("Staged but uncommitted:", staged)
         return False, untracked, changed, staged
     repo.git.checkout(branch)
     return True, [], [], []

@@ -66,6 +66,12 @@ class Grid:
         displace_pole: bool = False,
         name: Optional[str] = None,
     ) -> None:
+        self.lenx = lenx
+        self.leny = leny
+        self.resolution = resolution
+        self.xstart = xstart
+        self.ystart = ystart
+        self.name = name
         """
         Grid instance constructor.
 

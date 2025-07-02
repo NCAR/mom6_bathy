@@ -4,7 +4,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 class CommandManager(ABC):
-    def __init__(self, domain_id, snapshot_dir="snapshots"):
+    def __init__(self, domain_id, snapshot_dir="Topos"):
         self._undo_history = []
         self._redo_history = []
         self.snapshot_dir = snapshot_dir
@@ -33,7 +33,7 @@ class CommandManager(ABC):
             id_str = "_".join(f"{k}-{v}" for k, v in dom_id.items())
         else:
             id_str = str(dom_id)
-        return os.path.join("edit_histories", f"history_{id_str}.json")
+        return os.path.join(self.snapshot_dir, f"history_{id_str}.json")
 
     def save_histories(self):
         path = self.get_history_path()
@@ -71,7 +71,8 @@ class CommandManager(ABC):
         snapshot_domain = data.get("domain_id", {})
         current_domain = self.get_domain_id()
         if snapshot_domain != current_domain:
-            print("WARNING: Loaded snapshot domain does not match current domain!")
+            # Accept domain change silently for TopoEditor
+            pass
         self._undo_history = [
             command_registry[d['type']].deserialize(d)(*args, **kwargs) for d in data["undo_history"]
         ]
@@ -111,7 +112,7 @@ class CommandManager(ABC):
         pass
 
 class TopoCommandManager(CommandManager):
-    def __init__(self, domain_id, topo, command_registry, snapshot_dir="snapshots"):
+    def __init__(self, domain_id, topo, command_registry, snapshot_dir="Topos"):
         super().__init__(domain_id, snapshot_dir)
         self._topo = topo
         self._command_registry = command_registry
@@ -130,6 +131,17 @@ class TopoCommandManager(CommandManager):
         else:
             cmd()
 
+    def get_history_path(self):
+        dom_id = self.get_domain_id()
+        if isinstance(dom_id, dict):
+            grid_name = dom_id.get("grid_name", "unknown")
+            shape = dom_id.get("shape", ["?", "?"])
+            shape_str = f"{shape[0]}x{shape[1]}"
+            fname = f"history_{grid_name}_{shape_str}.json"
+        else:
+            fname = f"history_{str(dom_id)}.json"
+        return os.path.join(self.snapshot_dir, fname)
+    
     def push(self, command):
         self._undo_history.append(command)
         self._redo_history.clear()
@@ -159,28 +171,27 @@ class TopoCommandManager(CommandManager):
         self.save_histories()
         return True
 
-    def load_commit(self, name, command_registry, topo, reset_to_golden=False):
-        """ Golden (or golden state) refers to the original, reference, or baseline state of the (topo) data before 
+    def load_commit(self, name, command_registry, topo, reset_to_original=False):
+        """ Original (or original state) refers to the reference, or baseline state of the (topo) data before 
         any user edits or modifications have been applied.
         """
-        if reset_to_golden: 
+        if reset_to_original: 
             # If true, topo is reset to the original state. If false, in-memory state is used.
             topo_id = self.get_domain_id()
             grid_name = topo_id['grid_name']
             shape = topo_id['shape']
             shape_str = f"{shape[0]}x{shape[1]}"
-            golden_dir = "original_topo"
-            golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
-            golden_min_depth_path = os.path.join(golden_dir, f"golden_min_depth_{grid_name}_{shape_str}.json")
+            original_topo_path = os.path.join(self.snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy")
+            original_min_depth_path = os.path.join(self.snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json")
 
-            if os.path.exists(golden_topo_path):
-                topo.depth.data[:] = np.load(golden_topo_path)
-                if os.path.exists(golden_min_depth_path):
-                    with open(golden_min_depth_path, "r") as f:
+            if os.path.exists(original_topo_path):
+                topo.depth.data[:] = np.load(original_topo_path)
+                if os.path.exists(original_min_depth_path):
+                    with open(original_min_depth_path, "r") as f:
                         d = json.load(f)
                         topo.min_depth = d.get("min_depth", topo.min_depth)
             else:
-                print("Warning: golden topo not found, cannot reset before loading snapshot.")
+                print("Warning: original topo not found, cannot reset before loading snapshot.")
 
         # Call the base class implementation for the rest
         super().load_commit(name, command_registry, topo)
@@ -190,28 +201,25 @@ class TopoCommandManager(CommandManager):
         grid_name = topo_id['grid_name']
         shape = topo_id['shape']
         shape_str = f"{shape[0]}x{shape[1]}"
-        golden_dir = "original_topo"
-        golden_topo_path = os.path.join(golden_dir, f"golden_topo_{grid_name}_{shape_str}.npy")
-        golden_min_depth_path = os.path.join(golden_dir, f"golden_min_depth_{grid_name}_{shape_str}.json")
+        original_topo_path = os.path.join(self.snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy")
+        original_min_depth_path = os.path.join(self.snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json")
 
-        if os.path.exists(golden_topo_path):
-            topo.depth.data[:] = np.load(golden_topo_path)
-            if os.path.exists(golden_min_depth_path):
-                with open(golden_min_depth_path, "r") as f:
+        if os.path.exists(original_topo_path):
+            topo.depth.data[:] = np.load(original_topo_path)
+            if os.path.exists(original_min_depth_path):
+                with open(original_min_depth_path, "r") as f:
                     d = json.load(f)
                     topo.min_depth = d.get("min_depth", topo.min_depth)
-            print(f"Topo reset to golden/original topo for {grid_name} {shape_str} from disk.")
         else:
             topo.depth.data[:] = np.copy(original_depth)
             topo.min_depth = original_min_depth
-            print("Topo reset to first-in-memory state.")
 
-        golden_name = f"golden_{grid_name}_{shape_str}"
+        original_name = f"original_{grid_name}_{shape_str}"
         from mom6_bathy.edit_command import COMMAND_REGISTRY
         try:
-            self.load_commit(golden_name, COMMAND_REGISTRY, topo)
+            self.load_commit(original_name, COMMAND_REGISTRY, topo)
         except FileNotFoundError:
-            print("Golden command snapshot not found, edit history not reset.")
+            print("Original command snapshot not found, edit history not reset.")
 
         if min_depth_specifier is not None:
             min_depth_specifier.value = topo.min_depth
@@ -225,3 +233,4 @@ class TopoCommandManager(CommandManager):
     def initialize(self):
         self.load_histories()
         self.replay()
+        
