@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import numpy as np
 import datetime
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
@@ -136,9 +137,9 @@ class GridEditor(widgets.HBox):
 
         n_jq, n_iq = self.grid.qlon.shape
         for i in range(n_iq):
-            self.ax.plot(self.grid.qlon[:, i], self.grid.qlat[:, i], color='k', linewidth=0.5, transform=ccrs.PlateCarree())
+            self.ax.plot(self.grid.qlon[:, i], self.grid.qlat[:, i], color='k', linewidth=0.1, transform=ccrs.PlateCarree())
         for j in range(n_jq):
-            self.ax.plot(self.grid.qlon[j, :], self.grid.qlat[j, :], color='k', linewidth=0.5, transform=ccrs.PlateCarree())
+            self.ax.plot(self.grid.qlon[j, :], self.grid.qlat[j, :], color='k', linewidth=0.1, transform=ccrs.PlateCarree())
         self.ax.set_title("Grid Editor")
 
         lon_min, lon_max = float(self.grid.qlon.min()), float(self.grid.qlon.max())
@@ -151,8 +152,39 @@ class GridEditor(widgets.HBox):
         gl.xlabel_style = {'size': 10}
         gl.ylabel_style = {'size': 10}
 
+        self._draw_scale_bar(lon_min, lon_max, lat_min, lat_max)
+
         self.fig.canvas.draw_idle()
-        
+    
+    def _draw_scale_bar(self, lon_min, lon_max, lat_min, lat_max):
+        """Draw a fixed-length scale bar with dynamic label using geometric calculation."""
+        try:
+            frac = 0.2
+            bar_lat = lat_min + 0.05 * (lat_max - lat_min)
+            bar_lon_start = lon_min + 0.05 * (lon_max - lon_min)
+            bar_lon_end = bar_lon_start + frac * (lon_max - lon_min)
+
+            # Convert to radians
+            R = 6371000  # meters
+            lat_rad = np.deg2rad(bar_lat)
+            dlon_rad = np.deg2rad(bar_lon_end - bar_lon_start)
+            bar_length_m = abs(dlon_rad * np.cos(lat_rad) * R)
+
+            # # Label: show the actual bar length in appropriate units
+            # if bar_length_m >= 1609.34:
+            #     label = f"{bar_length_m/1609.34:.1f} mi"
+            if bar_length_m >= 1000:
+                label = f"{bar_length_m/1000:.1f} km"
+            else:
+                label = f"{int(bar_length_m)} m"
+
+            # Draw the scale bar
+            self.ax.plot([bar_lon_start, bar_lon_end], [bar_lat, bar_lat], color='k', linewidth=3, transform=ccrs.PlateCarree())
+            self.ax.text((bar_lon_start + bar_lon_end) / 2, bar_lat + 0.01 * (lat_max - lat_min),
+                        label, ha='center', va='bottom', fontsize=10, transform=ccrs.PlateCarree())
+        except Exception as e:
+            print(f"Failed to draw scale bar: {e}")
+
     def _sanitize_grid_name(self, name):
         return re.sub(r'[^A-Za-z0-9_]+', '_', name)
 
