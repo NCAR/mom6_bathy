@@ -28,7 +28,7 @@ class TopoEditor(widgets.HBox):
         # --- Command Manager ---
         self.current_branch = get_current_branch(self.repo_root)
         self.command_manager = TopoCommandManager(
-            domain_id=self.get_topo_id,
+            domain_id=self.topo.get_domain_id,
             topo=self.topo,
             command_registry=COMMAND_REGISTRY,
             snapshot_dir=self.SNAPSHOT_DIR
@@ -37,24 +37,27 @@ class TopoEditor(widgets.HBox):
         self._original_depth = np.array(self.topo.depth.data)
         self._original_min_depth = self.topo.min_depth
 
-        # --- Restore last domain/grid if available and matches ---
-        restored_snapshot = self.check_restore_last_domain(restore_last=restore_last)
+        # --- Restore last session if requested ---
+        restored_topo, restored_snapshot = self.topo.check_restore_last_domain(
+            self.SNAPSHOT_DIR, self.topo.get_domain_id, restore_last=restore_last
+        )
+        if restored_topo is not None:
+            self.topo = restored_topo
 
-        # Ensure original topo exists for resets
-        self._ensure_original_topo()
+        # --- Ensure original state is saved for this domain ---
+        self.topo.ensure_original_state(
+            snapshot_dir=self.SNAPSHOT_DIR,
+            command_manager=self.command_manager,
+            repo=self.repo,
+            repo_root=self.repo_root
+        )
 
-        # --- Ensure domain dropdown is up-to-date on init ---
-        self._domain_options = self._get_domain_options()
-        self._current_domain = None
-
-        # Only use the fallback logic
-        for label, value in self._domain_options:
-            if value == os.path.basename(self.SNAPSHOT_DIR):
-                self._current_domain = value
-                break
+        # --- Domain options for switching between grids/domains ---
+        self._domain_options = self.topo.get_domain_options(self.SNAPSHOT_DIR)
+        self._current_domain = self.topo.get_current_domain(self._domain_options, self.SNAPSHOT_DIR)
 
         if build_ui:
-            # Setup UI controls, plot, and observers
+            # --- Build UI controls, plot, and observers ---
             self.construct_control_panel()
             self.construct_interactive_plot()
             self.construct_observances()
@@ -62,21 +65,21 @@ class TopoEditor(widgets.HBox):
             self.refresh_commit_dropdown()
             self._domain_dropdown.options = self._domain_options
 
-            # Always set the dropdown to the current domain
+            # Always set the dropdown to the current domain if possible
             if self._current_domain:
                 self._domain_dropdown.value = self._current_domain
             else:
-                # fallback: set to first option if current not found
                 if self._domain_options:
                     self._domain_dropdown.value = self._domain_options[0][1]
-
+            
+            # --- Initialize the widget layout ---
             super().__init__([self._control_panel, self._interactive_plot])
 
-            # Load restored snapshot if available
+            # --- Load restored snapshot if available ---
             if restored_snapshot:
                 self.load_commit(name=restored_snapshot)
 
-            # Now load autosave if it exists and is newer than the restored snapshot
+            # --- Load autosave if it exists and is newer than the restored snapshot ---
             autosave_path = os.path.join(self.SNAPSHOT_DIR, "_autosave_working.json")
             restored_path = os.path.join(self.SNAPSHOT_DIR, f"{restored_snapshot}.json") if restored_snapshot else None
             if os.path.exists(autosave_path):
@@ -85,162 +88,16 @@ class TopoEditor(widgets.HBox):
                 ):
                     self.load_commit(name="_autosave_working")
         else:
+            # If not building UI, just initialize as an empty HBox [TESTING PURPOSES]
             super().__init__([])
 
     def initialize_history(self):
+        """Initialize the command manager's history and update button states."""
         self.command_manager.initialize()
         self.update_undo_redo_buttons()
 
-    def get_topo_id(self):
-        grid = self.topo._grid
-        # Try to get all relevant grid attributes, fallback to None if missing
-        grid_name = getattr(grid, "name", getattr(grid, "_name", None))
-        shape = [int(v) for v in self.topo.depth.data.shape]
-        lenx = getattr(grid, "lenx", None)
-        leny = getattr(grid, "leny", None)
-        resolution = getattr(grid, "resolution", None)
-        xstart = getattr(grid, "xstart", None)
-        ystart = getattr(grid, "ystart", None)
-        return {
-            "grid_name": grid_name,
-            "shape": shape,
-            "lenx": lenx,
-            "leny": leny,
-            "resolution": resolution,
-            "xstart": xstart,
-            "ystart": ystart,
-        }
-    
-    def _persist_last_domain(self, domain_id=None, snapshot_name=None, load=False):
-        """Save or load the last used domain and snapshot to/from a JSON file."""
-        path = os.path.join(self.SNAPSHOT_DIR, ".last_domain.json")
-        if load:
-            try:
-                with open(path, "r") as f:
-                    data = json.load(f)
-                return data.get("domain_id"), data.get("snapshot_name")
-            except Exception:
-                return None, None
-        else:
-            try:
-                with open(path, "w") as f:
-                    json.dump({"domain_id": domain_id, "snapshot_name": snapshot_name}, f)
-            except Exception:
-                pass
-    
-    def check_restore_last_domain(self, restore_last=True):
-        """Restore last domain/grid only if it matches the current topo's grid_name and shape."""
-        if not restore_last:
-            return None
-        last_domain_id, snapshot_name = self._persist_last_domain(load=True)
-        if last_domain_id is not None:
-            current_id = self.get_topo_id()
-            if (last_domain_id.get("grid_name") == current_id.get("grid_name") and
-                last_domain_id.get("shape") == current_id.get("shape")):
-                return self._restore_last_domain()
-        return None
-    
-    def _restore_last_domain(self):
-        """Restore the last used domain/grid and snapshot, if available. Returns snapshot_name if present, else None."""
-        domain_id, snapshot_name = self._persist_last_domain(load=True)
-        if not domain_id:
-            return None  # Nothing to restore
-
-        try:
-            from mom6_bathy.grid import Grid
-            from mom6_bathy.topo import Topo
-            grid_kwargs = {k: v for k, v in dict(
-                lenx=domain_id.get("lenx"),
-                leny=domain_id.get("leny"),
-                resolution=domain_id.get("resolution"),
-                xstart=domain_id.get("xstart"),
-                ystart=domain_id.get("ystart"),
-                name=domain_id.get("grid_name")
-            ).items() if v is not None}
-            new_grid = Grid(**grid_kwargs)
-            min_depth = domain_id.get("min_depth", 9.5)
-            shape = tuple(domain_id.get("shape", []))
-            shape_str = f"{shape[0]}x{shape[1]}"
-            original_min_depth_path = os.path.join(self.SNAPSHOT_DIR, f"original_min_depth_{domain_id.get('grid_name')}_{shape_str}.json")
-            if os.path.exists(original_min_depth_path):
-                with open(original_min_depth_path, "r") as f:
-                    d = json.load(f)
-                    min_depth = d.get("min_depth", min_depth)
-            new_topo = Topo(new_grid, min_depth)
-            original_topo_path = os.path.join(self.SNAPSHOT_DIR, f"original_topo_{domain_id.get('grid_name')}_{shape_str}.npy")
-            if os.path.exists(original_topo_path):
-                loaded = np.load(original_topo_path)
-                new_topo._depth = xr.DataArray(
-                    loaded.copy(),
-                    dims=["ny", "nx"],
-                    attrs={"units": "m"},
-                )
-            # Set state
-            self.topo = new_topo
-            self.ny = self.topo.depth.data.shape[0]
-            self.nx = self.topo.depth.data.shape[1]
-            self._original_depth = np.array(self.topo.depth.data)
-            self._original_min_depth = self.topo.min_depth
-            self.command_manager = TopoCommandManager(domain_id=self.get_topo_id, topo=self.topo, command_registry=COMMAND_REGISTRY, snapshot_dir=self.SNAPSHOT_DIR)
-            return snapshot_name  # May be None!
-        except Exception as e:
-            print(f"[WARN] Could not restore last domain: {e}")
-            return None
-    
-    def _get_domain_options(self):
-        base_dir = os.path.dirname(self.SNAPSHOT_DIR)
-        domains = list_domain_dirs(base_dir)
-        # Optionally, parse domain name and shape for display
-        options = []
-        for d in domains:
-            label = d.replace("domain_", "")
-            options.append((label, d))
-        return options
-
-    def _ensure_original_topo(self):
-        """
-        Ensure that the original (reference) topography and minimum depth files exist for the current grid/domain.
-
-        This method performs the following:
-        1. Saves the current topography and minimum depth as 'original' files if they do not already exist.
-        2. Creates an 'original' snapshot commit if missing.
-        3. Initializes the git repository with the original snapshot if needed.
-        4. Ensures the original snapshot is tracked in git.
-
-        This is used to guarantee that a baseline, unmodified state is always available for resets and history.
-        """
-        topo_id = self.get_topo_id()
-        grid_name = topo_id['grid_name']
-        shape = topo_id['shape']
-        shape_str = f"{shape[0]}x{shape[1]}"
-        original_topo_path = os.path.join(self.SNAPSHOT_DIR, f"original_topo_{grid_name}_{shape_str}.npy")
-        original_min_depth_path = os.path.join(self.SNAPSHOT_DIR, f"original_min_depth_{grid_name}_{shape_str}.json")
-        original_name = f"original_{grid_name}_{shape_str}"
-        original_path = os.path.join(self.SNAPSHOT_DIR, f"{original_name}.json")
-
-        # 1. Create original topo/min_depth files if missing
-        if not os.path.exists(original_topo_path):
-            np.save(original_topo_path, np.asarray(self.topo.depth.data, dtype=np.float32))
-        if not os.path.exists(original_min_depth_path):
-            with open(original_min_depth_path, "w") as f:
-                json.dump({"min_depth": float(self.topo.min_depth)}, f)
-
-        # 2. Create original snapshot file if missing
-        if not os.path.exists(original_path):
-            self.command_manager.save_commit(original_name)
-
-        # 3. Initialize repo if needed
-        repo = self.repo
-        if not repo.head.is_valid():
-            rel_path = os.path.relpath(original_path, self.repo_root)
-            repo.git.add(rel_path)
-            repo.index.commit(f"Initial commit: original snapshot {original_name}")
-
-        # 4. Ensure tracked in git
-        snapshot_action('ensure_tracked', self.repo_root, 
-                        file_path=original_path, commit_msg=f"Update original snapshot {original_name}")
-
     def load_commit(self, name=None, reset_to_original=False):
+        """Load snapshot/commit by name and update the editor state."""
         if name is None:
             name = self._snapshot_name.value
         if not name:
@@ -253,34 +110,38 @@ class TopoEditor(widgets.HBox):
             self.update_undo_redo_buttons()
             if hasattr(self, "_min_depth_specifier"):
                 self._min_depth_specifier.value = self.topo.min_depth
-            self._persist_last_domain(self.get_topo_id(), name)
+            self.topo.persist_last_domain(self.SNAPSHOT_DIR, self.topo.get_domain_id(), name)
         except FileNotFoundError:
             print(f"Snapshot '{name}' not found.")
 
     def apply_edit(self, cmd):
+        """Apply an edit command, update the UI, and autosave the working state."""
         self.command_manager.execute(cmd)
         self.update_undo_redo_buttons()
         self.trigger_refresh()
         self.command_manager.save_commit("_autosave_working")
 
     def undo_last_edit(self, b=None):
+        """Undo the last edit command and update the UI."""
         self.command_manager.undo()
         self.update_undo_redo_buttons()
         self._min_depth_specifier.value = self.topo.min_depth
         self.trigger_refresh()
     
     def redo_last_edit(self, b=None):
+        """Redo the last undone edit command and update the UI."""
         self.command_manager.redo()
         self.update_undo_redo_buttons()
         self._min_depth_specifier.value = self.topo.min_depth
         self.trigger_refresh()
 
     def reset(self, b=None):
+        """Reset the topo to its original state and update the UI."""
         self.command_manager.reset(
             self.topo,
             self._original_depth,
             self._original_min_depth,
-            self.get_topo_id,
+            self.topo.get_domain_id,
             min_depth_specifier=self._min_depth_specifier,
             trigger_refresh=self.trigger_refresh
         )
@@ -288,12 +149,14 @@ class TopoEditor(widgets.HBox):
         print("Topo reset to original state.")
 
     def update_undo_redo_buttons(self):
+        """Enable or disable the undo/redo buttons based on command history."""
         if hasattr(self, "_undo_button"):
             self._undo_button.disabled = not (hasattr(self.command_manager, "_undo_history") and bool(self.command_manager._undo_history))
         if hasattr(self, "_redo_button"):
             self._redo_button.disabled = not (hasattr(self.command_manager, "_redo_history") and bool(self.command_manager._redo_history))
 
     def refresh_commit_dropdown(self):
+        """Refresh the list of available commits/snapshots in the dropdown menu."""
         current_branch = get_current_branch(self.repo_root)
         options = commit_info(
             self.repo_root,
@@ -343,6 +206,7 @@ class TopoEditor(widgets.HBox):
         self.update_commit_details()
 
     def update_commit_details(self, change=None):
+        """Update the commit details based on the selected commit in the dropdown."""
         val = self._commit_dropdown.value
         if not val:
             self._commit_details.value = ""
@@ -356,30 +220,40 @@ class TopoEditor(widgets.HBox):
         )
 
     def construct_interactive_plot(self):
+        """
+        Construct the interactive matplotlib plot for the topography editor.
+
+        This sets up the main map display, colorbar, and coordinate formatting.
+        The plot is embedded in a widget for use in the Jupyter interface.
+        """
+        # Close any existing figure to avoid memory leaks
         if hasattr(self, "fig") and self.fig is not None:
             plt.close(self.fig)
             self.fig = None
             self.ax = None
 
-        plt.ioff()
+        plt.ioff()  # Turn off interactive mode for setup
 
+        # Create the figure and axis with Cartopy projection
         self.fig = plt.figure(figsize=(7, 6))
         self.ax = self.fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
 
+        # Set map extent based on grid longitude/latitude
         lon_min = float(self.topo._grid.qlon.data.min())
         lon_max = float(self.topo._grid.qlon.data.max())
         lat_min = float(self.topo._grid.qlat.data.min())
         lat_max = float(self.topo._grid.qlat.data.max())
         self.ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
 
+        # Custom coordinate formatter for mouse hover
         def format_coord(x, y):
             j, i = self.topo._grid.get_indices(y, x)
             return f'x={x:.2f}, y={y:.2f}, i={i}, j={j} depth={self.topo.depth.data[j, i]:.2f}'
         self.ax.format_coord = format_coord
 
+        # Set up colormap and plot the depth field
         self.cmap = plt.get_cmap('viridis')
         self.cmap.set_under('w')
-
         self.im = self.ax.pcolormesh(
             self.topo._grid.qlon.data,
             self.topo._grid.qlat.data,
@@ -389,24 +263,37 @@ class TopoEditor(widgets.HBox):
             transform=ccrs.PlateCarree()
         )
 
+        # Axis labels and title
         self.ax.set_title('Double click on a cell to change its depth.')
         self.ax.set_xlabel(f'x ({self.topo._grid.qlon.units})')
         self.ax.set_ylabel(f'y ({self.topo._grid.qlat.units})')
 
+        # Add colorbar for depth
         self.cbar = self.fig.colorbar(self.im, ax=self.ax, orientation='vertical', pad=0.02)
         self.cbar.set_label(f'Depth ({self.topo.depth.units})')
         self.cbar.set_ticks(MaxNLocator(integer=True))
 
+        # Enable toolbar and layout
         self.fig.canvas.toolbar_visible = True
         self.fig.canvas.toolbar_position = 'top'
         self.fig.tight_layout()
-        plt.ion()
+        plt.ion()  # Restore interactive mode
+
+        # Wrap the figure in a widget for display
         self._interactive_plot = widgets.HBox(
             children=(self.fig.canvas,),
             layout={'border_left': '1px solid grey'}
         )
 
     def construct_control_panel(self):
+        """
+        Construct the control panel widgets for the topography editor.
+
+        This includes controls for display mode, cell editing, undo/redo, 
+        snapshots, and git/domain management. The controls are grouped 
+        into logical sections for clarity.
+        """
+        # --- Display and global settings ---
         self._min_depth_specifier = widgets.BoundedFloatText(
             value=self.topo.min_depth,
             min=-1000.0,
@@ -417,7 +304,6 @@ class TopoEditor(widgets.HBox):
             layout={'width': '80%'},
             style={'description_width': 'auto'}
         )
-
         self._display_mode_toggle = widgets.ToggleButtons(
             options=['depth', 'mask', 'basinmask'],
             description='Field:',
@@ -427,8 +313,8 @@ class TopoEditor(widgets.HBox):
             style={'description_width': '40px', 'button_width': '85px'}
         )
 
+        # --- Cell editing widgets ---
         self._selected_cell_label = widgets.Label("Selected cell: None (double click to select a cell).")
-
         self._depth_specifier = widgets.FloatText(
             value=None,
             step=10.0,
@@ -439,32 +325,31 @@ class TopoEditor(widgets.HBox):
             style={'description_width': 'auto'}
         )
 
+        # --- Basin editing widgets ---
         self._basin_specifier_toggle = widgets.Button(
             description="Erase Disconnected Basins",
             disabled=True,
             layout={'width': '90%', 'display': 'flex'},
             style={'description_width': '100px'}
         )
-        
         self._basin_specifier_delete_selected = widgets.Button(
             description="Erase Selected Basin",
             disabled=True,
             layout={'width': '90%', 'display': 'flex'},
             style={'description_width': '100px'}
         )
-        
         self._basin_specifier = widgets.Label(
             value='Basin Label Number: None',
             layout={'width': '80%'},
             style={'description_width': 'auto'}
         )
 
-        # Undo/Redo
+        # --- Undo/Redo/Reset ---
         self._undo_button = widgets.Button(description='Undo', disabled=True, layout={'width': '44%'})
         self._redo_button = widgets.Button(description='Redo', disabled=True, layout={'width': '44%'})
-        # Reset
         self._reset_button = widgets.Button(description='Reset', layout={'width': '44%'}, button_style='danger')
-        # Snapshots
+
+        # --- Snapshot controls ---
         self._snapshot_name = widgets.Text(value='', placeholder='Enter snapshot name', description='Name:', layout={'width': '90%'})
         self._commit_msg = widgets.Text(
             value='',
@@ -484,10 +369,9 @@ class TopoEditor(widgets.HBox):
         self._save_button = widgets.Button(description='Save State', layout={'width': '44%'})
         self._load_button = widgets.Button(description='Load State', layout={'width': '44%'})
 
-        # --- Git Version Control ---
-        # --- Domain Switcher ---
+        # --- Domain and git controls ---
         self._domain_dropdown = widgets.Dropdown(
-            options=self._get_domain_options(),
+            options=self.topo.get_domain_options(self.SNAPSHOT_DIR),
             description='Domain:',
             layout={'width': '90%'}
         )
@@ -505,7 +389,7 @@ class TopoEditor(widgets.HBox):
         self._git_delete_branch_button = widgets.Button(
             description='Delete Branch',
             layout={'width': '44%'},
-            button_style='danger'  # Makes it red
+            button_style='danger'
         )
         self._git_branch_dropdown = widgets.Dropdown(
             options=list_branches(self.repo_root),
@@ -513,7 +397,6 @@ class TopoEditor(widgets.HBox):
             layout={'width': '90%'}
         )
         self._git_checkout_button = widgets.Button(description='Checkout', layout={'width': '44%'})
-       
         self._git_merge_source_dropdown = widgets.Dropdown(
             options=list_branches(self.repo_root),
             description='Merge from:',
@@ -521,35 +404,30 @@ class TopoEditor(widgets.HBox):
         )
         self._git_merge_button = widgets.Button(description='Merge Branch', layout={'width': '44%'})
 
-         # Group related controls
+        # --- Group controls into logical sections ---
         display_section = widgets.VBox([
             widgets.HTML("<h3>Display</h3>"),
             self._display_mode_toggle,
         ])
-
         global_settings_section = widgets.VBox([
             widgets.HTML("<h3>Global Settings</h3>"),
             self._min_depth_specifier,
         ])
-
         cell_editing_section = widgets.VBox([
             widgets.HTML("<h3>Cell Editing</h3>"),
             self._selected_cell_label,
             self._depth_specifier,
         ])
-
         basin_section = widgets.VBox([
             widgets.HTML("<h3>Basin Selector</h3>"),
             self._basin_specifier,
-            self._basin_specifier_toggle,      
-            self._basin_specifier_delete_selected,  
+            self._basin_specifier_toggle,
+            self._basin_specifier_delete_selected,
         ])
-
         history_section = widgets.VBox([
             widgets.HTML("<h3>Edit History</h3>"),
             widgets.HBox([self._undo_button, self._redo_button, self._reset_button]),
         ])
-
         snapshot_section = widgets.VBox([
             self._snapshot_name,
             self._commit_msg,
@@ -557,7 +435,6 @@ class TopoEditor(widgets.HBox):
             self._commit_details,
             widgets.HBox([self._save_button, self._load_button]),
         ])
-
         git_section = widgets.VBox([
             self._domain_dropdown,
             self._switch_domain_button,
@@ -569,7 +446,7 @@ class TopoEditor(widgets.HBox):
             self._git_merge_button,
         ])
 
-        # Always-visible controls
+        # --- Layout: always-visible controls and advanced accordions ---
         main_controls = widgets.VBox([
             display_section,
             global_settings_section,
@@ -577,17 +454,14 @@ class TopoEditor(widgets.HBox):
             basin_section,
             history_section,
         ])
-
-        # Each advanced section in its own Accordion (so both can be open at once)
         snapshot_accordion = widgets.Accordion(children=[snapshot_section])
         snapshot_accordion.set_title(0, 'Snapshots')
         snapshot_accordion.selected_index = None  # collapsed by default
-
         git_accordion = widgets.Accordion(children=[git_section])
         git_accordion.set_title(0, 'Git Version Control')
         git_accordion.selected_index = None  # collapsed by default
 
-        # Combine everything
+        # --- Combine everything into the control panel ---
         self._control_panel = widgets.VBox([
             widgets.HTML("<h2>Topo Editor</h2>"),
             main_controls,
@@ -595,11 +469,13 @@ class TopoEditor(widgets.HBox):
             git_accordion,
         ], layout={'width': '30%', 'height': '100%', 'overflow_y': 'auto'})
 
+        # Set the current branch in the dropdown if available
         current_branch = get_current_branch(self.repo_root)
         if current_branch in self._git_branch_dropdown.options:
-            self._git_branch_dropdown.value = current_branch
+            self._git_branch_dropdown.value
 
     def refresh_display_mode(self, change):
+        """ Refresh the display mode of the topography plot based on the selected mode."""
         mode = change['new']
         if mode == 'depth':
             self.im.set_clim(vmin=self.topo.min_depth, vmax=float(np.nanmax(self.topo.depth.data)))
@@ -619,9 +495,11 @@ class TopoEditor(widgets.HBox):
         self.fig.canvas.draw_idle()
                 
     def trigger_refresh(self):
+        """Trigger a refresh of the interactive plot."""
         self.refresh_display_mode({'new': self._display_mode_toggle.value})
 
     def _select_cell(self, i, j):
+        """Select a cell in the topography grid and update the UI accordingly."""
         # Remove old patch if it exists
         if self._selected_cell is not None and len(self._selected_cell) > 2 and self._selected_cell[2] is not None and hasattr(self, "ax"):
             try:
@@ -675,34 +553,35 @@ class TopoEditor(widgets.HBox):
                     self._basin_specifier_delete_selected.disabled = True
 
     def construct_observances(self):
+        """Attach event observers and callbacks to all interactive widgets and plot elements."""
         # Display mode toggle
         self._display_mode_toggle.observe(self.refresh_display_mode, names='value', type='change')
 
-        # Double click event
+        # Double click event for cell selection on the plot
         self.fig.canvas.mpl_connect('button_press_event', self.on_double_click)
 
-        # Min depth change
+        # Min depth change observer
         self._min_depth_specifier.observe(self.on_min_depth_change, names='value', type='change')
 
         # Basin erase buttons
         self._basin_specifier_toggle.on_click(self.erase_disconnected_basins)
         self._basin_specifier_delete_selected.on_click(self.erase_selected_basin)
 
-        # Depth change
+        # Depth change observer for selected cell
         self._depth_specifier.observe(self.on_depth_change, names='value', type='change')
 
-        # Undo/Redo/Reset
+        # Undo/Redo/Reset buttons
         self._undo_button.on_click(self.undo_last_edit)
         self._redo_button.on_click(self.redo_last_edit)
         self._reset_button.on_click(self.reset)
 
-        # Snapshots
+        # Snapshot controls
         self._save_button.on_click(self.on_save_and_commit)
         self._load_button.on_click(self.on_load_button_clicked)
         self._snapshot_name.observe(lambda change: self.refresh_commit_dropdown(), names='value')
         self._commit_dropdown.observe(self.update_commit_details, names='value')
 
-        # Git
+        # Git/domain controls
         self._switch_domain_button.on_click(self.on_switch_domain)
         self._git_create_branch_button.on_click(self.on_git_create_branch)
         self._git_delete_branch_button.on_click(self.on_git_delete_branch)
@@ -718,6 +597,7 @@ class TopoEditor(widgets.HBox):
     # --- UI Callback Methods ---
 
     def on_save_and_commit(self, _btn=None):
+        """Save the current state as a snapshot and commit it to the repository."""
         name = self._snapshot_name.value.strip()
         msg = self._commit_msg.value.strip()
         if not name:
@@ -736,14 +616,15 @@ class TopoEditor(widgets.HBox):
         return
 
     def on_double_click(self, event):
+        """Handle double-click events on the plot to select a cell."""
         if event.dblclick and event.xdata is not None and event.ydata is not None:
             # Convert lon/lat to grid indices
             j, i = self.topo._grid.get_indices(event.ydata, event.xdata)
             if 0 <= i < self.nx and 0 <= j < self.ny:
                 self._select_cell(i, j)
 
-
     def on_min_depth_change(self, change):
+        """Handle changes to the minimum depth specifier."""
         old_val = self.topo.min_depth
         new_val = change['new']
         if old_val != new_val:
@@ -752,6 +633,7 @@ class TopoEditor(widgets.HBox):
             self.update_undo_redo_buttons()
 
     def erase_disconnected_basins(self, b):
+        """Erase all disconnected basins in the topography."""
         if self._selected_cell is None:
             return
         i, j, _ = self._selected_cell
@@ -767,6 +649,7 @@ class TopoEditor(widgets.HBox):
         self.update_undo_redo_buttons()
     
     def erase_selected_basin(self, b):
+        """Erase the basin associated with the currently selected cell."""
         if self._selected_cell is None:
             return
         i, j, _ = self._selected_cell
@@ -782,6 +665,7 @@ class TopoEditor(widgets.HBox):
         self.update_undo_redo_buttons()
 
     def on_depth_change(self, change):
+        """Handle changes to the depth specifier for the selected cell."""
         if self._selected_cell is None:
             return
         i, j, _ = self._selected_cell
@@ -794,6 +678,7 @@ class TopoEditor(widgets.HBox):
         self.update_undo_redo_buttons()
 
     def load_new_topo(self, new_topo):
+        """Load a new topography object and update the editor state."""
         self.topo = new_topo
         self.ny = self.topo.depth.data.shape[0]
         self.nx = self.topo.depth.data.shape[1]
@@ -804,16 +689,17 @@ class TopoEditor(widgets.HBox):
         self._original_depth = np.array(self.topo.depth.data)
         self._original_min_depth = self.topo.min_depth
         self._selected_cell = None
-        self.command_manager = TopoCommandManager(domain_id=self.get_topo_id, topo=self.topo, command_registry=COMMAND_REGISTRY, snapshot_dir=self.SNAPSHOT_DIR)
+        self.command_manager = TopoCommandManager(domain_id=self.topo.get_domain_id, topo=self.topo, command_registry=COMMAND_REGISTRY, snapshot_dir=self.SNAPSHOT_DIR)
         self.construct_control_panel()
         self.construct_interactive_plot()
         self.construct_observances()
         self.initialize_history()
         self.refresh_commit_dropdown()
         self.children = [self._control_panel, self._interactive_plot]
-        self._persist_last_domain(self.get_topo_id(), None)
+        self.topo.persist_last_domain(self.SNAPSHOT_DIR, self.topo.get_domain_id(), None)
         
     def on_load_button_clicked(self, b):
+        """Load a snapshot from the dropdown and update the editor state."""
         val = self._commit_dropdown.value
         if not val:
             print("No commit selected.")
@@ -834,7 +720,7 @@ class TopoEditor(widgets.HBox):
             return
 
         # Get current grid info
-        current_id = self.get_topo_id()
+        current_id = self.topo.get_domain_id()
         current_grid_name = current_id.get("grid_name")
         current_shape = tuple(current_id.get("shape", []))
 
@@ -855,6 +741,7 @@ class TopoEditor(widgets.HBox):
     # --- Git Callbacks ---
     
     def on_switch_domain(self, b):
+        """Switch to a different domain based on the selected dropdown value."""
         selected = self._domain_dropdown.value
         if not selected:
             print("No domain selected.")
@@ -911,11 +798,11 @@ class TopoEditor(widgets.HBox):
             original_name = f"original_{domain_id.get('grid_name')}_{shape_str}"
             original_snapshot_path = os.path.join(self.SNAPSHOT_DIR, f"{original_name}.json")
             if not os.path.exists(original_snapshot_path):
-                self.command_manager = TopoCommandManager(domain_id=self.get_topo_id, topo=new_topo, command_registry=COMMAND_REGISTRY, snapshot_dir=self.SNAPSHOT_DIR)
+                self.command_manager = TopoCommandManager(domain_id=self.topo.get_domain_id, topo=new_topo, command_registry=COMMAND_REGISTRY, snapshot_dir=self.SNAPSHOT_DIR)
                 self.command_manager.save_commit(original_name)
 
             self.load_new_topo(new_topo)
-            self._domain_dropdown.options = self._get_domain_options()
+            self._domain_dropdown.options = self.topo.get_domain_options(self.SNAPSHOT_DIR)
             self._domain_dropdown.value = selected
             self.refresh_commit_dropdown()
 
@@ -944,6 +831,7 @@ class TopoEditor(widgets.HBox):
             print(f"Failed to switch domain: {e}")
 
     def on_git_create_branch(self, b):
+        """Create a new git branch and switch to it."""
         name = self._git_branch_name.value.strip()
         if not name:
             print("Please enter a branch name.")
@@ -959,6 +847,7 @@ class TopoEditor(widgets.HBox):
 
 
     def on_git_delete_branch(self, b):
+        """Delete the specified git branch."""
         name = self._git_branch_name.value.strip()
         if not name:
             print("Please enter the branch name to delete.")
@@ -977,6 +866,7 @@ class TopoEditor(widgets.HBox):
             print(f"Error deleting branch: {str(e)}")
 
     def on_git_checkout(self, b):
+        """Checkout the specified git branch."""
         target = self._git_branch_dropdown.value
         if not target:
             print("Please select a branch to checkout.")
@@ -994,7 +884,6 @@ class TopoEditor(widgets.HBox):
             self._git_merge_source_dropdown.options = list_branches(self.repo_root)
 
             # --- Reset domain dropdown/options to reflect new branch ---
-            self._domain_options = self._get_domain_options()
             self._domain_dropdown.options = self._domain_options
 
             # Try to keep the same domain selected, or fallback to the first available
@@ -1031,6 +920,7 @@ class TopoEditor(widgets.HBox):
             print(f"Error checking out branch: {str(e)}")
 
     def on_git_merge(self, b):
+        """Merge the selected branch into the current branch."""
         source = self._git_merge_source_dropdown.value
         if not source:
             print("Select a branch to merge from.")
