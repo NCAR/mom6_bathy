@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 import scipy
 from mom6_bathy.aux import check_lon_range
-
+from mom6_bathy.grid import Grid
 
 def latlon2ji(src_lat, src_lon, lat, lon):
     nj, ni = len(src_lat), len(src_lon)
@@ -55,7 +55,38 @@ def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
 
     data = data.values
     dy, dx = np.mean(np.diff(src_lon)), np.mean(np.diff(src_lat))
+
+    
     j0, i0, j1, i1 = latlon2ji_simple(src_lat, src_lon, spr_lat, spr_lon)
+
+    # Create dummy grid for chlorophyll source data for access to get_indices
+    chl_source_grid = Grid(
+        resolution = 0.1,
+        xstart = 278.0,
+        lenx = 1.0,
+        ystart = 7.0,
+        leny = 1.0,
+        name = "seawifs",
+    )
+
+    # Set Correct CHL coordinates
+    lon2d, lat2d = np.meshgrid(src_lon, src_lat)  # shape (nj, ni)
+
+    chl_source_grid.tlon = xr.DataArray(lon2d)
+    chl_source_grid.tlat = xr.DataArray(lat2d)
+
+    # Reset KDTree
+    chl_source_grid._kdtree = None
+
+    # Get indexes for source data
+    j0,i0 = chl_source_grid.get_indices(spr_lat.ravel(),spr_lon.ravel())
+    j0 = j0.reshape(spr_lat.shape)
+    i0 = i0.reshape(spr_lon.shape)
+    j1 = j0 + 1
+    i1 = i0 + 1
+
+
+
 
     def ydist(lat0, lat1):
         return np.abs(lat1 - lat0)

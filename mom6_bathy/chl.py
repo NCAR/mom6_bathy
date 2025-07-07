@@ -176,7 +176,7 @@ def interpolate_and_fill_seawifs(
     factor = 1
     while factor * grid.ny < reg_src_nj and factor * grid.nx < reg_src_ni:
         factor += 1
-    spr_lat, spr_lon = grid.refine(factor=factor)
+    spr_lat, spr_lon = grid.refine(factor=30)
 
     # Set output path
     if output_path is None:

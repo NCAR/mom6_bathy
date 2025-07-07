@@ -637,18 +637,24 @@ class Grid:
             The j, i indices of the given tlat and tlon pair.
         """
 
-        max_tlon = self.tlon.max()
-        min_tlon = self.tlon.min()
+        max_tlon = self.tlon.max().item()
+        min_tlon = self.tlon.min().item()
 
         # Try to adjust the longitude to the range of the grid (if possible)
-        if tlon > max_tlon and (tlon - 360.0) > min_tlon:
+        if (tlon > max_tlon).any() and ((tlon - 360.0) > min_tlon).any():
             tlon -= 360.0
-        elif tlon < min_tlon and (tlon + 360.0) < max_tlon:
+        elif (tlon < min_tlon).any() and ((tlon + 360.0) < max_tlon).any():
             tlon += 360.0
-
-        dist, indices = self.kdtree.query([tlat, tlon])
+        if type(tlon) == float:
+            dist, indices = self.kdtree.query([tlat, tlon])
+        else:
+            points = np.column_stack((tlat, tlon))
+            dist, indices = self.kdtree.query(points)
+            dist = dist.reshape(tlat.shape)
+            indices = indices.reshape(tlon.shape)
+        
         j, i = np.unravel_index(indices, self.tlat.shape)
-        return int(j), int(i)
+        return j,i
 
     def plot(self, property_name):
         """
