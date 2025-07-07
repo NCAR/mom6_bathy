@@ -5,7 +5,6 @@ import ipywidgets as widgets
 import numpy as np
 import matplotlib.pyplot as plt
 import threading
-
 from mom6_bathy.vgrid import VGrid
 
 class VGridEditor(widgets.HBox):
@@ -19,21 +18,42 @@ class VGridEditor(widgets.HBox):
         self.vgrids_dir = os.path.join(self.repo_root, "VGrids")
         os.makedirs(self.vgrids_dir, exist_ok=True)
 
-        # If no vgrid provided, start with a default
         if vgrid is None:
             vgrid = VGrid.uniform(nk=10, depth=100.0)
         self.vgrid = vgrid
         self._initial_dz = np.copy(self.vgrid.dz)
 
-        self.construct_control_panel()
-        self.construct_observances()
+        # Infer ratio and grid type from dz
+        ratio_value, grid_type = self.infer_ratio_and_type(self.vgrid.dz)
+
+        # --- Disable observers during setup ---
+        self._observers_attached = False
+        self.construct_control_panel(ratio_value=ratio_value, grid_type=grid_type)
+
+        # Set widget values to match vgrid BEFORE attaching observers
+        self._nk_slider.value = self.vgrid.nk
+        self._depth_slider.value = float(self.vgrid.depth)
+        self._ratio_slider.value = ratio_value
+        self._type_toggle.value = grid_type
+
         self.plot_vgrid()
-
         super().__init__([self._control_panel, self.fig.canvas], layout=widgets.Layout(width="100%", align_items="flex-start"))
-
+        self.construct_observances()  # Attach observers only after UI is set up and values are correct
+        self._observers_attached = True
         self.refresh_commit_dropdown()
 
-    def construct_control_panel(self):
+    @staticmethod
+    def infer_ratio_and_type(dz, tol=1e-2):
+        """Infer the top/bottom ratio and grid type from dz array."""
+        dz0 = dz[0]
+        dzbot = dz[-1]
+        ratio = dzbot / dz0 if dz0 != 0 else 1.0
+        if np.isclose(ratio, 1.0, atol=tol):
+            return 1.0, "Uniform"
+        else:
+            return ratio, "Hyperbolic"
+
+    def construct_control_panel(self, ratio_value=1.0, grid_type="Uniform"):
         label_style = {'description_width': '120px'}
 
         self._nk_slider = widgets.IntSlider(
@@ -45,7 +65,7 @@ class VGridEditor(widgets.HBox):
             layout={'width': '98%'}, style=label_style
         )
         self._ratio_slider = widgets.FloatSlider(
-            value=1.0, min=0.1, max=10.0, step=0.01,
+            value=ratio_value, min=0.1, max=20.0, step=0.01,
             description="Top/Bottom Ratio:",
             layout={'width': '98%'}, style=label_style
         )
@@ -73,7 +93,7 @@ class VGridEditor(widgets.HBox):
 
         self._type_toggle = widgets.ToggleButtons(
             options=["Uniform", "Hyperbolic"],
-            value="Uniform",
+            value=grid_type,
             description="Type",
             layout={'width': '98%'}, style=label_style
         )
@@ -126,6 +146,9 @@ class VGridEditor(widgets.HBox):
         ], layout={'width': '35%', 'height': '100%'})
 
     def construct_observances(self):
+        # Only attach observers if not already attached
+        if getattr(self, "_observers_attached", False):
+            return
         self._save_button.on_click(self.save_vgrid)
         self._load_button.on_click(self.load_vgrid)
         self._reset_button.on_click(self.reset_vgrid)
@@ -244,10 +267,11 @@ class VGridEditor(widgets.HBox):
 
     def reset_vgrid(self, b=None):
         self.vgrid = VGrid(self._initial_dz.copy())
+        ratio_value, grid_type = self.infer_ratio_and_type(self.vgrid.dz)
         self._nk_slider.value = self.vgrid.nk
         self._depth_slider.value = float(self.vgrid.depth)
-        self._type_toggle.value = "Uniform"
-        self._ratio_slider.value = 1.0
+        self._type_toggle.value = grid_type
+        self._ratio_slider.value = ratio_value
         self.plot_vgrid()
 
     def refresh_commit_dropdown(self):
