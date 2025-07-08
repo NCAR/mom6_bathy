@@ -46,11 +46,11 @@ class GridEditor(widgets.HBox):
         if grid is None:
             grid = self.grid
         sanitized_name = self._sanitize_grid_name(grid.name)
-        shape_str = f"{int(grid.leny/grid.resolution)}x{int(grid.lenx/grid.resolution)}"
+        shape_str = f"{grid.ny}x{grid.nx}"
         folder = os.path.join("Grids", f"{sanitized_name}_{shape_str}")
-        snapfile = f"grid_{sanitized_name}.json"
-        json_path = os.path.join(folder, snapfile)
-        return folder, json_path
+        nc_path = os.path.join(folder, f"grid_{sanitized_name}.nc")
+        json_path = os.path.join(folder, f"grid_{sanitized_name}.json")
+        return folder, nc_path, json_path
 
     def construct_control_panel(self):
         self._snapshot_name = widgets.Text(value='', placeholder='Enter grid name', description='Name:', layout={'width': '90%'})
@@ -204,10 +204,14 @@ class GridEditor(widgets.HBox):
         self.grid.name = sanitized_name
 
         # Update folder and path for new grid
-        folder, json_path = self._get_grid_folder_and_path()
+        folder, nc_path, json_path = self._get_grid_folder_and_path()
         os.makedirs(folder, exist_ok=True)
         self.SNAPSHOT_DIR = folder
 
+        # Save the full Grid object as NetCDF
+        self.grid.to_netcdf(nc_path)
+
+        # Save metadata for UI/slider state
         domain_id = {
             "name": self.grid.name,
             "resolution": self.grid.resolution,
@@ -216,18 +220,47 @@ class GridEditor(widgets.HBox):
             "ystart": self.grid.ystart,
             "leny": self.grid.leny,
         }
-        # Save metadata
         metadata = {
             "domain_id": domain_id,
             "message": msg,
             "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "filename": os.path.basename(json_path)
+            "filename": os.path.basename(json_path),
+            "ncfile": os.path.basename(nc_path)
         }
         with open(json_path, "w") as f:
             json.dump(metadata, f, indent=2)
-        print(f"Saved grid '{os.path.basename(json_path)}' in '{folder}'.")
+        print(f"Saved grid '{os.path.basename(json_path)}' and NetCDF in '{folder}'.")
         self.refresh_commit_dropdown()
         return
+
+    def load_grid(self, b=None):
+        val = self._commit_dropdown.value
+        if not val:
+            print("No grid selected.")
+            return
+        file_path = val
+        snapshot_path = os.path.join(self.grids_dir, file_path)
+        try:
+            with open(snapshot_path, "r") as f:
+                data = json.load(f)
+            domain_id = data.get("domain_id", {})
+            ncfile = data.get("ncfile")
+            if not ncfile:
+                print("No NetCDF file recorded in metadata. Cannot load grid.")
+                return
+            nc_path = os.path.join(os.path.dirname(snapshot_path), ncfile)
+            from mom6_bathy.grid import Grid
+            self.grid = Grid.from_netcdf(nc_path)
+            # Set sliders using metadata
+            self._resolution_slider.value = float(domain_id.get("resolution"))
+            self._xstart_slider.value = float(domain_id.get("xstart"))
+            self._lenx_slider.value = float(domain_id.get("lenx"))
+            self._ystart_slider.value = float(domain_id.get("ystart"))
+            self._leny_slider.value = float(domain_id.get("leny"))
+            self.plot_grid()
+            print(f"Loaded grid '{snapshot_path}' and NetCDF '{nc_path}'.")
+        except Exception as e:
+            print(f"Failed to load grid: {e}")
 
     def sync_sliders_to_grid(self):
         try:
@@ -266,32 +299,6 @@ class GridEditor(widgets.HBox):
             name=self.grid.name
         )
         self.plot_grid()
-
-    def load_grid(self, b=None):
-        val = self._commit_dropdown.value
-        if not val:
-            print("No grid selected.")
-            return
-        file_path = val
-        snapshot_path = os.path.join(self.grids_dir, file_path)
-        try:
-            with open(snapshot_path, "r") as f:
-                data = json.load(f)
-            domain_id = data.get("domain_id", {})
-            from mom6_bathy.grid import Grid
-            self.grid = Grid(
-                name=domain_id.get("name"),
-                resolution=domain_id.get("resolution"),
-                xstart=domain_id.get("xstart"),
-                lenx=domain_id.get("lenx"),
-                ystart=domain_id.get("ystart"),
-                leny=domain_id.get("leny"),
-            )
-            self.sync_sliders_to_grid()
-            self.plot_grid()
-            print(f"Loaded grid '{snapshot_path}'.")
-        except Exception as e:
-            print(f"Failed to load grid: {e}")
 
     def reset_grid(self, b=None):
         from mom6_bathy.grid import Grid

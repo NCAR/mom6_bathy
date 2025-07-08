@@ -20,10 +20,9 @@ class TopoEditor(widgets.HBox):
         self.nx = self.topo.depth.data.shape[1]
 
         # --- Per-Grid Repo Logic ---
-        self.SNAPSHOT_DIR = get_domain_dir(self.topo._grid, base_dir=snapshot_dir)
-        os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
-        self.repo = repo_action(self.SNAPSHOT_DIR)
-        self.repo_root = self.SNAPSHOT_DIR
+        self.SNAPSHOT_DIR = self.topo.SNAPSHOT_DIR
+        self.repo = self.topo.repo
+        self.repo_root = self.topo.repo_root
 
         # --- Command Manager ---
         self.current_branch = get_current_branch(self.repo_root)
@@ -191,11 +190,6 @@ class TopoEditor(widgets.HBox):
                 new_label = f"{label} [Grid: {grid_name}, Shape: {shape}]"
                 filtered_options.append((new_label, value))
 
-        # Sort by file modification time, newest first
-        filtered_options.sort(
-            key=lambda x: os.path.getmtime(os.path.join(self.repo_root, x[1][1])),
-            reverse=True
-        )
         self._commit_dropdown.options = filtered_options if filtered_options else []
         if filtered_options:
             option_values = [v for (l, v) in filtered_options]
@@ -706,127 +700,84 @@ class TopoEditor(widgets.HBox):
             return
         commit_sha, file_path = val
         snapshot_name = os.path.splitext(os.path.basename(file_path))[0]
+        self.reset()
+        self.load_commit(name=snapshot_name)
+        self.refresh_commit_dropdown()
+        # Set dropdown to the just-loaded commit if present
+        for label, value in self._commit_dropdown.options:
+            if os.path.splitext(os.path.basename(value[1]))[0] == snapshot_name:
+                self._commit_dropdown.value = value
+                break
+        print(f"Loaded snapshot '{snapshot_name}' for current grid.")
 
-        # Load the snapshot's grid info
-        abs_path = os.path.join(self.repo_root, file_path)
-        try:
-            with open(abs_path, "r") as f:
-                data = json.load(f)
-            domain_id = data.get("domain_id", {})
-            snapshot_grid_name = domain_id.get("grid_name")
-            snapshot_shape = tuple(domain_id.get("shape", []))
-        except Exception as e:
-            print(f"Could not read snapshot grid info: {e}")
-            return
-
-        # Get current grid info
-        current_id = self.topo.get_domain_id()
-        current_grid_name = current_id.get("grid_name")
-        current_shape = tuple(current_id.get("shape", []))
-
-        # Only allow loading if grid matches current domain
-        if (snapshot_grid_name == current_grid_name) and (snapshot_shape == current_shape):
-            self.reset()
-            self.load_commit(name=snapshot_name)
-            self.refresh_commit_dropdown()
-            # Set dropdown to the just-loaded commit if present
-            for label, value in self._commit_dropdown.options:
-                if os.path.splitext(os.path.basename(value[1]))[0] == snapshot_name:
-                    self._commit_dropdown.value = value
-                    break
-            print(f"Loaded snapshot '{snapshot_name}' for current grid.")
-        else:
-            print(f"Snapshot '{snapshot_name}' does not match the current domain/grid. Use the domain switcher to change domains.")
-            
     # --- Git Callbacks ---
     
     def on_switch_domain(self, b):
         """Switch to a different domain based on the selected dropdown value."""
         selected = self._domain_dropdown.value
         if not selected:
-            print("No domain selected.")
             return
         base_dir = os.path.dirname(self.SNAPSHOT_DIR)
         domain_dir = os.path.join(base_dir, selected)
-        original_files = [
-            f for f in os.listdir(domain_dir)
-            if f.startswith("original_") and f.endswith(".json") and "min_depth" not in f
-        ]
-        if not original_files:
-            return
-        original_path = os.path.join(domain_dir, original_files[0])
         try:
-            with open(original_path, "r") as f:
-                data = json.load(f)
-            domain_id = data.get("domain_id", {})
-
-            from mom6_bathy.grid import Grid
-            from mom6_bathy.topo import Topo
-            grid_kwargs = dict(
-                lenx=domain_id.get("lenx"),
-                leny=domain_id.get("leny"),
-                resolution=domain_id.get("resolution"),
-                xstart=domain_id.get("xstart"),
-                ystart=domain_id.get("ystart"),
-                name=domain_id.get("grid_name")
-            )
-            grid_kwargs = {k: v for k, v in grid_kwargs.items() if v is not None}
-            new_grid = Grid(**grid_kwargs)
-            shape = tuple(domain_id.get("shape", []))
-            shape_str = f"{shape[0]}x{shape[1]}"
-            self.SNAPSHOT_DIR = get_domain_dir(new_grid)
-            os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
-            self.repo = repo_action(self.SNAPSHOT_DIR)
-            self.repo_root = self.SNAPSHOT_DIR
-
-            original_min_depth_path = os.path.join(self.SNAPSHOT_DIR, f"original_min_depth_{domain_id.get('grid_name')}_{shape_str}.json")
-            if os.path.exists(original_min_depth_path):
-                with open(original_min_depth_path, "r") as f:
-                    d = json.load(f)
-                    min_depth = d.get("min_depth", 9.5)
-            else:
-                min_depth = 9.5
-            new_topo = Topo(new_grid, min_depth)
-            original_topo_path = os.path.join(self.SNAPSHOT_DIR, f"original_topo_{domain_id.get('grid_name')}_{shape_str}.npy")
-            if os.path.exists(original_topo_path):
-                loaded = np.load(original_topo_path)
-                new_topo._depth = xr.DataArray(
-                    loaded.copy(),
-                    dims=["ny", "nx"],
-                    attrs={"units": "m"},
-                )
-            original_name = f"original_{domain_id.get('grid_name')}_{shape_str}"
-            original_snapshot_path = os.path.join(self.SNAPSHOT_DIR, f"{original_name}.json")
-            if not os.path.exists(original_snapshot_path):
-                self.command_manager = TopoCommandManager(domain_id=self.topo.get_domain_id, topo=new_topo, command_registry=COMMAND_REGISTRY, snapshot_dir=self.SNAPSHOT_DIR)
-                self.command_manager.save_commit(original_name)
-
+            new_topo = self.topo.from_domain_dir(domain_dir)
             self.load_new_topo(new_topo)
-            self._domain_dropdown.options = self.topo.get_domain_options(self.SNAPSHOT_DIR)
+            snapshot_dir = self.SNAPSHOT_DIR
+            self._domain_dropdown.options = self.topo.get_domain_options(snapshot_dir)
             self._domain_dropdown.value = selected
             self.refresh_commit_dropdown()
 
-            user_snapshots = [
-                f for f in os.listdir(self.SNAPSHOT_DIR)
-                if (
-                    f.endswith('.json')
-                    and not f.startswith('original_')
-                    and not f.startswith('.')
-                    and not f.startswith('_')
-                    and not f.startswith('history_')
-                )
-            ]
-            if user_snapshots:
-                # Find the most recent user snapshot (not original, not autosave/history)
-                user_snapshots.sort(key=lambda f: os.path.getmtime(os.path.join(self.SNAPSHOT_DIR, f)), reverse=True)
-                latest_snapshot = user_snapshots[0]
-                latest_name = latest_snapshot.replace(".json", "")
-                self.load_commit(latest_name)
+            # Use commit_info to get all available snapshots for this branch
+            current_branch = get_current_branch(self.repo_root)
+            options = commit_info(
+                self.repo_root,
+                file_pattern="*.json", 
+                root_only=True,      
+                change_types=("D"),
+                mode='list',
+                branch=current_branch
+            )
+
+            # Get grid info for the new topo
+            grid_name = new_topo._grid.name
+            shape_tuple = tuple([d - 1 for d in new_topo._grid.qlon.shape])
+
+            # Find the latest snapshot for this grid/shape
+            latest_snapshot = None
+            latest_mtime = -1
+            for (label, value) in options:
+                abs_path = os.path.join(self.repo_root, value[1])
+                if not abs_path.endswith('.json') or not os.path.exists(abs_path):
+                    continue
+                try:
+                    with open(abs_path, "r") as f:
+                        data = json.load(f)
+                    domain_id = data.get("domain_id", {})
+                    if (
+                        domain_id.get("grid_name") == grid_name and
+                        tuple(domain_id.get("shape", [])) == shape_tuple
+                    ):
+                        mtime = os.path.getmtime(abs_path)
+                        if mtime > latest_mtime:
+                            latest_snapshot = os.path.splitext(os.path.basename(abs_path))[0]
+                            latest_mtime = mtime
+                except Exception:
+                    continue
+
+            if latest_snapshot:
+                self.load_commit(latest_snapshot)
+                print(f"Switched to domain '{selected}' and loaded latest snapshot '{latest_snapshot}'.")
             else:
+                # Fallback: try to load original or reset
+                shape_str = f"{shape_tuple[0]}x{shape_tuple[1]}"
+                original_name = f"original_{grid_name}_{shape_str}"
+                original_snapshot_path = os.path.join(snapshot_dir, f"{original_name}.json")
                 if os.path.exists(original_snapshot_path):
                     self.load_commit(original_name)
+                    print(f"Switched to domain '{selected}' and loaded original snapshot '{original_name}'.")
                 else:
                     self.reset()
+                    print(f"Switched to domain '{selected}' but no snapshot found, reset to original state.")
         except Exception as e:
             print(f"Failed to switch domain: {e}")
 

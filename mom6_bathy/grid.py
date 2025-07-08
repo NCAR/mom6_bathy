@@ -848,3 +848,79 @@ class Grid:
             self._supergrid.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"}
         )
         ds.to_netcdf(path)
+
+    def to_netcdf(self, path):
+        ny, nx = self.tlon.shape
+        nyp, nxp = self.qlon.shape
+
+        ds = xr.Dataset(
+            {
+                "tlon": (["ny", "nx"], self.tlon.values),
+                "tlat": (["ny", "nx"], self.tlat.values),
+                "ulon": (["ny", "nxp"], self.ulon.values),
+                "ulat": (["ny", "nxp"], self.ulat.values),
+                "vlon": (["nyp", "nx"], self.vlon.values),
+                "vlat": (["nyp", "nx"], self.vlat.values),
+                "qlon": (["nyp", "nxp"], self.qlon.values),
+                "qlat": (["nyp", "nxp"], self.qlat.values),
+                "dxt": (["ny", "nx"], self.dxt.values),
+                "dyt": (["ny", "nx"], self.dyt.values),
+                "dxCv": (["ny", "nx"], self.dxCv.values),
+                "dyCu": (["ny", "nx"], self.dyCu.values),
+                "dxCu": (["ny", "nx"], self.dxCu.values),
+                "dyCv": (["ny", "nx"], self.dyCv.values),
+                "angle": (["ny", "nx"], self.angle.values),
+                "angle_q": (["nyp", "nxp"], self.angle_q.values),
+                "tarea": (["ny", "nx"], self.tarea.values),
+            },
+            coords={
+                "ny": np.arange(ny),
+                "nx": np.arange(nx),
+                "nyp": np.arange(nyp),
+                "nxp": np.arange(nxp),
+            }
+        )
+        ds.attrs.update({
+            "name": self.name,
+            "lenx": self.lenx,
+            "leny": self.leny,
+            "resolution": self.resolution,
+            "xstart": self.xstart,
+            "ystart": self.ystart,
+            "nx": self.nx,
+            "ny": self.ny,
+            "date_created": datetime.now().isoformat(),
+        })
+        ds.to_netcdf(path)
+
+    @classmethod
+    def from_netcdf(cls, path):
+        ds = xr.open_dataset(path)
+        grid = cls(
+            lenx=float(ds.attrs["lenx"]),
+            leny=float(ds.attrs["leny"]),
+            resolution=float(ds.attrs["resolution"]),
+            xstart=float(ds.attrs["xstart"]),
+            ystart=float(ds.attrs["ystart"]),
+            name=ds.attrs.get("name", None),
+        )
+        # Assign arrays directly to avoid recomputation
+        grid.tlon = ds["tlon"]
+        grid.tlat = ds["tlat"]
+        grid.ulon = ds["ulon"]
+        grid.ulat = ds["ulat"]
+        grid.vlon = ds["vlon"]
+        grid.vlat = ds["vlat"]
+        grid.qlon = ds["qlon"]
+        grid.qlat = ds["qlat"]
+        grid.dxt = ds["dxt"]
+        grid.dyt = ds["dyt"]
+        grid.dxCv = ds["dxCv"]
+        grid.dyCu = ds["dyCu"]
+        grid.dxCu = ds["dxCu"]
+        grid.dyCv = ds["dyCv"]
+        grid.angle = ds["angle"]
+        grid.angle_q = ds["angle_q"]
+        grid.tarea = ds["tarea"]
+        # Add more arrays if needed
+        return grid

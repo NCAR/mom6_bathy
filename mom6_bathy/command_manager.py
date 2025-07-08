@@ -62,22 +62,24 @@ class CommandManager(ABC):
         with open(fname, "w") as f:
             json.dump(data, f)
 
-    def load_commit(self, name, command_registry, *args, **kwargs):
+    def load_commit(self, name, command_registry, topo, reset_to_original=False):
         fname = os.path.join(self.snapshot_dir, f"{name}.json")
         if not os.path.exists(fname):
             raise FileNotFoundError(f"No snapshot named {name}")
         with open(fname, "r") as f:
             data = json.load(f)
-        snapshot_domain = data.get("domain_id", {})
-        current_domain = self.get_domain_id()
-        if snapshot_domain != current_domain:
-            # Accept domain change silently for TopoEditor
-            pass
+        # Restore topo state using Topo's method if possible
+        if hasattr(topo, "update_from_snapshot_dict"):
+            topo.update_from_snapshot_dict(data)
+        elif hasattr(type(topo), "from_snapshot_file"):
+            pass  # Already handled in TopoEditor if needed
+
+        # Restore histories
         self._undo_history = [
-            command_registry[d['type']].deserialize(d)(*args, **kwargs) for d in data["undo_history"]
+            command_registry[d['type']].deserialize(d)(topo) for d in data.get("undo_history", [])
         ]
         self._redo_history = [
-            command_registry[d['type']].deserialize(d)(*args, **kwargs) for d in data["redo_history"]
+            command_registry[d['type']].deserialize(d)(topo) for d in data.get("redo_history", [])
         ]
         self.replay()
 
@@ -176,7 +178,6 @@ class TopoCommandManager(CommandManager):
         any user edits or modifications have been applied.
         """
         if reset_to_original: 
-            # If true, topo is reset to the original state. If false, in-memory state is used.
             topo_id = self.get_domain_id()
             grid_name = topo_id['grid_name']
             shape = topo_id['shape']
