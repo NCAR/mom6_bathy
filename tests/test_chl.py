@@ -1,9 +1,17 @@
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
 from mom6_bathy.chl import interpolate_and_fill_seawifs
-from .utils import on_cisl_machine
 import pytest
 import os
+"""Functions that are used in tests."""
+
+import socket
+
+
+def on_cisl_machine():
+    """Return True if the current machine is a CISL machine, False otherwise."""
+    fqdn = socket.getfqdn()
+    return "hpc.ucar.edu" in fqdn
 
 
 def test_chl(tmp_path):
@@ -26,7 +34,7 @@ def test_chl(tmp_path):
         grid,
         topo,
         processed_seawifs_path="/glade/campaign/cesm/cesmdata/cseg/inputdata/ocn/mom/croc/chl/data/SeaWIFS.L3m.MC.CHL.chlor_a.0.25deg.nc",
-        output_path=tmp_path / "seawifs-clim-1997-2010-pan2.nc",
+        output_path="seawifs-clim-1997-2010-pan-xesmf.nc",
     )
 
-    assert os.path.exists(tmp_path / "seawifs-clim-1997-2010-pan2.nc")
+    assert os.path.exists("seawifs-clim-1997-2010-pan-xesmf.nc")

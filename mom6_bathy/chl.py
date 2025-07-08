@@ -162,7 +162,7 @@ def interpolate_and_fill_seawifs(
 
     # Subset the source latitude and longitude indices
     lat_mask = (src_lat >= min_lat) & (src_lat <= max_lat)
-    lon_mask = (src_lon >= min_lon-360) & (src_lon <= max_lon-360)
+    lon_mask = (src_lon >= min_lon - 360) & (src_lon <= max_lon - 360)
 
     # Subset the source data and coordinates
     src_lat_regional = src_lat[lat_mask]
@@ -176,7 +176,7 @@ def interpolate_and_fill_seawifs(
     factor = 1
     while factor * grid.ny < reg_src_nj and factor * grid.nx < reg_src_ni:
         factor += 1
-    spr_lat, spr_lon = grid.refine(factor=30)
+    spr_lat, spr_lon = grid.refine(factor=factor)
 
     # Set output path
     if output_path is None:

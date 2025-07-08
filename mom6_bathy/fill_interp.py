@@ -3,6 +3,9 @@ import xarray as xr
 import scipy
 from mom6_bathy.aux import check_lon_range
 from mom6_bathy.grid import Grid
+import xesmf as xe
+from os.path import isfile
+
 
 def latlon2ji(src_lat, src_lon, lat, lon):
     nj, ni = len(src_lat), len(src_lon)
@@ -56,17 +59,16 @@ def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
     data = data.values
     dy, dx = np.mean(np.diff(src_lon)), np.mean(np.diff(src_lat))
 
-    
     j0, i0, j1, i1 = latlon2ji_simple(src_lat, src_lon, spr_lat, spr_lon)
 
     # Create dummy grid for chlorophyll source data for access to get_indices
     chl_source_grid = Grid(
-        resolution = 0.1,
-        xstart = 278.0,
-        lenx = 1.0,
-        ystart = 7.0,
-        leny = 1.0,
-        name = "seawifs",
+        resolution=0.1,
+        xstart=278.0,
+        lenx=1.0,
+        ystart=7.0,
+        leny=1.0,
+        name="seawifs",
     )
 
     # Set Correct CHL coordinates
@@ -78,15 +80,23 @@ def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
     # Reset KDTree
     chl_source_grid._kdtree = None
 
-    # Get indexes for source data
-    j0,i0 = chl_source_grid.get_indices(spr_lat.ravel(),spr_lon.ravel())
-    j0 = j0.reshape(spr_lat.shape)
-    i0 = i0.reshape(spr_lon.shape)
-    j1 = j0 + 1
-    i1 = i0 + 1
+    # # Get indexes for source data
+    # j0,i0 = chl_source_grid.get_indices(spr_lat.ravel(),spr_lon.ravel())
+    # j0 = j0.reshape(spr_lat.shape)
+    # i0 = i0.reshape(spr_lon.shape)
+    # j1 = j0 + 1
+    # i1 = i0 + 1
 
-
-
+    src = {"lon": lon2d, "lat": lat2d}
+    dst = {"lon": spr_lon.squeeze(), "lat": spr_lat.squeeze()}
+    regridder = xe.Regridder(
+        src,
+        dst,
+        "bilinear",
+        filename="bilin_weights.nc",
+        reuse_weights=isfile("bilin_weights.nc"),
+    )
+    result = regridder(data)
 
     def ydist(lat0, lat1):
         return np.abs(lat1 - lat0)
@@ -99,9 +109,10 @@ def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
     w_n = ydist(src_lat[j0], spr_lat) / dy
     w_s = 1.0 - w_n
 
-    return (w_s * w_w * data[j0, i0] + w_n * w_e * data[j1, i1]) + (
+    r2 = (w_s * w_w * data[j0, i0] + w_n * w_e * data[j1, i1]) + (
         w_n * w_w * data[j1, i0] + w_s * w_e * data[j0, i1]
     )
+    return result[..., np.newaxis, np.newaxis]
 
 
 def fill_missing_data(idata, mask, maxiter=0, stabilizer=1.0e-14, tripole=False):
