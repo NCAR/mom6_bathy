@@ -1,8 +1,5 @@
 import os
-import re
-import json
 import numpy as np
-import datetime
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
@@ -14,7 +11,6 @@ class GridEditor(widgets.HBox):
         self.grid = grid
         self.repo_root = repo_root if repo_root is not None else os.getcwd()
         self.grids_dir = os.path.join(self.repo_root, "Grids")
-        os.makedirs(self.grids_dir, exist_ok=True)
         self._initial_params = {
             "lenx": grid.lenx,
             "leny": grid.leny,
@@ -41,17 +37,7 @@ class GridEditor(widgets.HBox):
 
         self.refresh_commit_dropdown()
         self.plot_grid()
-
-    def _get_grid_folder_and_path(self, grid=None):
-        if grid is None:
-            grid = self.grid
-        sanitized_name = self._sanitize_grid_name(grid.name)
-        shape_str = f"{grid.ny}x{grid.nx}"
-        folder = os.path.join("Grids", f"{sanitized_name}_{shape_str}")
-        nc_path = os.path.join(folder, f"grid_{sanitized_name}.nc")
-        json_path = os.path.join(folder, f"grid_{sanitized_name}.json")
-        return folder, nc_path, json_path
-
+    
     def construct_control_panel(self):
         self._snapshot_name = widgets.Text(value='', placeholder='Enter grid name', description='Name:', layout={'width': '90%'})
         self._commit_msg = widgets.Text(value='', placeholder='Enter grid message', description='Message:', layout={'width': '90%'})
@@ -185,9 +171,6 @@ class GridEditor(widgets.HBox):
         except Exception as e:
             print(f"Failed to draw scale bar: {e}")
 
-    def _sanitize_grid_name(self, name):
-        return re.sub(r'[^A-Za-z0-9_]+', '_', name)
-
     def save_grid(self, _btn=None):
         name = self._snapshot_name.value.strip()
         msg = self._commit_msg.value.strip()
@@ -200,35 +183,16 @@ class GridEditor(widgets.HBox):
 
         if name.lower().endswith('.json'):
             name = name[:-5]
-        sanitized_name = self._sanitize_grid_name(name)
+        sanitized_name = self.grid.sanitize_name(name)
         self.grid.name = sanitized_name
 
-        # Update folder and path for new grid
-        folder, nc_path, json_path = self._get_grid_folder_and_path()
-        os.makedirs(folder, exist_ok=True)
+        # Use Grid's path logic
+        folder, nc_path, json_path = self.grid._get_folder_and_paths(self.repo_root)
         self.SNAPSHOT_DIR = folder
 
-        # Save the full Grid object as NetCDF
         self.grid.to_netcdf(nc_path)
+        self.grid.save_metadata(json_path, msg, ncfile=nc_path)
 
-        # Save metadata for UI/slider state
-        domain_id = {
-            "name": self.grid.name,
-            "resolution": self.grid.resolution,
-            "xstart": self.grid.xstart,
-            "lenx": self.grid.lenx,
-            "ystart": self.grid.ystart,
-            "leny": self.grid.leny,
-        }
-        metadata = {
-            "domain_id": domain_id,
-            "message": msg,
-            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "filename": os.path.basename(json_path),
-            "ncfile": os.path.basename(nc_path)
-        }
-        with open(json_path, "w") as f:
-            json.dump(metadata, f, indent=2)
         print(f"Saved grid '{os.path.basename(json_path)}' and NetCDF in '{folder}'.")
         self.refresh_commit_dropdown()
         return
@@ -238,19 +202,17 @@ class GridEditor(widgets.HBox):
         if not val:
             print("No grid selected.")
             return
-        file_path = val
-        snapshot_path = os.path.join(self.grids_dir, file_path)
+        # Use Grid's path logic to get the full path to the JSON
+        snapshot_path = os.path.join(self.grids_dir, val)
         try:
-            with open(snapshot_path, "r") as f:
-                data = json.load(f)
+            data = self.grid.load_metadata(snapshot_path)
             domain_id = data.get("domain_id", {})
             ncfile = data.get("ncfile")
             if not ncfile:
                 print("No NetCDF file recorded in metadata. Cannot load grid.")
                 return
             nc_path = os.path.join(os.path.dirname(snapshot_path), ncfile)
-            from mom6_bathy.grid import Grid
-            self.grid = Grid.from_netcdf(nc_path)
+            self.grid = self.grid.from_netcdf(nc_path)
             # Set sliders using metadata
             self._resolution_slider.value = float(domain_id.get("resolution"))
             self._xstart_slider.value = float(domain_id.get("xstart"))
@@ -296,7 +258,8 @@ class GridEditor(widgets.HBox):
             resolution=self._resolution_slider.value,
             xstart=self._xstart_slider.value,
             ystart=self._ystart_slider.value,
-            name=self.grid.name
+            name=self.grid.name,
+            save_on_create=False  # Avoid saving on every slider change
         )
         self.plot_grid()
 
@@ -304,7 +267,7 @@ class GridEditor(widgets.HBox):
         from mom6_bathy.grid import Grid
         params = self._initial_params
         name = self._snapshot_name.value.strip() or params["name"]
-        sanitized_name = self._sanitize_grid_name(name)
+        sanitized_name = self.grid.sanitize_name(name)
         self.grid = Grid(
             lenx=params["lenx"],
             leny=params["leny"],
@@ -317,24 +280,25 @@ class GridEditor(widgets.HBox):
         self.plot_grid()
 
     def refresh_commit_dropdown(self):
-        grid_jsons = []
-        for root, dirs, files in os.walk(self.grids_dir):
-            for fname in files:
-                if fname.startswith("grid_") and fname.endswith(".json"):
-                    rel_dir = os.path.relpath(root, self.grids_dir)
-                    rel_path = os.path.join(rel_dir, fname) if rel_dir != "." else fname
-                    grid_jsons.append(rel_path)
+        grid_jsons = self.grid.list_metadata_files(self.grids_dir)
         options = []
         for rel_path in grid_jsons:
             abs_path = os.path.join(self.grids_dir, rel_path)
             try:
-                with open(abs_path, "r") as f:
-                    data = json.load(f)
+                data = self.grid.load_metadata(abs_path)
                 msg = data.get("message", "")
                 date = data.get("date", "")
-                label = f"{os.path.basename(rel_path)}"
+                domain_id = data.get("domain_id", {})
+                # Extract shape from folder name if possible
+                folder_name = os.path.basename(os.path.dirname(abs_path))
+                # Remove 'grid_' prefix from file name
+                base_name = os.path.basename(rel_path)
+                if base_name.startswith("grid_"):
+                    base_name = base_name[5:]
+                # Compose label: name_shape (from folder), or fallback to name
+                label = f"{folder_name}" if "_" in folder_name else f"{domain_id.get('name', '')}"
                 options.append((label, rel_path))
-            except Exception as e:
+            except Exception:
                 continue
 
         # Sort by file modification time, newest first
@@ -360,8 +324,7 @@ class GridEditor(widgets.HBox):
         file_path = val
         abs_path = os.path.join(self.grids_dir, file_path)
         try:
-            with open(abs_path, "r") as f:
-                data = json.load(f)
+            data = self.grid.load_metadata(abs_path)
             msg = data.get("message", "")
             date = data.get("date", "")
             domain_id = data.get("domain_id", {})

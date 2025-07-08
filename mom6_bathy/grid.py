@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 import numpy as np
 import xarray as xr
+import json
 from scipy.spatial import cKDTree
 from midas.rectgrid_gen import supergrid as MidasSupergrid
 
@@ -65,6 +66,7 @@ class Grid:
         tripolar_n: bool = False,
         displace_pole: bool = False,
         name: Optional[str] = None,
+        save_on_create: bool = True
     ) -> None:
         self.lenx = lenx
         self.leny = leny
@@ -147,7 +149,11 @@ class Grid:
             displace_pole=displace_pole,
         )
 
+        # Create the Grids folder for this grid instance
+        if self.name and save_on_create:
+            self._initialize_on_disk(message="Initial grid creation")
 
+    
     @property
     def name(self) -> str:
         """Name of the grid."""
@@ -162,8 +168,12 @@ class Grid:
     
     @name.setter
     def name(self, new_name: str) -> None:
-        assert new_name is None or new_name.replace("_", "").isalnum(), "Grid name must be alphanumeric"
-        self._name = new_name
+        if new_name is not None:
+            sanitized = self.sanitize_name(new_name)
+            assert sanitized.replace("_", "").isalnum(), "Grid name must be alphanumeric"
+            self._name = sanitized
+        else:
+            self._name = None
     
     def __getitem__(self, slices) -> xr.DataArray:
         """
@@ -347,6 +357,11 @@ class Grid:
         # If there are 3 lines (i.e., 2 or more cells with the same x coordinate),
         # the grid is tripolar
         return nlines == 3
+    
+    @staticmethod
+    def sanitize_name(name):
+        import re
+        return re.sub(r'[^A-Za-z0-9_]+', '_', name)
     
     def is_rectangular(self, rtol=1e-3) -> bool:
         """Check if the grid is a rectangular lat-lon grid by comparing the
@@ -849,7 +864,74 @@ class Grid:
         )
         ds.to_netcdf(path)
 
+    def _initialize_on_disk(self, message="Initial grid creation"):
+        """
+        Create the Grids folder (if needed) and save .nc and .json files for this grid.
+        """
+        if not self.name:
+            raise ValueError("Grid must have a name to initialize on disk.")
+
+        folder, nc_path, json_path = self._get_folder_and_paths()
+        os.makedirs(folder, exist_ok=True)
+
+        # Save NetCDF
+        self.to_netcdf(nc_path)
+
+        # Save metadata JSON
+        domain_id = {
+            "name": self.name,
+            "resolution": self.resolution,
+            "xstart": self.xstart,
+            "lenx": self.lenx,
+            "ystart": self.ystart,
+            "leny": self.leny,
+        }
+        metadata = {
+            "domain_id": domain_id,
+            "message": message,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "filename": os.path.basename(json_path),
+            "ncfile": os.path.basename(nc_path)
+        }
+        with open(json_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+    def _get_grid_folder(self, root_dir=None, create=True):
+        """
+        Returns the folder path for this grid (optionally creates it).
+        """
+        if root_dir is None:
+            root_dir = os.getcwd()
+        folder = os.path.join(root_dir, "Grids", self.name or "UnnamedGrid")
+        if create:
+            os.makedirs(folder, exist_ok=True)
+        return folder
+
+    def _get_folder_and_paths(self, root_dir=None):
+        """
+        Returns (folder, nc_path, json_path) for this grid.
+        """
+        import os
+        sanitized_name = self.name if self.name is not None else "UnnamedGrid"
+        # Optionally, use a sanitize method if you want to enforce valid names
+        # sanitized_name = self.sanitize_name(self.name)
+        shape_str = f"{self.ny}x{self.nx}"
+        if root_dir is None:
+            root_dir = os.getcwd()
+        folder = os.path.join(root_dir, "Grids", f"{sanitized_name}_{shape_str}")
+        nc_path = os.path.join(folder, f"grid_{sanitized_name}.nc")
+        json_path = os.path.join(folder, f"grid_{sanitized_name}.json")
+        return folder, nc_path, json_path
+    
+
     def to_netcdf(self, path):
+        if path is None:
+            folder = self.get_grid_folder()
+            path = os.path.join(folder, f"{self.name}.nc")
+        else:
+            folder = os.path.dirname(path)
+            os.makedirs(folder, exist_ok=True)
+    
         ny, nx = self.tlon.shape
         nyp, nxp = self.qlon.shape
 
@@ -924,3 +1006,53 @@ class Grid:
         grid.tarea = ds["tarea"]
         # Add more arrays if needed
         return grid
+    
+    def save_metadata(self, json_path, message, ncfile=None):
+        """
+        Save grid metadata (for UI/slider state) to a JSON file.
+        """
+        domain_id = {
+            "name": self.name,
+            "resolution": self.resolution,
+            "xstart": self.xstart,
+            "lenx": self.lenx,
+            "ystart": self.ystart,
+            "leny": self.leny,
+        }
+        metadata = {
+            "domain_id": domain_id,
+            "message": message,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "filename": os.path.basename(json_path),
+            "ncfile": os.path.basename(ncfile) if ncfile else None,
+        }
+        with open(json_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+    @classmethod
+    def load_metadata(cls, json_path):
+        """
+        Load grid metadata from a JSON file.
+        Returns the metadata dictionary.
+        """
+        with open(json_path, "r") as f:
+            metadata = json.load(f)
+        return metadata
+    
+    @classmethod
+    def list_metadata_files(cls, grids_dir, filter_checkpoint=True):
+        """
+        List all grid metadata (.json) files in the given directory and subdirectories.
+
+        Returns a list of relative paths from grids_dir.
+        """
+        metadata_files = []
+        for root, dirs, files in os.walk(grids_dir):
+            for fname in files:
+                if fname.startswith("grid_") and fname.endswith(".json"):
+                    if filter_checkpoint and "-checkpoint" in fname:
+                        continue
+                    rel_dir = os.path.relpath(root, grids_dir)
+                    rel_path = os.path.join(rel_dir, fname) if rel_dir != "." else fname
+                    metadata_files.append(rel_path)
+        return metadata_files

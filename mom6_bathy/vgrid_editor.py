@@ -19,7 +19,7 @@ class VGridEditor(widgets.HBox):
         os.makedirs(self.vgrids_dir, exist_ok=True)
 
         if vgrid is None:
-            vgrid = VGrid.uniform(nk=10, depth=100.0)
+            vgrid = VGrid.uniform(nk=10, depth=100.0, save_on_create=False, repo_root=self.repo_root)
         self.vgrid = vgrid
         self._initial_dz = np.copy(self.vgrid.dz)
 
@@ -38,13 +38,12 @@ class VGridEditor(widgets.HBox):
 
         self.plot_vgrid()
         super().__init__([self._control_panel, self.fig.canvas], layout=widgets.Layout(width="100%", align_items="flex-start"))
-        self.construct_observances()  # Attach observers only after UI is set up and values are correct
+        self.construct_observances()
         self._observers_attached = True
         self.refresh_commit_dropdown()
 
     @staticmethod
     def infer_ratio_and_type(dz, tol=1e-2):
-        """Infer the top/bottom ratio and grid type from dz array."""
         dz0 = dz[0]
         dzbot = dz[-1]
         ratio = dzbot / dz0 if dz0 != 0 else 1.0
@@ -79,10 +78,8 @@ class VGridEditor(widgets.HBox):
 
         def show_help(change=None):
             self.ratio_help.layout.display = 'block'
-            # Cancel any previous timer
             if self._ratio_help_timer is not None:
                 self._ratio_help_timer.cancel()
-            # Start a new timer to hide after 3 seconds
             self._ratio_help_timer = threading.Timer(3.0, hide_help)
             self._ratio_help_timer.start()
 
@@ -127,7 +124,7 @@ class VGridEditor(widgets.HBox):
             self._nk_slider,
             self._depth_slider,
             self._ratio_slider,
-            self.ratio_help,  # Only shows on focus
+            self.ratio_help,
             self._reset_button,
         ], layout=widgets.Layout(width="100%", align_items="stretch", overflow_y="visible"))
         
@@ -146,7 +143,6 @@ class VGridEditor(widgets.HBox):
         ], layout={'width': '35%', 'height': '100%'})
 
     def construct_observances(self):
-        # Only attach observers if not already attached
         if getattr(self, "_observers_attached", False):
             return
         self._save_button.on_click(self.save_vgrid)
@@ -166,10 +162,9 @@ class VGridEditor(widgets.HBox):
             plt.ion()
         else:
             self.ax.clear()
-        # Draw horizontal lines at each interface
         for depth in self.vgrid.z:
             self.ax.axhline(y=depth, color='steelblue')
-        self.ax.set_ylim(max(self.vgrid.z) + 10, min(self.vgrid.z) - 10)  # Invert y-axis
+        self.ax.set_ylim(max(self.vgrid.z) + 10, min(self.vgrid.z) - 10)
         self.ax.set_ylabel("Depth")
         self.ax.set_title("Vertical Grid")
         self.fig.canvas.draw_idle()
@@ -179,11 +174,12 @@ class VGridEditor(widgets.HBox):
         depth = self._depth_slider.value
         ratio = self._ratio_slider.value
         grid_type = self._type_toggle.value
+        name = self.vgrid.name
         if grid_type == "Uniform":
-            self.vgrid = VGrid.uniform(nk=nk, depth=depth)
+            self.vgrid = VGrid.uniform(nk=nk, depth=depth, name=name, save_on_create=False, repo_root=self.repo_root)
             self._ratio_slider.disabled = True
         else:
-            self.vgrid = VGrid.hyperbolic(nk=nk, depth=depth, ratio=ratio)
+            self.vgrid = VGrid.hyperbolic(nk=nk, depth=depth, ratio=ratio, name=name, save_on_create=False, repo_root=self.repo_root)
             self._ratio_slider.disabled = False
         self.plot_vgrid()
 
@@ -197,29 +193,17 @@ class VGridEditor(widgets.HBox):
             print("Enter a vgrid message!")
             return
 
-        if name.lower().endswith('.nc'):
-            name = name[:-3]
-        sanitized_name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name)
-        vgrid_name = f"vgrid_{sanitized_name}"
-        vgrid_dir = os.path.join(self.vgrids_dir, vgrid_name)
-        os.makedirs(vgrid_dir, exist_ok=True)
+        sanitized_name = VGrid.sanitize_name(name)
+        self.vgrid.name = sanitized_name
 
-        # Save metadata
-        metadata = {
-            "name": sanitized_name,
-            "nk": self.vgrid.nk,
-            "depth": float(self.vgrid.depth),
-            "type": self._type_toggle.value,
-            "ratio": self._ratio_slider.value,
-            "message": msg,
-            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        meta_path = os.path.join(vgrid_dir, f"{vgrid_name}.json")
-        with open(meta_path, "w") as f:
-            json.dump(metadata, f, indent=2)
-        print(f"Saved vgrid metadata in '{vgrid_dir}'.")
+        folder, nc_path, json_path = self.vgrid._get_folder_and_paths(self.repo_root)
+        os.makedirs(folder, exist_ok=True)
+        self.vgrid.write(nc_path)
+        self.vgrid.save_metadata(json_path, msg, ncfile=nc_path)
+
+        print(f"Saved vgrid '{os.path.basename(json_path)}' and NetCDF in '{folder}'.")
         self.refresh_commit_dropdown()
-        rel_path = os.path.join(vgrid_name, f"{vgrid_name}.json")
+        rel_path = os.path.join(os.path.basename(folder), os.path.basename(json_path))
         if rel_path in [v for (_, v) in self._commit_dropdown.options]:
             self._commit_dropdown.value = rel_path
         return
@@ -231,30 +215,28 @@ class VGridEditor(widgets.HBox):
             return
         meta_path = os.path.join(self.vgrids_dir, val)
         try:
-            with open(meta_path, "r") as f:
-                data = json.load(f)
+            data = VGrid.load_metadata(meta_path)
             nk = data.get("nk", 10)
             depth = data.get("depth", 100.0)
+            name = data.get("name", None)
             ratio = data.get("ratio", 1.0)
             grid_type = data.get("type", "Uniform")
 
-            # Temporarily remove observers to avoid triggering _on_param_change
             self._nk_slider.unobserve(self._on_param_change, names="value")
             self._depth_slider.unobserve(self._on_param_change, names="value")
             self._type_toggle.unobserve(self._on_param_change, names="value")
             self._ratio_slider.unobserve(self._on_param_change, names="value")
 
             if grid_type == "Uniform":
-                self.vgrid = VGrid.uniform(nk=nk, depth=depth)
+                self.vgrid = VGrid.uniform(nk=nk, depth=depth, name=name, save_on_create=False, repo_root=self.repo_root)
             else:
-                self.vgrid = VGrid.hyperbolic(nk=nk, depth=depth, ratio=ratio)
+                self.vgrid = VGrid.hyperbolic(nk=nk, depth=depth, ratio=ratio, name=name, save_on_create=False, repo_root=self.repo_root)
 
             self._nk_slider.value = self.vgrid.nk
             self._depth_slider.value = float(self.vgrid.depth)
             self._type_toggle.value = grid_type
             self._ratio_slider.value = ratio
 
-            # Reconnect observers
             self._nk_slider.observe(self._on_param_change, names="value")
             self._depth_slider.observe(self._on_param_change, names="value")
             self._type_toggle.observe(self._on_param_change, names="value")
@@ -266,7 +248,7 @@ class VGridEditor(widgets.HBox):
             print(f"Failed to load vgrid: {e}")
 
     def reset_vgrid(self, b=None):
-        self.vgrid = VGrid(self._initial_dz.copy())
+        self.vgrid = VGrid(self._initial_dz.copy(), save_on_create=False, repo_root=self.repo_root)
         ratio_value, grid_type = self.infer_ratio_and_type(self.vgrid.dz)
         self._nk_slider.value = self.vgrid.nk
         self._depth_slider.value = float(self.vgrid.depth)
@@ -275,19 +257,12 @@ class VGridEditor(widgets.HBox):
         self.plot_vgrid()
 
     def refresh_commit_dropdown(self):
-        vgrid_jsons = []
-        for root, dirs, files in os.walk(self.vgrids_dir):
-            for fname in files:
-                if fname.startswith("vgrid_") and fname.endswith(".json"):
-                    rel_dir = os.path.relpath(root, self.vgrids_dir)
-                    rel_path = os.path.join(rel_dir, fname) if rel_dir != "." else fname
-                    vgrid_jsons.append(rel_path)
+        vgrid_jsons = VGrid.list_metadata_files(self.vgrids_dir)
         options = []
         for rel_path in vgrid_jsons:
             abs_path = os.path.join(self.vgrids_dir, rel_path)
             try:
-                with open(abs_path, "r") as f:
-                    data = json.load(f)
+                data = VGrid.load_metadata(abs_path)
                 base = os.path.basename(rel_path)
                 if base.startswith("vgrid_") and base.endswith(".json"):
                     display_name = base[len("vgrid_"):-len(".json")]
@@ -302,11 +277,10 @@ class VGridEditor(widgets.HBox):
             reverse=True
         )
         self._commit_dropdown.options = options if options else []
-        # Only set value if it is already set and still valid
         if options:
             option_values = [v for (l, v) in options]
             if self._commit_dropdown.value not in option_values:
-                self._commit_dropdown.value = None
+                self._commit_dropdown.value = options[0][1]
         else:
             self._commit_dropdown.value = None
         self.update_commit_details()
@@ -318,8 +292,7 @@ class VGridEditor(widgets.HBox):
             return
         abs_path = os.path.join(self.vgrids_dir, val)
         try:
-            with open(abs_path, "r") as f:
-                data = json.load(f)
+            data = VGrid.load_metadata(abs_path)
             details = (
                 f"<b>Name:</b> {data.get('name', '')}<br>"
                 f"<b>Date:</b> {data.get('date', '')}<br>"

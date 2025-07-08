@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import datetime
 import numpy as np
 import xarray as xr
@@ -22,6 +23,9 @@ class VGrid:
     def __init__(
         self,
         dz: np.ndarray,
+        name: str = None,
+        save_on_create: bool = True,
+        repo_root: str = None
     ):
         """Create a vertical grid.
         
@@ -31,6 +35,11 @@ class VGrid:
             Array of vertical grid spacings (meters)
         """
         self.dz = dz
+        self.name = name
+        self.repo_root = repo_root or os.getcwd()
+        if self.name and save_on_create:
+            self._initialize_on_disk(message="Initial vgrid creation")
+
 
     @property
     def nk(self):
@@ -46,12 +55,66 @@ class VGrid:
     def z(self):
         """Array of vertical grid cell center depths (meters)."""
         return np.cumsum(self.dz) - 0.5 * self.dz
+    
+    @classmethod
+    def sanitize_name(self, name):
+        import re
+        return re.sub(r'[^A-Za-z0-9_\-]+', '_', name)
+
+    def _get_folder_and_paths(self, repo_root=None):
+        sanitized_name = self.sanitize_name(self.name) if self.name else "UnnamedVGrid"
+        vgrids_dir = os.path.join(repo_root or self.repo_root, "VGrids")
+        folder = os.path.join(vgrids_dir, f"vgrid_{sanitized_name}")
+        nc_path = os.path.join(folder, f"vgrid_{sanitized_name}.nc")
+        json_path = os.path.join(folder, f"vgrid_{sanitized_name}.json")
+        return folder, nc_path, json_path
+
+    def _initialize_on_disk(self, message="Initial vgrid creation"):
+        folder, nc_path, json_path = self._get_folder_and_paths()
+        os.makedirs(folder, exist_ok=True)
+        self.write(nc_path)
+        self.save_metadata(json_path, message, ncfile=nc_path)
+
+    def save_metadata(self, json_path, message, ncfile=None):
+        metadata = {
+            "name": self.name,
+            "nk": self.nk,
+            "depth": float(self.depth),
+            "message": message,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "filename": os.path.basename(json_path),
+            "ncfile": os.path.basename(ncfile) if ncfile else None,
+        }
+        with open(json_path, "w") as f:
+            json.dump(metadata, f, indent=2)
 
     @classmethod
+    def load_metadata(cls, json_path):
+        with open(json_path, "r") as f:
+            metadata = json.load(f)
+        return metadata
+
+    @classmethod
+    def list_metadata_files(cls, vgrids_dir, filter_checkpoint=True):
+        metadata_files = []
+        for root, dirs, files in os.walk(vgrids_dir):
+            for fname in files:
+                if fname.startswith("vgrid_") and fname.endswith(".json"):
+                    if filter_checkpoint and "-checkpoint" in fname:
+                        continue
+                    rel_dir = os.path.relpath(root, vgrids_dir)
+                    rel_path = os.path.join(rel_dir, fname) if rel_dir != "." else fname
+                    metadata_files.append(rel_path)
+        return metadata_files
+    
+    @classmethod
     def uniform(
-        cls, 
-        nk: int, 
-        depth: float
+        cls,
+        nk: int,
+        depth: float,
+        name: str = None,
+        save_on_create: bool = True,
+        repo_root: str = None
     ):
         """Create a uniform vertical grid instance.
 
@@ -72,7 +135,7 @@ class VGrid:
         # update the bottom layer thickness to ensure the total depth is correct
         dz[-1] = depth - np.sum(dz[:-1])
 
-        return cls(dz)
+        return cls(dz, name=name, save_on_create=save_on_create, repo_root=repo_root)
 
 
     @classmethod
@@ -80,7 +143,10 @@ class VGrid:
         cls,
         nk: int,
         depth: float,
-        ratio: float
+        ratio: float,
+        name: str = None,
+        save_on_create: bool = True,
+        repo_root: str = None
     ):
         """Create a hyperbolic vertical grid instance. (Adapted from regional-mom6)
         
@@ -107,11 +173,17 @@ class VGrid:
         # update the bottom layer thickness to ensure the total depth is correct
         dz[-1] = depth - np.sum(dz[:-1])
 
-        return cls(dz)
+        return cls(dz, name=name, save_on_create=save_on_create, repo_root=repo_root)
 
 
     @classmethod
-    def from_file(cls, filename: str):
+    def from_file(
+        cls,
+        filename: str,
+        name: str = None,
+        save_on_create: bool = False,
+        repo_root: str = None
+    ):
         """Create a vertical grid from an existing vertical grid file.
         
         Parameters
@@ -127,7 +199,7 @@ class VGrid:
         assert 'dz' in ds, f"File {filename} does not contain a 'dz' variable"
         dz = ds['dz'].values
 
-        return cls(dz)
+        return cls(dz, name=name, save_on_create=save_on_create, repo_root=repo_root)
 
     def write(self, filename: str):
         """Write the vertical grid to a NetCDF file.
