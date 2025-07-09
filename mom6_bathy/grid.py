@@ -619,7 +619,6 @@ class Grid:
 
         # reset _kdtree such that it is recomputed when self.kdtree is accessed again
         self._kdtree = None
-
     def get_indices(self, tlat: float, tlon: float) -> tuple[int, int]:
         """
         Get the i, j indices of a given tlat and tlon pair.
@@ -637,24 +636,18 @@ class Grid:
             The j, i indices of the given tlat and tlon pair.
         """
 
-        max_tlon = self.tlon.max().item()
-        min_tlon = self.tlon.min().item()
+        max_tlon = self.tlon.max()
+        min_tlon = self.tlon.min()
 
         # Try to adjust the longitude to the range of the grid (if possible)
-        if (tlon > max_tlon).any() and ((tlon - 360.0) > min_tlon).any():
+        if tlon > max_tlon and (tlon - 360.0) > min_tlon:
             tlon -= 360.0
-        elif (tlon < min_tlon).any() and ((tlon + 360.0) < max_tlon).any():
+        elif tlon < min_tlon and (tlon + 360.0) < max_tlon:
             tlon += 360.0
-        if type(tlon) == float:
-            dist, indices = self.kdtree.query([tlat, tlon])
-        else:
-            points = np.column_stack((tlat, tlon))
-            dist, indices = self.kdtree.query(points)
-            dist = dist.reshape(tlat.shape)
-            indices = indices.reshape(tlon.shape)
-        
+
+        dist, indices = self.kdtree.query([tlat, tlon])
         j, i = np.unravel_index(indices, self.tlat.shape)
-        return j,i
+        return int(j), int(i)
 
     def plot(self, property_name):
         """

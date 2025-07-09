@@ -8,16 +8,8 @@ warnings.filterwarnings("ignore")
 import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor, CellExecutionError
 
+from utils import on_cisl_machine
 
-"""Functions that are used in tests."""
-
-import socket
-
-
-def on_cisl_machine():
-    """Return True if the current machine is a CISL machine, False otherwise."""
-    fqdn = socket.getfqdn()
-    return "hpc.ucar.edu" in fqdn
 
 def test_notebooks():
     """Run all notebooks in the ../notebooks directory."""

@@ -6,16 +6,8 @@ import xarray as xr
 
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
+from utils import on_cisl_machine
 
-"""Functions that are used in tests."""
-
-import socket
-
-
-def on_cisl_machine():
-    """Return True if the current machine is a CISL machine, False otherwise."""
-    fqdn = socket.getfqdn()
-    return "hpc.ucar.edu" in fqdn
 
 def test_is_tripolar():
     """Check if Grid.is_tripolar() and .is_cyclic_x() methods work correctly for different MOM grids."""
