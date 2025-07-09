@@ -3,6 +3,7 @@ from mom6_bathy.topo import Topo
 from mom6_bathy.chl import interpolate_and_fill_seawifs
 import pytest
 import os
+
 """Functions that are used in tests."""
 
 import socket
@@ -34,7 +35,7 @@ def test_chl(tmp_path):
         grid,
         topo,
         processed_seawifs_path="/glade/campaign/cesm/cesmdata/cseg/inputdata/ocn/mom/croc/chl/data/SeaWIFS.L3m.MC.CHL.chlor_a.0.25deg.nc",
-        output_path="seawifs-clim-1997-2010-pan-xesmf.nc",
+        output_path=tmp_path / "seawifs-clim-1997-2010-pan-xesmf.nc",
     )
 
-    assert os.path.exists("seawifs-clim-1997-2010-pan-xesmf.nc")
+    assert os.path.exists(tmp_path / "seawifs-clim-1997-2010-pan-xesmf.nc")

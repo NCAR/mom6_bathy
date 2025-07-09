@@ -9,7 +9,7 @@ from os.path import isfile
 
 def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
     """
-    Bilinear Interpolation of data from src_lat, src_lon to spr_lat, spr_lon. Does not work for global grids
+    Bilinear Interpolation of data from src_lat, src_lon to spr_lat, spr_lon.
     """
     assert check_lon_range(src_lon) == check_lon_range(
         spr_lon
@@ -27,7 +27,7 @@ def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
         reuse_weights=isfile("bilin_weights.nc"),
     )
     result = regridder(data)
-    return result[..., np.newaxis, np.newaxis]
+    return result
 
 
 def fill_missing_data(idata, mask, maxiter=0, stabilizer=1.0e-14, tripole=False):

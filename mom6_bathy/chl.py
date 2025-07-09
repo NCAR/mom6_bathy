@@ -61,27 +61,7 @@ def interpolate_and_fill_seawifs(
         (np.arange(src_ni) + 0.5) / src_ni
     ) * 360.0 + src_x0  # Recompute as doubles
 
-    # Get bounds from grid
-    min_lat, max_lat = grid.qlat.min().item(), grid.qlat.max().item()
-    min_lon, max_lon = grid.qlon.min().item(), grid.qlon.max().item()
-
-    # Subset the source latitude and longitude indices
-    lat_mask = (src_lat >= min_lat) & (src_lat <= max_lat)
-    lon_mask = (src_lon >= min_lon - 360) & (src_lon <= max_lon - 360)
-
-    # Subset the source data and coordinates
-    src_lat_regional = src_lat[lat_mask]
-    src_lon_regional = src_lon[lon_mask]
-    src_data_regional = src_data[..., lat_mask, :][..., :, lon_mask]
-
-    # 4. Set src_nj and src_ni for the regional subset
-    reg_src_nj, reg_src_ni = src_data_regional.shape[-2], src_data_regional.shape[-1]
-
-    # Refines the grid to similar resolution to the source data.
-    factor = 1
-    while factor * grid.ny < reg_src_nj and factor * grid.nx < reg_src_ni:
-        factor += 1
-    spr_lat, spr_lon = grid.refine(factor=factor)
+    spr_lat, spr_lon = grid.tlat.values, grid.tlon.values
 
     # Set output path
     if output_path is None:
@@ -109,9 +89,6 @@ def interpolate_and_fill_seawifs(
         # adj lon to -180 to 180
         adj_lon = spr_lon - 360
         q_int = super_interp(src_lat, src_lon, src_data[t, ::-1, :], spr_lat, adj_lon)
-
-        # Average it back to the original grid
-        q_int = grid.coarsen(q_int)
 
         # Fill any missing data
         q = q_int * ocn_mask
@@ -147,6 +124,9 @@ def interpolate_and_fill_seawifs(
         },
     )
     print(f"Wrote interpolated and filled SeaWiFS data to:\n{output_path}")
+
+    # Clean up weights file if it exists
+    Path("bilin_weights.nc").unlink(missing_ok=True)
 
     return chla
 
