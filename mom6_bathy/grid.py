@@ -619,7 +619,7 @@ class Grid:
 
         # reset _kdtree such that it is recomputed when self.kdtree is accessed again
         self._kdtree = None
-
+        
     def get_indices(self, tlat: float, tlon: float) -> tuple[int, int]:
         """
         Get the i, j indices of a given tlat and tlon pair.
