@@ -2,12 +2,11 @@ from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
 import xarray as xr
 import numpy as np
+import xesmf as xe
 from datetime import datetime
 from pathlib import Path
-from mom6_bathy.fill_interp import (
-    super_interp,
-    fill_missing_data,
-)
+from os.path import isfile
+from mom6_bathy.aux import fill_missing_data
 
 
 def interpolate_and_fill_seawifs(
@@ -88,7 +87,18 @@ def interpolate_and_fill_seawifs(
         # Bilinearly interpolate the source data onto the super-sampled grid
         # adj lon to -180 to 180
         adj_lon = spr_lon - 360
-        q_int = super_interp(src_lat, src_lon, src_data[t, ::-1, :], spr_lat, adj_lon)
+        data = src_data[t, ::-1, :].values
+
+        src = {"lon": adj_lon, "lat": src_lat}
+        dst = {"lon": spr_lon, "lat": spr_lat}
+        regridder = xe.Regridder(
+            src,
+            dst,
+            "bilinear",
+            filename="bilin_weights.nc",
+            reuse_weights=isfile("bilin_weights.nc"),
+        )
+        q_int = regridder(data)
 
         # Fill any missing data
         q = q_int * ocn_mask
