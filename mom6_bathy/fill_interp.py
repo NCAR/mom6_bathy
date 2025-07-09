@@ -117,7 +117,7 @@ def super_interp(src_lat, src_lon, data, spr_lat, spr_lon):
 
 def fill_missing_data(idata, mask, maxiter=0, stabilizer=1.0e-14, tripole=False):
     """
-    Returns data with masked values objectively interpolated except where mask==0. Does not assume periodicity
+    Returns data with masked values objectively interpolated except where mask==0. Does not work for periodic grids.
 
     Arguments:
     data - np.ma.array with mask==True where there is missing data or land.
