@@ -3,16 +3,7 @@ from mom6_bathy.topo import Topo
 from mom6_bathy.chl import interpolate_and_fill_seawifs
 import pytest
 import os
-
-"""Functions that are used in tests."""
-
-import socket
-
-
-def on_cisl_machine():
-    """Return True if the current machine is a CISL machine, False otherwise."""
-    fqdn = socket.getfqdn()
-    return "hpc.ucar.edu" in fqdn
+from .utils import on_cisl_machine
 
 
 def test_chl(tmp_path):
