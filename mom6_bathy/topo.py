@@ -140,14 +140,10 @@ class Topo:
 
         topo = cls(grid, min_depth)
         # Load original topo array if available
-        original_topo_path = os.path.join(snapshot_dir, f"original_topo_{domain_id.get('grid_name')}_{shape_str}.npy")
+        original_topo_path = os.path.join(snapshot_dir, f"original_topo_{domain_id.get('grid_name')}_{shape_str}.nc")
         if os.path.exists(original_topo_path):
-            loaded = np.load(original_topo_path)
-            topo._depth = xr.DataArray(
-                loaded.copy(),
-                dims=["ny", "nx"],
-                attrs={"units": "m"},
-            )
+            ds = xr.open_dataset(original_topo_path)
+            topo._depth = ds["depth"]
         return topo
     
     def ensure_original_state(self, snapshot_dir, command_manager, repo, repo_root):
@@ -162,13 +158,17 @@ class Topo:
         grid_name = topo_id['grid_name']
         shape = topo_id['shape']
         shape_str = f"{shape[0]}x{shape[1]}"
-        original_topo_path = os.path.join(snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy")
+        original_topo_path = os.path.join(snapshot_dir, f"original_topo_{grid_name}_{shape_str}.nc")
         original_min_depth_path = os.path.join(snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json")
         original_name = f"original_{grid_name}_{shape_str}"
         original_path = os.path.join(snapshot_dir, f"{original_name}.json")
 
         if not os.path.exists(original_topo_path):
-            np.save(original_topo_path, np.asarray(self.depth.data, dtype=np.float32))
+            ds = xr.Dataset(
+                {"depth": (["ny", "nx"], self.depth.data, {"units": "m"})},
+                attrs={"date_created": datetime.now().isoformat()}
+            )
+            ds.to_netcdf(original_topo_path)
         if not os.path.exists(original_min_depth_path):
             with open(original_min_depth_path, "w") as f:
                 json.dump({"min_depth": float(self.min_depth)}, f)
@@ -281,14 +281,10 @@ class Topo:
                     d = json.load(f)
                     min_depth = d.get("min_depth", min_depth)
             new_topo = Topo(new_grid, min_depth)
-            original_topo_path = os.path.join(snapshot_dir, f"original_topo_{domain_id.get('grid_name')}_{shape_str}.npy")
+            original_topo_path = os.path.join(snapshot_dir, f"original_topo_{domain_id.get('grid_name')}_{shape_str}.nc")
             if os.path.exists(original_topo_path):
-                loaded = np.load(original_topo_path)
-                new_topo._depth = xr.DataArray(
-                    loaded.copy(),
-                    dims=["ny", "nx"],
-                    attrs={"units": "m"},
-                )
+                ds = xr.open_dataset(original_topo_path)
+                new_topo._depth = ds["depth"]
             # Set state in the editor after calling this!
             return new_topo, snapshot_name  # Return the new topo and snapshot name
         except Exception as e:

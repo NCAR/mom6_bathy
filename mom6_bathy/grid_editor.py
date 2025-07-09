@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import xarray as xr
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
@@ -46,24 +47,39 @@ class GridEditor(widgets.HBox):
         self._save_button = widgets.Button(description='Save Grid', layout={'width': '44%'})
         self._load_button = widgets.Button(description='Load Grid', layout={'width': '44%'})
         self._reset_button = widgets.Button(description='Reset', layout={'width': '100%'}, button_style='danger')
-
+        
         # Use initial values for slider ranges
-        initial_xstart = float(self.grid.xstart)
-        initial_ystart = float(self.grid.ystart)
+        initial_xstart = float(self.grid.xstart) % 360
 
-        self._resolution_slider = widgets.FloatSlider(
-            value=self.grid.resolution, min=0.01, max=1.0, step=0.01, description="Resolution"
-        )
+        # Handle longitude wrap-around and negative values for slider
+        slider_window = 30
+        slider_min = initial_xstart - slider_window
+        slider_max = initial_xstart + slider_window
+
+        # Clamp to [-180, 360] (or [-180, 180] if you prefer)
+        if slider_min < -180:
+            slider_min = -180.0
+        if slider_max > 360:
+            slider_max = 360.0
+
+        # If min >= max (e.g., initial_xstart near -180 or 360), set a default window
+        if slider_min >= slider_max:
+            slider_min = max(-180.0, initial_xstart - 15)
+            slider_max = min(360.0, initial_xstart + 15)
+
         self._xstart_slider = widgets.FloatSlider(
             value=initial_xstart,
-            min=max(initial_xstart - 30, 0),
-            max=min(initial_xstart + 30, 360),
+            min=slider_min,
+            max=slider_max,
             step=0.01,
             description="xstart"
         )
         self._lenx_slider = widgets.FloatSlider(
             value=self.grid.lenx, min=0.01, max=50.0, step=0.01, description="lenx"
         )
+
+        initial_ystart = float(self.grid.ystart)  
+
         self._ystart_slider = widgets.FloatSlider(
             value=initial_ystart,
             min=max(initial_ystart - 30, -90),
@@ -73,6 +89,10 @@ class GridEditor(widgets.HBox):
         )
         self._leny_slider = widgets.FloatSlider(
             value=self.grid.leny, min=0.01, max=50.0, step=0.01, description="leny"
+        )
+
+        self._resolution_slider = widgets.FloatSlider(
+            value=self.grid.resolution, min=0.01, max=1.0, step=0.01, description="Resolution"
         )
 
         controls = widgets.VBox([
@@ -142,6 +162,26 @@ class GridEditor(widgets.HBox):
 
         self.fig.canvas.draw_idle()
     
+    def _nice_scale_length(self, length_m):
+        """
+        Given a length in meters, return a 'nice' rounded value (1, 2, 5, 10, 20, 50, 100, etc.)
+        in meters or kilometers.
+        """
+        import math
+        if length_m == 0:
+            return 0
+        exp = math.floor(math.log10(length_m))
+        base = length_m / (10 ** exp)
+        if base < 1.5:
+            nice = 1
+        elif base < 3.5:
+            nice = 2
+        elif base < 7.5:
+            nice = 5
+        else:
+            nice = 10
+        return nice * (10 ** exp)
+
     def _draw_scale_bar(self, lon_min, lon_max, lat_min, lat_max):
         """Draw a fixed-length scale bar with dynamic label using geometric calculation."""
         try:
@@ -156,15 +196,18 @@ class GridEditor(widgets.HBox):
             dlon_rad = np.deg2rad(bar_lon_end - bar_lon_start)
             bar_length_m = abs(dlon_rad * np.cos(lat_rad) * R)
 
-            # # Label: show the actual bar length in appropriate units
-            # if bar_length_m >= 1609.34:
-            #     label = f"{bar_length_m/1609.34:.1f} mi"
-            if bar_length_m >= 1000:
-                label = f"{bar_length_m/1000:.1f} km"
-            else:
-                label = f"{int(bar_length_m)} m"
+            # Use the nice rounding function
+            nice_length_m = self._nice_scale_length(bar_length_m)
 
-            # Draw the scale bar
+            # Now, recalculate bar_lon_end so the bar matches the nice length
+            nice_dlon_deg = np.rad2deg(nice_length_m / (np.cos(lat_rad) * R))
+            bar_lon_end = bar_lon_start + nice_dlon_deg
+
+            if nice_length_m >= 1000:
+                label = f"{int(nice_length_m/1000)} km"
+            else:
+                label = f"{int(nice_length_m)} m"
+
             self.ax.plot([bar_lon_start, bar_lon_end], [bar_lat, bar_lat], color='k', linewidth=3, transform=ccrs.PlateCarree())
             self.ax.text((bar_lon_start + bar_lon_end) / 2, bar_lat + 0.01 * (lat_max - lat_min),
                         label, ha='center', va='bottom', fontsize=10, transform=ccrs.PlateCarree())
@@ -181,75 +224,107 @@ class GridEditor(widgets.HBox):
             print("Enter a grid message!")
             return
 
-        if name.lower().endswith('.json'):
-            name = name[:-5]
+        if name.lower().endswith('.nc'):
+            name = name[:-3]
         sanitized_name = self.grid.sanitize_name(name)
         self.grid.name = sanitized_name
 
-        # Use Grid's path logic
-        folder, nc_path, json_path = self.grid._get_folder_and_paths(self.repo_root)
-        self.SNAPSHOT_DIR = folder
-
+        nc_path = os.path.join(self.grids_dir, f"grid_{sanitized_name}.nc")
         self.grid.to_netcdf(nc_path)
-        self.grid.save_metadata(json_path, msg, ncfile=nc_path)
-
-        print(f"Saved grid '{os.path.basename(json_path)}' and NetCDF in '{folder}'.")
+        print(f"Saved grid '{os.path.basename(nc_path)}' in '{self.grids_dir}'.")
         self.refresh_commit_dropdown()
         return
 
     def load_grid(self, b=None):
         val = self._commit_dropdown.value
         if not val:
-            print("No grid selected.")
             return
-        # Use Grid's path logic to get the full path to the JSON
-        snapshot_path = os.path.join(self.grids_dir, val)
+        nc_path = os.path.join(self.grids_dir, val)
         try:
-            data = self.grid.load_metadata(snapshot_path)
-            domain_id = data.get("domain_id", {})
-            ncfile = data.get("ncfile")
-            if not ncfile:
-                print("No NetCDF file recorded in metadata. Cannot load grid.")
-                return
-            nc_path = os.path.join(os.path.dirname(snapshot_path), ncfile)
             self.grid = self.grid.from_netcdf(nc_path)
-            # Set sliders using metadata
-            self._resolution_slider.value = float(domain_id.get("resolution"))
-            self._xstart_slider.value = float(domain_id.get("xstart"))
-            self._lenx_slider.value = float(domain_id.get("lenx"))
-            self._ystart_slider.value = float(domain_id.get("ystart"))
-            self._leny_slider.value = float(domain_id.get("leny"))
+            self.sync_sliders_to_grid()
+            self.construct_observances()
             self.plot_grid()
-            print(f"Loaded grid '{snapshot_path}' and NetCDF '{nc_path}'.")
+            print(f"Loaded grid from '{nc_path}'.")
         except Exception as e:
             print(f"Failed to load grid: {e}")
+            import traceback
+            traceback.print_exc()
 
     def sync_sliders_to_grid(self):
         try:
-            sliders = [
-                self._resolution_slider,
-                self._xstart_slider,
-                self._lenx_slider,
-                self._ystart_slider,
-                self._leny_slider,
-            ]
-            for slider in sliders:
-                try:
-                    slider.unobserve(self._on_slider_change, names="value")
-                except ValueError:
-                    pass
+            # --- xstart ---
+            initial_xstart = float(self.grid.xstart) % 360
+            slider_window = 30
+            slider_min = max(initial_xstart - slider_window, -180.0)
+            slider_max = min(initial_xstart + slider_window, 360.0)
+            if slider_min >= slider_max:
+                slider_min = max(-180.0, initial_xstart - 15)
+                slider_max = min(360.0, initial_xstart + 15)
+                if slider_min >= slider_max:
+                    slider_min = -180.0
+                    slider_max = 360.0
+            xstart_val = min(max(initial_xstart, slider_min), slider_max)
 
-            self._resolution_slider.value = float(self.grid.resolution)
-            self._xstart_slider.value = float(self.grid.xstart)
-            self._lenx_slider.value = float(self.grid.lenx)
-            self._ystart_slider.value = float(self.grid.ystart)
-            self._leny_slider.value = float(self.grid.leny)
+            # --- ystart ---
+            initial_ystart = float(self.grid.ystart)
+            y_min = max(initial_ystart - 30, -90)
+            y_max = min(initial_ystart + 30, 90)
+            if y_min >= y_max:
+                y_min = max(-90, initial_ystart - 15)
+                y_max = min(90, initial_ystart + 15)
+                if y_min >= y_max:
+                    y_min = -90
+                    y_max = 90
+            ystart_val = min(max(initial_ystart, y_min), y_max)
 
-            for slider in sliders:
+            # --- resolution ---
+            res_min, res_max = 0.01, 1.0
+            resolution_val = min(max(float(self.grid.resolution), res_min), res_max)
+
+            # --- lenx ---
+            lenx_min, lenx_max = 0.01, 50.0
+            lenx_val = min(max(float(self.grid.lenx), lenx_min), lenx_max)
+
+            # --- leny ---
+            leny_min, leny_max = 0.01, 50.0
+            leny_val = min(max(float(self.grid.leny), leny_min), leny_max)
+
+            # Remove old observers
+            for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
+                slider.unobserve(self._on_slider_change, names="value")
+
+            # Re-create all sliders
+            self._resolution_slider = widgets.FloatSlider(
+                value=resolution_val, min=res_min, max=res_max, step=0.01, description="Resolution"
+            )
+            self._xstart_slider = widgets.FloatSlider(
+                value=xstart_val, min=slider_min, max=slider_max, step=0.01, description="xstart"
+            )
+            self._lenx_slider = widgets.FloatSlider(
+                value=lenx_val, min=lenx_min, max=lenx_max, step=0.01, description="lenx"
+            )
+            self._ystart_slider = widgets.FloatSlider(
+                value=ystart_val, min=y_min, max=y_max, step=0.01, description="ystart"
+            )
+            self._leny_slider = widgets.FloatSlider(
+                value=leny_val, min=leny_min, max=leny_max, step=0.01, description="leny"
+            )
+
+            # Add observers
+            for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
                 slider.observe(self._on_slider_change, names="value")
+
+            # Update the control panel with the new sliders
+            controls = self._control_panel.children[0]
+            controls.children = (
+                controls.children[:1] +
+                (self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider) +
+                controls.children[-1:]
+            )
         except Exception as e:
             print(f"Error in sync_sliders_to_grid: {e}")
-            
+                        
     def _on_slider_change(self, change):
         from mom6_bathy.grid import Grid
         self.grid = Grid(
@@ -280,28 +355,26 @@ class GridEditor(widgets.HBox):
         self.plot_grid()
 
     def refresh_commit_dropdown(self):
-        grid_jsons = self.grid.list_metadata_files(self.grids_dir)
+        # List all .nc files in the Grids directory (no subfolders)
+        grid_nc_files = [
+            fname for fname in os.listdir(self.grids_dir)
+            if fname.startswith("grid_") and fname.endswith(".nc")
+        ]
         options = []
-        for rel_path in grid_jsons:
-            abs_path = os.path.join(self.grids_dir, rel_path)
+        current_grid_nc = None
+        for fname in grid_nc_files:
+            abs_path = os.path.join(self.grids_dir, fname)
             try:
-                data = self.grid.load_metadata(abs_path)
-                msg = data.get("message", "")
-                date = data.get("date", "")
-                domain_id = data.get("domain_id", {})
-                # Extract shape from folder name if possible
-                folder_name = os.path.basename(os.path.dirname(abs_path))
-                # Remove 'grid_' prefix from file name
-                base_name = os.path.basename(rel_path)
-                if base_name.startswith("grid_"):
-                    base_name = base_name[5:]
-                # Compose label: name_shape (from folder), or fallback to name
-                label = f"{folder_name}" if "_" in folder_name else f"{domain_id.get('name', '')}"
-                options.append((label, rel_path))
+                ds = xr.open_dataset(abs_path)
+                name = ds.attrs.get("name", "")
+                # Only show the name in the dropdown
+                label = f"{name}"
+                options.append((label, fname))
+                if name == self.grid.name:
+                    current_grid_nc = fname
             except Exception:
                 continue
 
-        # Sort by file modification time, newest first
         options.sort(
             key=lambda x: os.path.getmtime(os.path.join(self.grids_dir, x[1])),
             reverse=True
@@ -310,7 +383,9 @@ class GridEditor(widgets.HBox):
         self._commit_dropdown.options = options if options else []
         if options:
             option_values = [v for (l, v) in options]
-            if self._commit_dropdown.value not in option_values:
+            if current_grid_nc and current_grid_nc in option_values:
+                self._commit_dropdown.value = current_grid_nc
+            elif self._commit_dropdown.value not in option_values:
                 self._commit_dropdown.value = options[0][1]
         else:
             self._commit_dropdown.value = None
@@ -321,17 +396,21 @@ class GridEditor(widgets.HBox):
         if not val:
             self._commit_details.value = ""
             return
-        file_path = val
-        abs_path = os.path.join(self.grids_dir, file_path)
+        abs_path = os.path.join(self.grids_dir, val)
         try:
-            data = self.grid.load_metadata(abs_path)
-            msg = data.get("message", "")
-            date = data.get("date", "")
-            domain_id = data.get("domain_id", {})
+            ds = xr.open_dataset(abs_path)
+            name = ds.attrs.get("name", "")
+            date = ds.attrs.get("date_created", "")
+            # Trim date to only up to seconds (e.g., 2025-07-09T15:28:57)
+            date_short = date.split(".")[0] if "." in date else date
+            resolution = ds.attrs.get("resolution", "")
+            nx = ds.attrs.get("nx", "")
+            ny = ds.attrs.get("ny", "")
             details = (
-                f"<b>Name:</b> {domain_id.get('name', '')}<br>"
-                f"<b>Date:</b> {date}<br>"
-                f"<b>Message:</b> {msg}<br>"
+                f"<b>Name:</b> {name}<br>"
+                f"<b>Date:</b> {date_short}<br>"
+                f"<b>Resolution:</b> {resolution}<br>"
+                f"<b>nx:</b> {nx} <b>ny:</b> {ny}"
             )
             self._commit_details.value = details
         except Exception:

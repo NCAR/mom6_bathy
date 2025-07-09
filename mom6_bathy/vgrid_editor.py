@@ -1,6 +1,5 @@
 import os
-import json
-import datetime
+import xarray as xr
 import ipywidgets as widgets
 import numpy as np
 import matplotlib.pyplot as plt
@@ -165,7 +164,7 @@ class VGridEditor(widgets.HBox):
         for depth in self.vgrid.z:
             self.ax.axhline(y=depth, color='steelblue')
         self.ax.set_ylim(max(self.vgrid.z) + 10, min(self.vgrid.z) - 10)
-        self.ax.set_ylabel("Depth")
+        self.ax.set_ylabel("Depth (m)")
         self.ax.set_title("Vertical Grid")
         self.fig.canvas.draw_idle()
 
@@ -196,16 +195,10 @@ class VGridEditor(widgets.HBox):
         sanitized_name = VGrid.sanitize_name(name)
         self.vgrid.name = sanitized_name
 
-        folder, nc_path, json_path = self.vgrid._get_folder_and_paths(self.repo_root)
-        os.makedirs(folder, exist_ok=True)
-        self.vgrid.write(nc_path)
-        self.vgrid.save_metadata(json_path, msg, ncfile=nc_path)
-
-        print(f"Saved vgrid '{os.path.basename(json_path)}' and NetCDF in '{folder}'.")
+        nc_path = os.path.join(self.vgrids_dir, f"vgrid_{sanitized_name}.nc")
+        self.vgrid.write(nc_path, message=msg)
+        print(f"Saved vgrid '{os.path.basename(nc_path)}' in '{self.vgrids_dir}'.")
         self.refresh_commit_dropdown()
-        rel_path = os.path.join(os.path.basename(folder), os.path.basename(json_path))
-        if rel_path in [v for (_, v) in self._commit_dropdown.options]:
-            self._commit_dropdown.value = rel_path
         return
 
     def load_vgrid(self, b=None):
@@ -213,29 +206,21 @@ class VGridEditor(widgets.HBox):
         if not val:
             print("No vgrid selected.")
             return
-        meta_path = os.path.join(self.vgrids_dir, val)
+        nc_path = os.path.join(self.vgrids_dir, val)
         try:
-            data = VGrid.load_metadata(meta_path)
-            nk = data.get("nk", 10)
-            depth = data.get("depth", 100.0)
-            name = data.get("name", None)
-            ratio = data.get("ratio", 1.0)
-            grid_type = data.get("type", "Uniform")
-
+            self.vgrid = VGrid.from_file(nc_path, name=None, save_on_create=False, repo_root=self.repo_root)
+            # Infer ratio and grid type from dz
+            ratio_value, grid_type = self.infer_ratio_and_type(self.vgrid.dz)
+            # Temporarily remove observers to avoid recursion
             self._nk_slider.unobserve(self._on_param_change, names="value")
             self._depth_slider.unobserve(self._on_param_change, names="value")
             self._type_toggle.unobserve(self._on_param_change, names="value")
             self._ratio_slider.unobserve(self._on_param_change, names="value")
 
-            if grid_type == "Uniform":
-                self.vgrid = VGrid.uniform(nk=nk, depth=depth, name=name, save_on_create=False, repo_root=self.repo_root)
-            else:
-                self.vgrid = VGrid.hyperbolic(nk=nk, depth=depth, ratio=ratio, name=name, save_on_create=False, repo_root=self.repo_root)
-
             self._nk_slider.value = self.vgrid.nk
             self._depth_slider.value = float(self.vgrid.depth)
             self._type_toggle.value = grid_type
-            self._ratio_slider.value = ratio
+            self._ratio_slider.value = ratio_value
 
             self._nk_slider.observe(self._on_param_change, names="value")
             self._depth_slider.observe(self._on_param_change, names="value")
@@ -243,7 +228,7 @@ class VGridEditor(widgets.HBox):
             self._ratio_slider.observe(self._on_param_change, names="value")
 
             self.plot_vgrid()
-            print(f"Loaded vgrid '{val}'.")
+            print(f"Loaded vgrid from '{nc_path}'.")
         except Exception as e:
             print(f"Failed to load vgrid: {e}")
 
@@ -257,18 +242,20 @@ class VGridEditor(widgets.HBox):
         self.plot_vgrid()
 
     def refresh_commit_dropdown(self):
-        vgrid_jsons = VGrid.list_metadata_files(self.vgrids_dir)
+        # List all .nc files in the VGrids directory (no subfolders)
+        vgrid_nc_files = [
+            fname for fname in os.listdir(self.vgrids_dir)
+            if fname.startswith("vgrid_") and fname.endswith(".nc")
+        ]
         options = []
-        for rel_path in vgrid_jsons:
-            abs_path = os.path.join(self.vgrids_dir, rel_path)
+        for fname in vgrid_nc_files:
+            abs_path = os.path.join(self.vgrids_dir, fname)
             try:
-                data = VGrid.load_metadata(abs_path)
-                base = os.path.basename(rel_path)
-                if base.startswith("vgrid_") and base.endswith(".json"):
-                    display_name = base[len("vgrid_"):-len(".json")]
-                else:
-                    display_name = base
-                options.append((display_name, rel_path))
+                ds = xr.open_dataset(abs_path)
+                name = ds.attrs.get("title", fname)
+                # Only show the name in the dropdown
+                label = f"{fname[len('vgrid_'):-3]}"  # Remove prefix and .nc
+                options.append((label, fname))
             except Exception:
                 continue
 
@@ -292,11 +279,17 @@ class VGridEditor(widgets.HBox):
             return
         abs_path = os.path.join(self.vgrids_dir, val)
         try:
-            data = VGrid.load_metadata(abs_path)
+            ds = xr.open_dataset(abs_path)
+            name = ds.attrs.get("title", "")
+            date = ds.attrs.get("date_created", ds.attrs.get("history", ""))
+            date_short = date.split(".")[0] if "." in date else date  # Only up to seconds
+            depth = ds.attrs.get("maximum_depth", "")
+            nk = len(ds["dz"]) if "dz" in ds else ""
             details = (
-                f"<b>Name:</b> {data.get('name', '')}<br>"
-                f"<b>Date:</b> {data.get('date', '')}<br>"
-                f"<b>Message:</b> {data.get('message', '')}<br>"
+                f"<b>Name:</b> {name}<br>"
+                f"<b>Date:</b> {date_short}<br>"
+                f"<b>Depth:</b> {depth} m<br>"
+                f"<b>nk:</b> {nk}"
             )
             self._commit_details.value = details
         except Exception:
