@@ -852,6 +852,8 @@ class Grid:
             raise ValueError("Grid must have a name to initialize on disk.")
 
         nc_path = self._get_nc_path()
+        if os.path.exists(nc_path):
+            return
         self.to_netcdf(nc_path)
 
     def _get_grid_folder(self, root_dir=None, create=True):

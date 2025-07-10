@@ -4,7 +4,6 @@ import matplotlib.patches as patches
 import ipywidgets as widgets
 import os
 import json
-import xarray as xr
 import cartopy.crs as ccrs 
 from matplotlib.ticker import MaxNLocator
 from mom6_bathy.command_manager import TopoCommandManager
@@ -186,9 +185,9 @@ class TopoEditor(widgets.HBox):
             if filename.startswith('grid_'):
                 continue
             if filename.endswith('.json') and os.path.exists(abs_path):
-                grid_name, shape = get_grid_info(value[1])
-                new_label = f"{label} [Grid: {grid_name}, Shape: {shape}]"
-                filtered_options.append((new_label, value))
+                # Only show the snapshot name (without .json)
+                snapshot_name = os.path.splitext(filename)[0]
+                filtered_options.append((snapshot_name, value))
 
         self._commit_dropdown.options = filtered_options if filtered_options else []
         if filtered_options:

@@ -118,6 +118,8 @@ class VGrid:
         self.write(nc_path, message=message, author=author)
 
     def write(self, filename: str, message: str = None, author: str = None):
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
         dz0 = float(self.dz[0])
         dzbot = float(self.dz[-1])
         ratio = dzbot / dz0 if dz0 != 0 else 1.0

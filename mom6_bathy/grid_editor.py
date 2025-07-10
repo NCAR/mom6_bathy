@@ -401,8 +401,9 @@ class GridEditor(widgets.HBox):
             ds = xr.open_dataset(abs_path)
             name = ds.attrs.get("name", "")
             date = ds.attrs.get("date_created", "")
-            # Trim date to only up to seconds (e.g., 2025-07-09T15:28:57)
-            date_short = date.split(".")[0] if "." in date else date
+            # Format date: replace 'T' with ' ', trim to seconds
+            date_short = date.replace("T", " ")
+            date_short = date_short.split(".")[0] if "." in date_short else date_short
             resolution = ds.attrs.get("resolution", "")
             nx = ds.attrs.get("nx", "")
             ny = ds.attrs.get("ny", "")

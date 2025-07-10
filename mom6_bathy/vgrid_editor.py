@@ -12,10 +12,19 @@ class VGridEditor(widgets.HBox):
     Allows creation, editing, saving, and loading of vertical grid profiles.
     """
 
-    def __init__(self, vgrid=None, repo_root=None):
+    def __init__(self, vgrid=None, repo_root=None, topo=None, grid=None):
         self.repo_root = repo_root if repo_root is not None else os.getcwd()
         self.vgrids_dir = os.path.join(self.repo_root, "VGrids")
         os.makedirs(self.vgrids_dir, exist_ok=True)
+
+        self.topo = topo
+
+        # Try to infer min_depth from topo or grid if provided
+        self.min_depth = 1.0
+        if topo is not None and hasattr(topo, "depth"):
+            self.min_depth = float(np.nanmax(topo.depth.data))
+        elif grid is not None and hasattr(grid, "depth"):
+            self.min_depth = float(np.nanmax(grid.depth.data))
 
         if vgrid is None:
             vgrid = VGrid.uniform(nk=10, depth=100.0, save_on_create=False, repo_root=self.repo_root)
@@ -59,19 +68,27 @@ class VGridEditor(widgets.HBox):
             layout={'width': '98%'}, style=label_style
         )
         self._depth_slider = widgets.FloatSlider(
-            value=self.vgrid.depth, min=1.0, max=10000.0, step=1.0, description="Depth (m)",
+            value=max(self.vgrid.depth, self.min_depth),
+            min=1.0,
+            max=10000.0,
+            step=1.0,
+            description="Depth (m)",
             layout={'width': '98%'}, style=label_style
         )
+        self._warning_label = widgets.HTML(
+            value="",
+            layout={'width': '98%', 'color': 'red', 'display': 'none'}  # Start hidden
+        )
         self._ratio_slider = widgets.FloatSlider(
-            value=ratio_value, min=0.1, max=20.0, step=0.01,
+            value=ratio_value, min=0.1, max=10.0, step=0.01,
             description="Top/Bottom Ratio:",
             layout={'width': '98%'}, style=label_style
         )
         self.ratio_help = widgets.HTML(
-            value="<span style='font-size: 90%; color: #888;'>Ratio of bottom layer thickness to top layer thickness (for hyperbolic grids)</span>",
+            value="<span style='font-size: 90%; color: #888;'>Ratio of bottom layer thickness to top layer thickness</span>",
             layout={'width': '98%', 'display': 'none'}
         )
-
+        
         # Timer handle for hiding help
         self._ratio_help_timer = None
 
@@ -122,6 +139,7 @@ class VGridEditor(widgets.HBox):
             self._type_toggle,
             self._nk_slider,
             self._depth_slider,
+            self._warning_label,
             self._ratio_slider,
             self.ratio_help,
             self._reset_button,
@@ -169,11 +187,25 @@ class VGridEditor(widgets.HBox):
         self.fig.canvas.draw_idle()
 
     def _on_param_change(self, change):
+
         nk = self._nk_slider.value
         depth = self._depth_slider.value
         ratio = self._ratio_slider.value
         grid_type = self._type_toggle.value
         name = self.vgrid.name
+
+        # Warn if depth < topo max depth
+        topo_max = getattr(self, "min_depth", 1.0)
+        if hasattr(self, "topo") and self.topo is not None and hasattr(self.topo, "max_depth"):
+            topo_max = float(self.topo.max_depth)
+
+        if depth < topo_max - 0.5:
+            self._warning_label.value = f"<span style='color:red'>Warning: Depth is less than topo max depth ({topo_max:.2f} m)!</span>"
+            self._warning_label.layout.display = 'block'
+        else:
+            self._warning_label.value = ""
+            self._warning_label.layout.display = 'none'
+
         if grid_type == "Uniform":
             self.vgrid = VGrid.uniform(nk=nk, depth=depth, name=name, save_on_create=False, repo_root=self.repo_root)
             self._ratio_slider.disabled = True
@@ -282,7 +314,9 @@ class VGridEditor(widgets.HBox):
             ds = xr.open_dataset(abs_path)
             name = ds.attrs.get("title", "")
             date = ds.attrs.get("date_created", ds.attrs.get("history", ""))
-            date_short = date.split(".")[0] if "." in date else date  # Only up to seconds
+            # Format date: replace 'T' with ' ', trim to seconds
+            date_short = date.replace("T", " ")
+            date_short = date_short.split(".")[0] if "." in date_short else date_short
             depth = ds.attrs.get("maximum_depth", "")
             nk = len(ds["dz"]) if "dz" in ds else ""
             details = (
