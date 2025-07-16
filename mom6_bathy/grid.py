@@ -65,7 +65,12 @@ class Grid:
         tripolar_n: bool = False,
         displace_pole: bool = False,
         name: Optional[str] = None,
+        save_on_create: bool = True
     ) -> None:
+        self.lenx = lenx
+        self.leny = leny
+        self.resolution = resolution
+        self.xstart = xstart
         """
         Grid instance constructor.
 
@@ -100,10 +105,10 @@ class Grid:
         # default ystart value (centers the domain at the Equator)
         if ystart is None:
             ystart = -0.5 * leny
-        
+        self.ystart = ystart
+        self.name = name
         if nx is not None or ny is not None:
             assert nx is not None and ny is not None, "nx and ny must be provided together"
-            assert resolution is None, "resolution cannot be provided with nx and ny"
         else:
             assert resolution is not None, "resolution must be provided if nx and ny are not"
             nx = int(lenx / resolution)
@@ -141,7 +146,11 @@ class Grid:
             displace_pole=displace_pole,
         )
 
+        # Create the Grids folder for this grid instance
+        if self.name and save_on_create:
+            self._initialize_on_disk(message="Initial grid creation")
 
+    
     @property
     def name(self) -> str:
         """Name of the grid."""
@@ -156,10 +165,14 @@ class Grid:
     
     @name.setter
     def name(self, new_name: str) -> None:
-        assert new_name is None or new_name.replace("_", "").isalnum(), "Grid name must be alphanumeric"
-        self._name = new_name
+        if new_name is not None:
+            sanitized = self.sanitize_name(new_name)
+            assert sanitized.replace("_", "").isalnum(), "Grid name must be alphanumeric"
+            self._name = sanitized
+        else:
+            self._name = None
     
-    def __getitem__(self, slices) -> xr.DataArray:
+    def __getitem__(self, slices, name=None) -> "Grid":
         """
         Get a subgrid copy based on the provided slices.
 
@@ -170,6 +183,8 @@ class Grid:
             The first slice A:B:C corresponds to the j-axis (y-axis) and the second
             slice D:E:F corresponds to the i-axis (x-axis). Examples:
             grid[0:10, 0:20] or grid[:, 0:20] or grid[0:10, :].
+        name : str, optional
+            Name for the subgrid. If not provided, a default name is generated.
 
         Returns
         -------
@@ -177,7 +192,6 @@ class Grid:
             A new Grid instance representing the subgrid defined by the slices.
         """
 
-        # Check if args are a tuple of two slices
         assert isinstance(slices, tuple) and len(slices) == 2 and \
             all(isinstance(s, slice) for s in slices), \
             "Must provide both j and i slices when indexing the grid. "\
@@ -185,11 +199,9 @@ class Grid:
 
         j_slice, i_slice = slices
 
-        # If both slices are None, return a deep copy of the grid
         if j_slice == slice(None) and i_slice == slice(None):
             return copy.deepcopy(self)
 
-        # Get the slice bounds and steps 
         j_low, j_high, j_step = (
             j_slice.start or 0,
             j_slice.stop or self.ny,
@@ -201,7 +213,6 @@ class Grid:
             i_slice.step or 1,
         )
 
-        # Negative indices to positive indices
         if j_low < 0:
             j_low = (j_low + self.ny) % self.ny
         if i_low < 0:
@@ -211,7 +222,6 @@ class Grid:
         if i_high < 0:
             i_high = (i_high + self.nx) % self.nx
 
-        # Sanity checks for slice bounds and steps
         assert j_low >= 0, "Lower j slice bound must be non-negative"
         assert i_low >= 0, "Lower i slice bound must be non-negative"
         assert j_step > 0, "j slice step must be positive"
@@ -223,20 +233,17 @@ class Grid:
         assert j_high <= self.ny, "Upper j slice bound exceeds the grid's ny dimension"
         assert i_high <= self.nx, "Upper i slice bound exceeds the grid's nx dimension"
 
-        srefine = 2  # supergrid refinement factor
+        srefine = 2
 
-        # Periodicity checks:
         cyclic_y = self.supergrid.dict["cyclic_y"] and (j_low == 0) and (j_high == self.ny)
         cyclic_x = self.supergrid.dict["cyclic_x"] and (i_low == 0) and (i_high == self.nx)
         tripolar_n = self.supergrid.dict["tripolar_n"] and (i_low == 0) and (i_high == self.nx) and (j_high == self.ny)
 
-        # supergrid slicing:
         s_j_low = j_low * srefine
         s_j_high = (j_high) * srefine + 1
         s_i_low = i_low * srefine
         s_i_high = (i_high) * srefine + 1
-            
-        # Create a sub-supergrid with the sliced data
+
         sub_supergrid = MidasSupergrid(
             config=self.supergrid.dict["config"],
             axis_units=self.supergrid.dict["axis_units"],
@@ -251,25 +258,35 @@ class Grid:
             radius=self.supergrid.dict["radius"],
         )
 
-        # Create a name for the subgrid based on the slices
-        # This may (and should) be overriden by the user later
-        name = self.name or "subgrid"
-        if j_low>0 or j_high < self.ny:
-            name += f"_jb{j_low}_je{j_high}"
-        if i_low>0 or i_high < self.nx:
-            name += f"_ib{i_low}_ie{i_high}"
+        try:
+            dlon = float(np.abs(sub_supergrid.x[1, 1] - sub_supergrid.x[1, 3])) if sub_supergrid.x.shape[1] > 3 else float(np.abs(sub_supergrid.x[0, 1] - sub_supergrid.x[0, 0]))
+            dlat = float(np.abs(sub_supergrid.y[1, 1] - sub_supergrid.y[3, 1])) if sub_supergrid.y.shape[0] > 3 else float(np.abs(sub_supergrid.y[1, 0] - sub_supergrid.y[0, 0]))
+            sub_resolution = np.mean([dlon, dlat]) / srefine
+        except Exception:
+            sub_resolution = None
 
-        # Create a new Grid instance for the subgrid and return it
+        # Use provided name or generate default
+        if name is None:
+            name = self.name or "subgrid"
+            if j_low > 0 or j_high < self.ny:
+                name += f"_jb{j_low}_je{j_high}"
+            if i_low > 0 or i_high < self.nx:
+                name += f"_ib{i_low}_ie{i_high}"
+
         sub_grid = Grid(
             nx=int((i_high - i_low) / i_step),
             ny=int((j_high - j_low) / j_step),
             lenx=(sub_supergrid.x.max() - sub_supergrid.x.min()).item(),
             leny=(sub_supergrid.y.max() - sub_supergrid.y.min()).item(),
+            resolution=sub_resolution,
+            xstart=float(sub_supergrid.x.min()),
+            ystart=float(sub_supergrid.y.min()),
             cyclic_x=cyclic_x,
             name=name
         )
         sub_grid.supergrid = sub_supergrid
         sub_grid._compute_MOM6_grid_metrics()
+
         return sub_grid
 
     @staticmethod
@@ -342,6 +359,11 @@ class Grid:
         # the grid is tripolar
         return nlines == 3
     
+    @staticmethod
+    def sanitize_name(name):
+        import re
+        return re.sub(r'[^A-Za-z0-9_]+', '_', name)
+    
     def is_rectangular(self, rtol=1e-3) -> bool:
         """Check if the grid is a rectangular lat-lon grid by comparing the
         first and last rows and columns of the tlon and tlat arrays."""
@@ -355,47 +377,36 @@ class Grid:
 
 
     @classmethod
-    def from_supergrid(cls, path: str, name: Optional[str] = None) -> "Grid":
-        """Create a Grid instance from a supergrid file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the supergrid file to be written
-        name : str, optional
-            Name of the new grid. If provided, it will be used as the name of the grid.
-            If not provided, the name will be derived from the file name.
-
-        Returns
-        -------
-        Grid
-            The Grid instance created from the supergrid file.
-        """
-
-        # read supergrid dataset
+    def from_supergrid(cls, path: str, name: Optional[str] = None, save_on_create: bool = False) -> "Grid":
         ds = xr.open_dataset(path)
         assert (
             ds.x.units == ds.y.units and "degree" in ds.x.units
         ), "Only degrees units are supported in supergrid files"
 
-        # check supergrid
         Grid.check_supergrid(ds)
-
-        srefine = 2  # supergrid refinement factor
+        srefine = 2
 
         name = name or os.path.basename(path).replace(".nc", "") if os.path.basename(path).endswith(".nc") else os.path.basename(path)
 
-        # create an initial Grid object:
+        # Compute resolution for later assignment
+        try:
+            dlon = float(np.abs(ds.x[1, 1] - ds.x[1, 3])) if ds.x.shape[1] > 3 else float(np.abs(ds.x[0, 1] - ds.x[0, 0]))
+            dlat = float(np.abs(ds.y[1, 1] - ds.y[3, 1])) if ds.y.shape[0] > 3 else float(np.abs(ds.y[1, 0] - ds.y[0, 0]))
+            resolution = np.mean([dlon, dlat]) / srefine
+        except Exception:
+            resolution = None
+
         obj = cls(
             nx=int(len(ds.nx) / srefine),
             ny=int(len(ds.ny) / srefine),
             lenx=(ds.x.max() - ds.x.min()).item(),
             leny=(ds.y.max() - ds.y.min()).item(),
+            resolution=resolution,
             cyclic_x=Grid.is_cyclic_x(ds),
-            name=name
+            name=name,
+            save_on_create=save_on_create,  # <--- propagate this!
         )
 
-        # override obj.supergrid with the data from the original supergrid file
         obj.supergrid.x = ds.x.data
         obj.supergrid.y = ds.y.data
         obj.supergrid.dx = ds.dx.data
@@ -403,33 +414,12 @@ class Grid:
         obj.supergrid.area = ds.area.data
         obj.supergrid.angle_dx = ds.angle_dx.data
 
-        # update the MOM6 grid metrics based on the supergrid data
         obj._compute_MOM6_grid_metrics()
-
         return obj
 
     @classmethod
     def subgrid_from_supergrid(cls, path: str, llc: tuple[float, float], urc: tuple[float, float], name: str) -> "Grid":
-        """Create a Grid instance from a subset of a supergrid file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the full supergrid file to be carved out.
-        llc : tuple[float, float]
-            Lower left corner coordinates (lat, lon) of the subdomain to extract
-        urc : tuple[float, float]
-            Upper right corner coordinates (lat, lon) of the subset to extract
-        name : str
-            Name of the subgrid
-
-        Returns
-        -------
-        Grid
-            The Grid instance created from the supergrid file.
-        """
-
-        full_grid = cls.from_supergrid(path)
+        full_grid = cls.from_supergrid(path, save_on_create=False)  # <--- don't save full grid
 
         assert len(llc) == 2, "llc must be a tuple of two floats"
         assert len(urc) == 2, "urc must be a tuple of two floats"
@@ -441,9 +431,20 @@ class Grid:
         assert llc_j < urc_j, "Lower left corner must be below upper right corner"
         assert llc_i < urc_i, "Lower left corner must be to the left of upper right corner"
 
-        # create a subgrid from the full grid
-        subgrid = full_grid[llc_j:urc_j, llc_i:urc_i]
-        subgrid.name = name
+        # Only create the subgrid with the custom name
+        subgrid = full_grid.__getitem__((slice(llc_j, urc_j), slice(llc_i, urc_i)), name=name)
+
+        # --- Fix: Set resolution if missing ---
+        if getattr(subgrid, "resolution", None) is None:
+            # Try to infer from parent grid
+            if hasattr(full_grid, "resolution") and full_grid.resolution is not None:
+                subgrid.resolution = full_grid.resolution
+            else:
+                # Fallback: estimate from grid spacing
+                dlon = np.abs(subgrid.tlon[0, 1] - subgrid.tlon[0, 0])
+                dlat = np.abs(subgrid.tlat[1, 0] - subgrid.tlat[0, 0])
+                subgrid.resolution = float(np.mean([dlon, dlat]))
+                
         return subgrid
 
     @property
@@ -841,4 +842,167 @@ class Grid:
         ds["angle_dx"] = xr.DataArray(
             self._supergrid.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"}
         )
+        ds.attrs["name"] = self.name
+        ds.attrs["lenx"] = self.lenx
+        ds.attrs["leny"] = self.leny
+        ds.attrs["resolution"] = self.resolution
+        ds.attrs["xstart"] = self.xstart
+        ds.attrs["ystart"] = self.ystart
+        
         ds.to_netcdf(path)
+
+    def _initialize_on_disk(self, message="Initial grid creation"):
+        """
+        Save .nc file for this grid in the Grids directory.
+        """
+        if not self.name:
+            raise ValueError("Grid must have a name to initialize on disk.")
+
+        nc_path = self._get_nc_path()
+        if os.path.exists(nc_path):
+            return
+        self.to_netcdf(nc_path)
+
+    def _get_grid_folder(self, root_dir=None, create=True):
+        if root_dir is None:
+            root_dir = os.getcwd()
+        folder = os.path.join(root_dir, "Grids")
+        if create:
+            os.makedirs(folder, exist_ok=True)
+        return folder
+
+    def _get_nc_path(self, root_dir=None):
+        sanitized_name = self.name if self.name is not None else "UnnamedGrid"
+        if root_dir is None:
+            root_dir = os.getcwd()
+        folder = os.path.join(root_dir, "Grids")
+        nc_path = os.path.join(folder, f"grid_{sanitized_name}.nc")
+        return nc_path
+
+    def to_netcdf(self, path=None, format="grid"):
+        if self.resolution is None:
+            raise ValueError("Grid resolution is None. Cannot write to NetCDF. Please ensure resolution is set.")
+        if path is None:
+            path = self._get_nc_path()
+        folder = os.path.dirname(path)
+        os.makedirs(folder, exist_ok=True)
+
+        if format == "supergrid":
+            # Write in supergrid format (x, y, dx, dy, area, angle_dx)
+            ds = xr.Dataset()
+            ds.attrs["filename"] = os.path.basename(path)
+            ds.attrs["type"] = "MOM6 supergrid"
+            ds.attrs["Created"] = datetime.now().isoformat()
+            ds.attrs["name"] = self.name
+            ds.attrs["lenx"] = self.lenx
+            ds.attrs["leny"] = self.leny
+            ds.attrs["resolution"] = self.resolution
+            ds.attrs["xstart"] = self.xstart
+            ds.attrs["ystart"] = self.ystart
+
+            sg = self._supergrid
+            ds["y"] = xr.DataArray(sg.y, dims=["nyp", "nxp"], attrs={"units": sg.dict["axis_units"]})
+            ds["x"] = xr.DataArray(sg.x, dims=["nyp", "nxp"], attrs={"units": sg.dict["axis_units"]})
+            ds["dy"] = xr.DataArray(sg.dy, dims=["ny", "nxp"], attrs={"units": "meters"})
+            ds["dx"] = xr.DataArray(sg.dx, dims=["nyp", "nx"], attrs={"units": "meters"})
+            ds["area"] = xr.DataArray(sg.area, dims=["ny", "nx"], attrs={"units": "m2"})
+            ds["angle_dx"] = xr.DataArray(sg.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"})
+            ds.to_netcdf(path)
+        else:
+            # Default: write in regular grid format (tlon, tlat, etc.)
+            ny, nx = self.tlon.shape
+            nyp, nxp = self.qlon.shape
+
+            ds = xr.Dataset(
+                {
+                    "tlon": (["ny", "nx"], self.tlon.values),
+                    "tlat": (["ny", "nx"], self.tlat.values),
+                    "ulon": (["ny", "nxp"], self.ulon.values),
+                    "ulat": (["ny", "nxp"], self.ulat.values),
+                    "vlon": (["nyp", "nx"], self.vlon.values),
+                    "vlat": (["nyp", "nx"], self.vlat.values),
+                    "qlon": (["nyp", "nxp"], self.qlon.values),
+                    "qlat": (["nyp", "nxp"], self.qlat.values),
+                    "dxt": (["ny", "nx"], self.dxt.values),
+                    "dyt": (["ny", "nx"], self.dyt.values),
+                    "dxCv": (["ny", "nx"], self.dxCv.values),
+                    "dyCu": (["ny", "nx"], self.dyCu.values),
+                    "dxCu": (["ny", "nx"], self.dxCu.values),
+                    "dyCv": (["ny", "nx"], self.dyCv.values),
+                    "angle": (["ny", "nx"], self.angle.values),
+                    "angle_q": (["nyp", "nxp"], self.angle_q.values),
+                    "tarea": (["ny", "nx"], self.tarea.values),
+                },
+                coords={
+                    "ny": np.arange(ny),
+                    "nx": np.arange(nx),
+                    "nyp": np.arange(nyp),
+                    "nxp": np.arange(nxp),
+                }
+            )
+            ds.attrs.update({
+                "name": self.name,
+                "lenx": self.lenx,
+                "leny": self.leny,
+                "resolution": self.resolution,
+                "xstart": self.xstart,
+                "ystart": self.ystart,
+                "nx": self.nx,
+                "ny": self.ny,
+                "date_created": datetime.now().isoformat(),
+            })
+            ds.to_netcdf(path)
+
+    @classmethod
+    def from_netcdf(cls, path):
+        import re
+        ds = xr.open_dataset(path)
+        # Auto-detect format
+        if "tlon" in ds and "tlat" in ds:
+            # Standard grid format
+            raw_name = ds.attrs.get("name", None)
+            if raw_name is not None:
+                # Remove ALL leading ocean_hgrid_ prefixes
+                name = re.sub(r'^(ocean_hgrid_)+', '', raw_name)
+                # Remove ALL trailing _[sessionid] (6 hex digits) segments
+                while re.search(r'_[0-9a-f]{6}$', name):
+                    name = re.sub(r'_[0-9a-f]{6}$', '', name)
+            else:
+                name = None
+            grid = cls(
+                lenx=float(ds.attrs["lenx"]),
+                leny=float(ds.attrs["leny"]),
+                resolution=float(ds.attrs["resolution"]),
+                xstart=float(ds.attrs["xstart"]),
+                ystart=float(ds.attrs["ystart"]),
+                name=name,
+                save_on_create=False,  
+            )
+            # Assign arrays directly to avoid recomputation
+            grid.tlon = ds["tlon"]
+            grid.tlat = ds["tlat"]
+            if "units" not in grid.tlon.attrs:
+                grid.tlon.attrs["units"] = "degrees_east"
+            if "units" not in grid.tlat.attrs:
+                grid.tlat.attrs["units"] = "degrees_north"
+            grid.ulon = ds["ulon"]
+            grid.ulat = ds["ulat"]
+            grid.vlon = ds["vlon"]
+            grid.vlat = ds["vlat"]
+            grid.qlon = ds["qlon"]
+            grid.qlat = ds["qlat"]
+            grid.dxt = ds["dxt"]
+            grid.dyt = ds["dyt"]
+            grid.dxCv = ds["dxCv"]
+            grid.dyCu = ds["dyCu"]
+            grid.dxCu = ds["dxCu"]
+            grid.dyCv = ds["dyCv"]
+            grid.angle = ds["angle"]
+            grid.angle_q = ds["angle_q"]
+            grid.tarea = ds["tarea"]
+            return grid
+        elif "x" in ds and "y" in ds:
+            # Supergrid format
+            return cls.from_supergrid(path)
+        else:
+            raise ValueError(f"Unrecognized grid file format: {path}")

@@ -1,10 +1,13 @@
 import os
+import json
 import numpy as np
 import xarray as xr
+import shutil
 from datetime import datetime
 from scipy import interpolate
 from scipy.ndimage import label
 from mom6_bathy.aux import cell_area_rad
+from mom6_bathy.git_utils import get_domain_dir, repo_action
 from scipy.spatial import cKDTree
 
 
@@ -13,7 +16,7 @@ class Topo:
     Bathymetry Generator for MOM6 grids (mom6_bathy.grid.Grid).
     """
 
-    def __init__(self, grid, min_depth):
+    def __init__(self, grid, min_depth, snapshot_dir="Topos", save_on_create=True):
         """
         MOM6 Simpler Models bathymetry constructor.
 
@@ -28,6 +31,319 @@ class Topo:
         self._grid = grid
         self._depth = None
         self._min_depth = min_depth
+
+        # --- Per-Grid Repo Logic ---
+        if save_on_create:
+            self.SNAPSHOT_DIR = get_domain_dir(self._grid, base_dir=snapshot_dir)
+            os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
+            self.repo = repo_action(self.SNAPSHOT_DIR)
+            self.repo_root = self.SNAPSHOT_DIR
+
+            self.save_grid_definition(self.SNAPSHOT_DIR)
+            self.copy_grid_files_to_snapshot(self.SNAPSHOT_DIR)
+        else:
+            self.SNAPSHOT_DIR = None
+            self.repo = None
+            self.repo_root = None
+
+    def save_grid_definition(self, snapshot_dir):
+        """Save the associated grid NetCDF path in the topo's snapshot directory."""
+        grid_name = self._grid.name or 'grid'
+        grid_nc_name = f"grid_{grid_name}.nc"
+        grid_nc_path = os.path.join(snapshot_dir, grid_nc_name)
+        # Save the grid as NetCDF if not already present
+        if not os.path.exists(grid_nc_path):
+            self._grid.to_netcdf(grid_nc_path)
+        # Save a JSON pointer to the NetCDF file, named with the grid name
+        grid_json = os.path.join(snapshot_dir, f"grid_{grid_name}.json")
+        with open(grid_json, "w") as f:
+            json.dump({"grid_nc": grid_nc_name, "grid_name": grid_name}, f, indent=2)
+
+    def copy_grid_files_to_snapshot(self, snapshot_dir):
+        """
+        Copy the grid NetCDF and JSON files into the snapshot directory if they exist.
+        """
+        # Try to get the grid file paths (customize as needed for your project)
+        if hasattr(self._grid, "_get_grid_folder_and_path"):
+            folder, nc_path, json_path = self._grid._get_grid_folder_and_path(self._grid)
+            if os.path.exists(nc_path):
+                dest_nc = os.path.join(snapshot_dir, os.path.basename(nc_path))
+                if not os.path.exists(dest_nc):
+                    shutil.copy2(nc_path, dest_nc)
+            if os.path.exists(json_path):
+                dest_json = os.path.join(snapshot_dir, os.path.basename(json_path))
+                if not os.path.exists(dest_json):
+                    shutil.copy2(json_path, dest_json)
+
+    @classmethod
+    def load_grid_definition(cls, snapshot_dir, grid_name=None):
+        """Load the associated grid from the topo's snapshot directory."""
+        from mom6_bathy.grid import Grid
+        # If grid_name is not provided, try to find a grid_*.json file
+        if grid_name is None:
+            files = [f for f in os.listdir(snapshot_dir) if f.startswith("grid_") and f.endswith(".json")]
+            if not files:
+                raise FileNotFoundError("No grid_*.json file found in snapshot directory.")
+            grid_json = os.path.join(snapshot_dir, files[0])
+        else:
+            grid_json = os.path.join(snapshot_dir, f"grid_{grid_name}.json")
+        with open(grid_json, "r") as f:
+            meta = json.load(f)
+        grid_nc_path = os.path.join(snapshot_dir, meta["grid_nc"])
+        return Grid.from_netcdf(grid_nc_path)
+
+    @classmethod
+    def from_snapshot(cls, snapshot_dir, min_depth):
+        grid = cls.load_grid_definition(snapshot_dir)
+        # ... load topo data as before ...
+        return cls(grid, min_depth, snapshot_dir=snapshot_dir)
+
+    @classmethod
+    def from_domain_dir(cls, domain_dir, default_min_depth=9.5):
+        """
+        Create a Topo instance from a domain directory.
+        Loads grid, min_depth, and original topo if available.
+        """
+        from mom6_bathy.grid import Grid
+
+        # Find the original grid JSON
+        original_files = [
+            f for f in os.listdir(domain_dir)
+            if f.startswith("original_") and f.endswith(".json") and "min_depth" not in f
+        ]
+        if not original_files:
+            raise FileNotFoundError("No original grid JSON found in domain directory.")
+        original_path = os.path.join(domain_dir, original_files[0])
+        with open(original_path, "r") as f:
+            data = json.load(f)
+        domain_id = data.get("domain_id", {})
+
+        grid_kwargs = dict(
+            lenx=domain_id.get("lenx"),
+            leny=domain_id.get("leny"),
+            resolution=domain_id.get("resolution"),
+            xstart=domain_id.get("xstart"),
+            ystart=domain_id.get("ystart"),
+            name=domain_id.get("grid_name")
+        )
+        grid_kwargs = {k: v for k, v in grid_kwargs.items() if v is not None}
+        grid = Grid(**grid_kwargs)
+        shape = tuple(domain_id.get("shape", []))
+        shape_str = f"{shape[0]}x{shape[1]}"
+        snapshot_dir = get_domain_dir(grid)
+        os.makedirs(snapshot_dir, exist_ok=True)
+        repo = repo_action(snapshot_dir)
+
+        # Load min_depth if available
+        original_min_depth_path = os.path.join(snapshot_dir, f"original_min_depth_{domain_id.get('grid_name')}_{shape_str}.json")
+        if os.path.exists(original_min_depth_path):
+            with open(original_min_depth_path, "r") as f:
+                d = json.load(f)
+                min_depth = d.get("min_depth", default_min_depth)
+        else:
+            min_depth = default_min_depth
+
+        topo = cls(grid, min_depth)
+        # Load original topo array if available
+        original_topo_path = os.path.join(snapshot_dir, f"original_topo_{domain_id.get('grid_name')}_{shape_str}.nc")
+        if os.path.exists(original_topo_path):
+            ds = xr.open_dataset(original_topo_path)
+            topo._depth = ds["depth"]
+        return topo
+    
+    def ensure_original_state(self, snapshot_dir, command_manager, repo, repo_root):
+        """
+        Ensure that the original (reference) topography and minimum depth files exist for the current grid/domain.
+        Also ensures an original snapshot commit and git tracking.
+        """
+        topo_id = {
+            "grid_name": getattr(self._grid, "name", getattr(self._grid, "_name", None)),
+            "shape": [int(v) for v in self.depth.data.shape]
+        }
+        grid_name = topo_id['grid_name']
+        shape = topo_id['shape']
+        shape_str = f"{shape[0]}x{shape[1]}"
+        original_topo_path = os.path.join(snapshot_dir, f"original_topo_{grid_name}_{shape_str}.nc")
+        original_min_depth_path = os.path.join(snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json")
+        original_name = f"original_{grid_name}_{shape_str}"
+        original_path = os.path.join(snapshot_dir, f"{original_name}.json")
+
+        if not os.path.exists(original_topo_path):
+            ds = xr.Dataset(
+                {"depth": (["ny", "nx"], self.depth.data, {"units": "m"})},
+                attrs={"date_created": datetime.now().isoformat()}
+            )
+            ds.to_netcdf(original_topo_path)
+        if not os.path.exists(original_min_depth_path):
+            with open(original_min_depth_path, "w") as f:
+                json.dump({"min_depth": float(self.min_depth)}, f)
+
+        if not os.path.exists(original_path):
+            command_manager.save_commit(original_name)
+
+        if not repo.head.is_valid():
+            rel_path = os.path.relpath(original_path, repo_root)
+            repo.git.add(rel_path)
+            repo.index.commit(f"Initial commit: original snapshot {original_name}")
+
+        from mom6_bathy.git_utils import snapshot_action
+        snapshot_action('ensure_tracked', repo_root, 
+                        file_path=original_path, commit_msg=f"Update original snapshot {original_name}")
+    
+    def get_domain_id(self):
+        grid = self._grid
+        grid_name = getattr(grid, "name", getattr(grid, "_name", None))
+        shape = [int(v) for v in self.depth.data.shape]
+        lenx = getattr(grid, "lenx", None)
+        leny = getattr(grid, "leny", None)
+        resolution = getattr(grid, "resolution", None)
+        xstart = getattr(grid, "xstart", None)
+        ystart = getattr(grid, "ystart", None)
+        return {
+            "grid_name": grid_name,
+            "shape": shape,
+            "lenx": lenx,
+            "leny": leny,
+            "resolution": resolution,
+            "xstart": xstart,
+            "ystart": ystart,
+        }
+    
+    def get_domain_options(self, snapshot_dir):
+        """Return a list of (label, value) tuples for available domains."""
+        from mom6_bathy.git_utils import list_domain_dirs
+        base_dir = os.path.dirname(snapshot_dir)
+        domains = list_domain_dirs(base_dir)
+        options = []
+        for d in domains:
+            label = d.replace("domain_", "")
+            options.append((label, d))
+        return options
+
+    def get_current_domain(self, domain_options, snapshot_dir):
+        """Return the value of the current domain if present in options, else None."""
+        current = None
+        for label, value in domain_options:
+            if value == os.path.basename(snapshot_dir):
+                current = value
+                break
+        return current
+
+    def persist_last_domain(self, snapshot_dir, domain_id=None, snapshot_name=None, load=False):
+        """Save or load the last used domain and snapshot to/from a JSON file."""
+        path = os.path.join(snapshot_dir, ".last_domain.json")
+        if load:
+            try:
+                with open(path, "r") as f:
+                    data = json.load(f)
+                return data.get("domain_id"), data.get("snapshot_name")
+            except Exception:
+                return None, None
+        else:
+            try:
+                with open(path, "w") as f:
+                    json.dump({"domain_id": domain_id, "snapshot_name": snapshot_name}, f)
+            except Exception:
+                pass
+
+    def check_restore_last_domain(self, snapshot_dir, get_topo_id, restore_last=True):
+        """Restore last domain/grid only if it matches the current topo's grid_name and shape."""
+        if not restore_last:
+            return None, None
+        last_domain_id, snapshot_name = self.persist_last_domain(snapshot_dir, load=True)
+        if last_domain_id is not None:
+            current_id = get_topo_id()
+            if (last_domain_id.get("grid_name") == current_id.get("grid_name") and
+                last_domain_id.get("shape") == current_id.get("shape")):
+                new_topo, snap = self.restore_last_domain(snapshot_dir, get_topo_id)
+                return new_topo, snap
+        return None, None
+
+    def restore_last_domain(self, snapshot_dir, get_topo_id):
+        """Restore the last used domain/grid and snapshot, if available. Returns snapshot_name if present, else None."""
+        domain_id, snapshot_name = self.persist_last_domain(snapshot_dir, load=True)
+        if not domain_id:
+            return None  # Nothing to restore
+
+        try:
+            from mom6_bathy.grid import Grid
+            from mom6_bathy.topo import Topo
+            grid_kwargs = {k: v for k, v in dict(
+                lenx=domain_id.get("lenx"),
+                leny=domain_id.get("leny"),
+                resolution=domain_id.get("resolution"),
+                xstart=domain_id.get("xstart"),
+                ystart=domain_id.get("ystart"),
+                name=domain_id.get("grid_name")
+            ).items() if v is not None}
+            new_grid = Grid(**grid_kwargs)
+            min_depth = domain_id.get("min_depth", 9.5)
+            shape = tuple(domain_id.get("shape", []))
+            shape_str = f"{shape[0]}x{shape[1]}"
+            original_min_depth_path = os.path.join(snapshot_dir, f"original_min_depth_{domain_id.get('grid_name')}_{shape_str}.json")
+            if os.path.exists(original_min_depth_path):
+                with open(original_min_depth_path, "r") as f:
+                    d = json.load(f)
+                    min_depth = d.get("min_depth", min_depth)
+            new_topo = Topo(new_grid, min_depth)
+            original_topo_path = os.path.join(snapshot_dir, f"original_topo_{domain_id.get('grid_name')}_{shape_str}.nc")
+            if os.path.exists(original_topo_path):
+                ds = xr.open_dataset(original_topo_path)
+                new_topo._depth = ds["depth"]
+            # Set state in the editor after calling this!
+            return new_topo, snapshot_name  # Return the new topo and snapshot name
+        except Exception as e:
+            print(f"[WARN] Could not restore last domain: {e}")
+            return None, None
+    
+    def apply_edit(self, cmd):
+        self.command_manager.execute(cmd)
+        self.command_manager.save_commit("_autosave_working")
+
+    def undo_last_edit(self):
+        self.command_manager.undo()
+
+    def redo_last_edit(self):
+        self.command_manager.redo()
+
+    def to_snapshot_dict(self):
+        return {
+            "domain_id": self.get_domain_id(),
+            "depth": self._depth.data.tolist(),
+            "min_depth": self._min_depth,
+            # Add more fields as needed
+        }
+
+    def save_snapshot(self, path, extra_metadata=None):
+        data = self.to_snapshot_dict()
+        if extra_metadata:
+            data.update(extra_metadata)
+        with open(path, "w") as f:
+            json.dump(data, f)
+
+    @classmethod
+    def from_snapshot_file(cls, path):
+        with open(path, "r") as f:
+            data = json.load(f)
+        # Reconstruct grid and topo
+        from mom6_bathy.grid import Grid
+        domain_id = data["domain_id"]
+        grid_kwargs = {k: v for k, v in dict(
+            lenx=domain_id.get("lenx"),
+            leny=domain_id.get("leny"),
+            resolution=domain_id.get("resolution"),
+            xstart=domain_id.get("xstart"),
+            ystart=domain_id.get("ystart"),
+            name=domain_id.get("grid_name")
+        ).items() if v is not None}
+        grid = Grid(**grid_kwargs)
+        topo = cls(grid, data.get("min_depth", 9.5))
+        topo._depth = xr.DataArray(
+            np.array(data["depth"]),
+            dims=["ny", "nx"],
+            attrs={"units": "m"},
+        )
+        return topo
 
     @classmethod
     def from_topo_file(cls, grid, topo_file_path, min_depth=0.0):
@@ -44,7 +360,7 @@ class Topo:
             Minimum water column depth (m). Columns with shallower depths are to be masked out.
         """
 
-        topo = cls(grid, 0.0)
+        topo = cls(grid, 0.0, save_on_create=False)
         topo.set_depth_via_topog_file(topo_file_path)
         topo.min_depth = min_depth
         return topo
@@ -578,7 +894,7 @@ class Topo:
             dims=["ny", "nx"],
             attrs={
                 "long_name": "array of t-grid latitudes",
-                "units": self._grid.tlat.units,
+                "units": self._grid.tlat.attrs.get("units", "degrees_north"),
             },
         )
 
@@ -586,8 +902,8 @@ class Topo:
             self._grid.tlon,
             dims=["ny", "nx"],
             attrs={
-                "long_name": "array of t-grid longitutes",
-                "units": self._grid.tlon.units,
+                "long_name": "array of t-grid longitudes",
+                "units": self._grid.tlon.attrs.get("units", "degrees_east"),
             },
         )
 
@@ -620,7 +936,7 @@ class Topo:
         """
 
         assert (
-            "degrees" in self._grid.tlat.units and "degrees" in self._grid.tlon.units
+            "degrees" in self._grid.tlat.attrs.get("units", "degrees_north") and "degrees" in self._grid.tlon.attrs.get("units", "degrees_east")
         ), "Unsupported coord"
 
         ds = xr.Dataset()
@@ -844,11 +1160,11 @@ class Topo:
             dims=["elementCount"],
             attrs={"long_name": "Node indices that define the element connectivity"},
         )
-
+        
         ds["elementArea"] = xr.DataArray(
             self._grid.tarea.data.flatten(),
             dims=["elementCount"],
-            attrs={"units": self._grid.tarea.units},
+            attrs={"units": self._grid.tarea.attrs.get("units", "unknown")},
         )
 
         ds["elementMask"] = xr.DataArray(
