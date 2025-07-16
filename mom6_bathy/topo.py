@@ -16,7 +16,7 @@ class Topo:
     Bathymetry Generator for MOM6 grids (mom6_bathy.grid.Grid).
     """
 
-    def __init__(self, grid, min_depth, snapshot_dir="Topos"):
+    def __init__(self, grid, min_depth, snapshot_dir="Topos", save_on_create=True):
         """
         MOM6 Simpler Models bathymetry constructor.
 
@@ -33,13 +33,18 @@ class Topo:
         self._min_depth = min_depth
 
         # --- Per-Grid Repo Logic ---
-        self.SNAPSHOT_DIR = get_domain_dir(self._grid, base_dir=snapshot_dir)
-        os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
-        self.repo = repo_action(self.SNAPSHOT_DIR)
-        self.repo_root = self.SNAPSHOT_DIR
+        if save_on_create:
+            self.SNAPSHOT_DIR = get_domain_dir(self._grid, base_dir=snapshot_dir)
+            os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
+            self.repo = repo_action(self.SNAPSHOT_DIR)
+            self.repo_root = self.SNAPSHOT_DIR
 
-        self.save_grid_definition(self.SNAPSHOT_DIR)
-        self.copy_grid_files_to_snapshot(self.SNAPSHOT_DIR)
+            self.save_grid_definition(self.SNAPSHOT_DIR)
+            self.copy_grid_files_to_snapshot(self.SNAPSHOT_DIR)
+        else:
+            self.SNAPSHOT_DIR = None
+            self.repo = None
+            self.repo_root = None
 
     def save_grid_definition(self, snapshot_dir):
         """Save the associated grid NetCDF path in the topo's snapshot directory."""
@@ -355,7 +360,7 @@ class Topo:
             Minimum water column depth (m). Columns with shallower depths are to be masked out.
         """
 
-        topo = cls(grid, 0.0)
+        topo = cls(grid, 0.0, save_on_create=False)
         topo.set_depth_via_topog_file(topo_file_path)
         topo.min_depth = min_depth
         return topo
@@ -889,7 +894,7 @@ class Topo:
             dims=["ny", "nx"],
             attrs={
                 "long_name": "array of t-grid latitudes",
-                "units": self._grid.tlat.units,
+                "units": self._grid.tlat.attrs.get("units", "degrees_north"),
             },
         )
 
@@ -897,8 +902,8 @@ class Topo:
             self._grid.tlon,
             dims=["ny", "nx"],
             attrs={
-                "long_name": "array of t-grid longitutes",
-                "units": self._grid.tlon.units,
+                "long_name": "array of t-grid longitudes",
+                "units": self._grid.tlon.attrs.get("units", "degrees_east"),
             },
         )
 
@@ -931,7 +936,7 @@ class Topo:
         """
 
         assert (
-            "degrees" in self._grid.tlat.units and "degrees" in self._grid.tlon.units
+            "degrees" in self._grid.tlat.attrs.get("units", "degrees_north") and "degrees" in self._grid.tlon.attrs.get("units", "degrees_east")
         ), "Unsupported coord"
 
         ds = xr.Dataset()
@@ -1155,11 +1160,11 @@ class Topo:
             dims=["elementCount"],
             attrs={"long_name": "Node indices that define the element connectivity"},
         )
-
+        
         ds["elementArea"] = xr.DataArray(
             self._grid.tarea.data.flatten(),
             dims=["elementCount"],
-            attrs={"units": self._grid.tarea.units},
+            attrs={"units": self._grid.tarea.attrs.get("units", "unknown")},
         )
 
         ds["elementMask"] = xr.DataArray(

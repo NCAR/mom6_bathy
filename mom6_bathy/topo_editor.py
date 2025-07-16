@@ -258,8 +258,8 @@ class TopoEditor(widgets.HBox):
 
         # Axis labels and title
         self.ax.set_title('Double click on a cell to change its depth.')
-        self.ax.set_xlabel(f'x ({self.topo._grid.qlon.units})')
-        self.ax.set_ylabel(f'y ({self.topo._grid.qlat.units})')
+        self.ax.set_xlabel(f'x ({self.topo._grid.qlon.attrs.get("units", "degrees_east")})')
+        self.ax.set_ylabel(f'y ({self.topo._grid.qlat.attrs.get("units", "degrees_north")})')
 
         # Add colorbar for depth
         self.cbar = self.fig.colorbar(self.im, ax=self.ax, orientation='vertical', pad=0.02)

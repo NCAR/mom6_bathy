@@ -80,7 +80,7 @@ class VGridEditor(widgets.HBox):
             layout={'width': '98%', 'color': 'red', 'display': 'none'}  # Start hidden
         )
         self._ratio_slider = widgets.FloatSlider(
-            value=ratio_value, min=0.1, max=10.0, step=0.01,
+            value=ratio_value, min=0.1, max=20.0, step=0.01,
             description="Top/Bottom Ratio:",
             layout={'width': '98%'}, style=label_style
         )

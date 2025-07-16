@@ -349,10 +349,16 @@ class GridEditor(widgets.HBox):
             resolution=params["resolution"],
             xstart=params["xstart"],
             ystart=params["ystart"],
-            name=sanitized_name
+            name=sanitized_name,
+            save_on_create=False
         )
         self.sync_sliders_to_grid()
         self.plot_grid()
+        grid_nc_name = f"grid_{sanitized_name}.nc"
+        option_values = [v for (l, v) in self._commit_dropdown.options]
+        if grid_nc_name in option_values:
+            self._commit_dropdown.value = grid_nc_name
+        self.update_commit_details()
 
     def refresh_commit_dropdown(self):
         # List all .nc files in the Grids directory (no subfolders)

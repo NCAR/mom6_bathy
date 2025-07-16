@@ -93,6 +93,14 @@ class VGrid:
         ds = xr.open_dataset(filename)
         assert 'dz' in ds, f"File {filename} does not contain a 'dz' variable"
         dz = ds['dz'].values
+        if name is None:
+            name = ds.attrs.get("title", None)
+            if name is None or name.strip() == "":
+                base = os.path.basename(filename)
+                if base.startswith("vgrid_") and base.endswith(".nc"):
+                    name = base[len("vgrid_"):-3]
+                else:
+                    name = "UnnamedVGrid"
         return cls(dz, name=name, save_on_create=save_on_create, repo_root=repo_root)
 
     def _get_vgrid_folder(self, root_dir=None, create=True):

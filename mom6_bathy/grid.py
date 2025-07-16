@@ -377,7 +377,7 @@ class Grid:
 
 
     @classmethod
-    def from_supergrid(cls, path: str, name: Optional[str] = None, save_on_create: bool = True) -> "Grid":
+    def from_supergrid(cls, path: str, name: Optional[str] = None, save_on_create: bool = False) -> "Grid":
         ds = xr.open_dataset(path)
         assert (
             ds.x.units == ds.y.units and "degree" in ds.x.units
@@ -842,6 +842,13 @@ class Grid:
         ds["angle_dx"] = xr.DataArray(
             self._supergrid.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"}
         )
+        ds.attrs["name"] = self.name
+        ds.attrs["lenx"] = self.lenx
+        ds.attrs["leny"] = self.leny
+        ds.attrs["resolution"] = self.resolution
+        ds.attrs["xstart"] = self.xstart
+        ds.attrs["ystart"] = self.ystart
+        
         ds.to_netcdf(path)
 
     def _initialize_on_disk(self, message="Initial grid creation"):
@@ -872,86 +879,130 @@ class Grid:
         nc_path = os.path.join(folder, f"grid_{sanitized_name}.nc")
         return nc_path
 
-    def to_netcdf(self, path=None):
+    def to_netcdf(self, path=None, format="grid"):
         if self.resolution is None:
             raise ValueError("Grid resolution is None. Cannot write to NetCDF. Please ensure resolution is set.")
         if path is None:
             path = self._get_nc_path()
         folder = os.path.dirname(path)
         os.makedirs(folder, exist_ok=True)
-    
-        ny, nx = self.tlon.shape
-        nyp, nxp = self.qlon.shape
 
-        ds = xr.Dataset(
-            {
-                "tlon": (["ny", "nx"], self.tlon.values),
-                "tlat": (["ny", "nx"], self.tlat.values),
-                "ulon": (["ny", "nxp"], self.ulon.values),
-                "ulat": (["ny", "nxp"], self.ulat.values),
-                "vlon": (["nyp", "nx"], self.vlon.values),
-                "vlat": (["nyp", "nx"], self.vlat.values),
-                "qlon": (["nyp", "nxp"], self.qlon.values),
-                "qlat": (["nyp", "nxp"], self.qlat.values),
-                "dxt": (["ny", "nx"], self.dxt.values),
-                "dyt": (["ny", "nx"], self.dyt.values),
-                "dxCv": (["ny", "nx"], self.dxCv.values),
-                "dyCu": (["ny", "nx"], self.dyCu.values),
-                "dxCu": (["ny", "nx"], self.dxCu.values),
-                "dyCv": (["ny", "nx"], self.dyCv.values),
-                "angle": (["ny", "nx"], self.angle.values),
-                "angle_q": (["nyp", "nxp"], self.angle_q.values),
-                "tarea": (["ny", "nx"], self.tarea.values),
-            },
-            coords={
-                "ny": np.arange(ny),
-                "nx": np.arange(nx),
-                "nyp": np.arange(nyp),
-                "nxp": np.arange(nxp),
-            }
-        )
-        ds.attrs.update({
-            "name": self.name,
-            "lenx": self.lenx,
-            "leny": self.leny,
-            "resolution": self.resolution,
-            "xstart": self.xstart,
-            "ystart": self.ystart,
-            "nx": self.nx,
-            "ny": self.ny,
-            "date_created": datetime.now().isoformat(),
-        })
-        ds.to_netcdf(path)
+        if format == "supergrid":
+            # Write in supergrid format (x, y, dx, dy, area, angle_dx)
+            ds = xr.Dataset()
+            ds.attrs["filename"] = os.path.basename(path)
+            ds.attrs["type"] = "MOM6 supergrid"
+            ds.attrs["Created"] = datetime.now().isoformat()
+            ds.attrs["name"] = self.name
+            ds.attrs["lenx"] = self.lenx
+            ds.attrs["leny"] = self.leny
+            ds.attrs["resolution"] = self.resolution
+            ds.attrs["xstart"] = self.xstart
+            ds.attrs["ystart"] = self.ystart
+
+            sg = self._supergrid
+            ds["y"] = xr.DataArray(sg.y, dims=["nyp", "nxp"], attrs={"units": sg.dict["axis_units"]})
+            ds["x"] = xr.DataArray(sg.x, dims=["nyp", "nxp"], attrs={"units": sg.dict["axis_units"]})
+            ds["dy"] = xr.DataArray(sg.dy, dims=["ny", "nxp"], attrs={"units": "meters"})
+            ds["dx"] = xr.DataArray(sg.dx, dims=["nyp", "nx"], attrs={"units": "meters"})
+            ds["area"] = xr.DataArray(sg.area, dims=["ny", "nx"], attrs={"units": "m2"})
+            ds["angle_dx"] = xr.DataArray(sg.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"})
+            ds.to_netcdf(path)
+        else:
+            # Default: write in regular grid format (tlon, tlat, etc.)
+            ny, nx = self.tlon.shape
+            nyp, nxp = self.qlon.shape
+
+            ds = xr.Dataset(
+                {
+                    "tlon": (["ny", "nx"], self.tlon.values),
+                    "tlat": (["ny", "nx"], self.tlat.values),
+                    "ulon": (["ny", "nxp"], self.ulon.values),
+                    "ulat": (["ny", "nxp"], self.ulat.values),
+                    "vlon": (["nyp", "nx"], self.vlon.values),
+                    "vlat": (["nyp", "nx"], self.vlat.values),
+                    "qlon": (["nyp", "nxp"], self.qlon.values),
+                    "qlat": (["nyp", "nxp"], self.qlat.values),
+                    "dxt": (["ny", "nx"], self.dxt.values),
+                    "dyt": (["ny", "nx"], self.dyt.values),
+                    "dxCv": (["ny", "nx"], self.dxCv.values),
+                    "dyCu": (["ny", "nx"], self.dyCu.values),
+                    "dxCu": (["ny", "nx"], self.dxCu.values),
+                    "dyCv": (["ny", "nx"], self.dyCv.values),
+                    "angle": (["ny", "nx"], self.angle.values),
+                    "angle_q": (["nyp", "nxp"], self.angle_q.values),
+                    "tarea": (["ny", "nx"], self.tarea.values),
+                },
+                coords={
+                    "ny": np.arange(ny),
+                    "nx": np.arange(nx),
+                    "nyp": np.arange(nyp),
+                    "nxp": np.arange(nxp),
+                }
+            )
+            ds.attrs.update({
+                "name": self.name,
+                "lenx": self.lenx,
+                "leny": self.leny,
+                "resolution": self.resolution,
+                "xstart": self.xstart,
+                "ystart": self.ystart,
+                "nx": self.nx,
+                "ny": self.ny,
+                "date_created": datetime.now().isoformat(),
+            })
+            ds.to_netcdf(path)
 
     @classmethod
     def from_netcdf(cls, path):
+        import re
         ds = xr.open_dataset(path)
-        grid = cls(
-            lenx=float(ds.attrs["lenx"]),
-            leny=float(ds.attrs["leny"]),
-            resolution=float(ds.attrs["resolution"]),
-            xstart=float(ds.attrs["xstart"]),
-            ystart=float(ds.attrs["ystart"]),
-            name=ds.attrs.get("name", None),
-            save_on_create=False,  
-        )
-        # Assign arrays directly to avoid recomputation
-        grid.tlon = ds["tlon"]
-        grid.tlat = ds["tlat"]
-        grid.ulon = ds["ulon"]
-        grid.ulat = ds["ulat"]
-        grid.vlon = ds["vlon"]
-        grid.vlat = ds["vlat"]
-        grid.qlon = ds["qlon"]
-        grid.qlat = ds["qlat"]
-        grid.dxt = ds["dxt"]
-        grid.dyt = ds["dyt"]
-        grid.dxCv = ds["dxCv"]
-        grid.dyCu = ds["dyCu"]
-        grid.dxCu = ds["dxCu"]
-        grid.dyCv = ds["dyCv"]
-        grid.angle = ds["angle"]
-        grid.angle_q = ds["angle_q"]
-        grid.tarea = ds["tarea"]
-        # Add more arrays if needed
-        return grid
+        # Auto-detect format
+        if "tlon" in ds and "tlat" in ds:
+            # Standard grid format
+            raw_name = ds.attrs.get("name", None)
+            if raw_name is not None:
+                # Remove ALL leading ocean_hgrid_ prefixes
+                name = re.sub(r'^(ocean_hgrid_)+', '', raw_name)
+                # Remove ALL trailing _[sessionid] (6 hex digits) segments
+                while re.search(r'_[0-9a-f]{6}$', name):
+                    name = re.sub(r'_[0-9a-f]{6}$', '', name)
+            else:
+                name = None
+            grid = cls(
+                lenx=float(ds.attrs["lenx"]),
+                leny=float(ds.attrs["leny"]),
+                resolution=float(ds.attrs["resolution"]),
+                xstart=float(ds.attrs["xstart"]),
+                ystart=float(ds.attrs["ystart"]),
+                name=name,
+                save_on_create=False,  
+            )
+            # Assign arrays directly to avoid recomputation
+            grid.tlon = ds["tlon"]
+            grid.tlat = ds["tlat"]
+            if "units" not in grid.tlon.attrs:
+                grid.tlon.attrs["units"] = "degrees_east"
+            if "units" not in grid.tlat.attrs:
+                grid.tlat.attrs["units"] = "degrees_north"
+            grid.ulon = ds["ulon"]
+            grid.ulat = ds["ulat"]
+            grid.vlon = ds["vlon"]
+            grid.vlat = ds["vlat"]
+            grid.qlon = ds["qlon"]
+            grid.qlat = ds["qlat"]
+            grid.dxt = ds["dxt"]
+            grid.dyt = ds["dyt"]
+            grid.dxCv = ds["dxCv"]
+            grid.dyCu = ds["dyCu"]
+            grid.dxCu = ds["dxCu"]
+            grid.dyCv = ds["dyCv"]
+            grid.angle = ds["angle"]
+            grid.angle_q = ds["angle_q"]
+            grid.tarea = ds["tarea"]
+            return grid
+        elif "x" in ds and "y" in ds:
+            # Supergrid format
+            return cls.from_supergrid(path)
+        else:
+            raise ValueError(f"Unrecognized grid file format: {path}")
