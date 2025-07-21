@@ -135,7 +135,7 @@ class VGridEditor(widgets.HBox):
         )
 
         controls = widgets.VBox([
-            widgets.HTML("<h3>Vertical Grid Controls</h3>"),
+            widgets.HTML("<h3>Vertical Grid Editor</h3>"),
             self._type_toggle,
             self._nk_slider,
             self._depth_slider,
@@ -183,7 +183,7 @@ class VGridEditor(widgets.HBox):
             self.ax.axhline(y=depth, color='steelblue')
         self.ax.set_ylim(max(self.vgrid.z) + 10, min(self.vgrid.z) - 10)
         self.ax.set_ylabel("Depth (m)")
-        self.ax.set_title("Vertical Grid")
+        self.ax.set_title("Use the sliders to adjust vertical grid parameters.")
         self.fig.canvas.draw_idle()
 
     def _on_param_change(self, change):

@@ -96,7 +96,7 @@ class GridEditor(widgets.HBox):
         )
 
         controls = widgets.VBox([
-            widgets.HTML("<h3>Grid Controls</h3>"),
+            widgets.HTML("<h3>Grid Editor</h3>"),
             self._resolution_slider,
             self._xstart_slider,
             self._lenx_slider,
@@ -146,7 +146,7 @@ class GridEditor(widgets.HBox):
             self.ax.plot(self.grid.qlon[:, i], self.grid.qlat[:, i], color='k', linewidth=0.1, transform=ccrs.PlateCarree())
         for j in range(n_jq):
             self.ax.plot(self.grid.qlon[j, :], self.grid.qlat[j, :], color='k', linewidth=0.1, transform=ccrs.PlateCarree())
-        self.ax.set_title("Grid Editor")
+        self.ax.set_title("Use the sliders to adjust grid parameters.")
 
         lon_min, lon_max = float(self.grid.qlon.min()), float(self.grid.qlon.max())
         lat_min, lat_max = float(self.grid.qlat.min()), float(self.grid.qlat.max())

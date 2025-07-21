@@ -352,7 +352,7 @@ class TopoEditor(widgets.HBox):
         )
         self._commit_dropdown = widgets.Dropdown(
             options=[],
-            description='Snapshots:',
+            description='Snapshot:',
             layout={'width': '90%'}
         )
         self._commit_details = widgets.HTML(
@@ -422,6 +422,9 @@ class TopoEditor(widgets.HBox):
             widgets.HBox([self._undo_button, self._redo_button, self._reset_button]),
         ])
         snapshot_section = widgets.VBox([
+            self._domain_dropdown,
+            self._switch_domain_button,
+            widgets.HTML("<hr>"),
             self._snapshot_name,
             self._commit_msg,
             self._commit_dropdown,
@@ -429,8 +432,6 @@ class TopoEditor(widgets.HBox):
             widgets.HBox([self._save_button, self._load_button]),
         ])
         git_section = widgets.VBox([
-            self._domain_dropdown,
-            self._switch_domain_button,
             self._git_branch_name,
             widgets.HBox([self._git_create_branch_button, self._git_delete_branch_button]),
             self._git_branch_dropdown,
@@ -448,7 +449,7 @@ class TopoEditor(widgets.HBox):
             history_section,
         ])
         snapshot_accordion = widgets.Accordion(children=[snapshot_section])
-        snapshot_accordion.set_title(0, 'Snapshots')
+        snapshot_accordion.set_title(0, 'Domains and Snapshots')
         snapshot_accordion.selected_index = None  # collapsed by default
         git_accordion = widgets.Accordion(children=[git_section])
         git_accordion.set_title(0, 'Git Version Control')
