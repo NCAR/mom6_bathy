@@ -2,14 +2,15 @@
 
 import os
 import argparse
-import xesmf as xe
 import xarray as xr
 import numpy as np
 from pathlib import Path
 from scipy.spatial import cKDTree
 from scipy.sparse import coo_matrix
 
-from mom6_bathy.aux import get_mesh_dimensions, cell_area_rad
+MPI = None
+
+from mom6_bathy.aux import get_mesh_dimensions, cell_area_rad, normalize_deg
 
 def grid_from_esmf_mesh(mesh: xr.Dataset | str | Path) -> "Grid":
     """Given an ESMF mesh where the grid metrics are stored in 1D (flattened) arrays,
@@ -39,12 +40,15 @@ def grid_from_esmf_mesh(mesh: xr.Dataset | str | Path) -> "Grid":
     mask = mesh['elementMask'].values.reshape((ny, nx))
 
     ds = xr.Dataset(
-        {
-            'lon': (('nlat', 'nlon'), lon),
-            'lat': (('nlat', 'nlon'), lat),
+        data_vars={
             'mask': (('nlat', 'nlon'), mask),
         },
-        coords={'nlat': np.arange(ny), 'nlon': np.arange(nx)}
+        coords={
+            'lon': (('nlat', 'nlon'), lon, {'standard_name': 'longitude', 'units': 'degrees_east'}),
+            'lat': (('nlat', 'nlon'), lat, {'standard_name': 'latitude', 'units': 'degrees_north'}),
+            'nlat': np.arange(ny),
+            'nlon': np.arange(nx),
+        }
     )
 
     return ds
@@ -152,6 +156,11 @@ def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=
     -------
     None
     """
+
+    rank = MPI.COMM_WORLD.Get_rank() if MPI else 0
+
+    if rank != 0:
+        return # TODO: parallelize this function
 
     if isinstance(src_mesh, str):
         src_mesh = xr.open_dataset(src_mesh)
@@ -477,6 +486,8 @@ def generate_ESMF_map_via_esmpy(src_mesh_path, dst_mesh_path, mapping_file, meth
             raise NotImplementedError("Conservative regridding is not yet tested.")
         case _:
             raise ValueError(f"Invalid regridding method: {method}")
+    
+    rank = MPI.COMM_WORLD.Get_rank() if MPI else 0
 
     # Create src and dst meshes and fields
     src_mesh = esmpy.Mesh(
@@ -497,16 +508,13 @@ def generate_ESMF_map_via_esmpy(src_mesh_path, dst_mesh_path, mapping_file, meth
 
     dst_field = esmpy.Field(dst_mesh, meshloc=esmpy.MeshLoc.ELEMENT)
 
-    # Apply mask:
-    maskval = 0.0  # Value to use for masked elements
-    src_mesh_ds = xr.open_dataset(src_mesh_path)
-    src_field.data[:] = np.where(src_mesh_ds.elementMask.data == 0, maskval, 1.0)
-    dst_mesh_ds = xr.open_dataset(dst_mesh_path)
-    dst_field.data[:] = np.where(dst_mesh_ds.elementMask.data == 0, maskval, 1.0)
 
     # Run the regridder
-    if os.path.exists(mapping_file):
+    if rank == 0 and os.path.exists(mapping_file):
         os.remove(mapping_file)
+
+    if MPI:
+        MPI.COMM_WORLD.Barrier()
 
     # Create regridder and save the weights to the mapping file temporarily
     # This file will later be extended to include the full ESMF map fields
@@ -514,8 +522,8 @@ def generate_ESMF_map_via_esmpy(src_mesh_path, dst_mesh_path, mapping_file, meth
         src_field,
         dst_field,
         filename=mapping_file,
-        src_mask_values=np.array([maskval]),
-        dst_mask_values=np.array([maskval]),
+        src_mask_values=np.array([0.0]),
+        dst_mask_values=np.array([0.0]),
         regrid_method=method,
         unmapped_action=esmpy.UnmappedAction.ERROR,
     )
@@ -614,18 +622,18 @@ def main(args):
         raise ValueError("dst_mesh must be a path to an existing ESMF mesh file.")
     if not isinstance(args.mapping_file, (str, Path)) or Path(args.mapping_file).exists():
         raise ValueError("mapping_file must be a path to a new ESMF mapping file.")
-    if args.use_esmpy:
+    
+    if args.parallel:
+        global MPI
+        from mpi4py import MPI
 
-        generate_ESMF_map_via_esmpy(
-            src_mesh_path=args.src_mesh,
-            dst_mesh_path=args.dst_mesh,
-            mapping_file=args.mapping_file,
-            method=args.method,
-            area_normalization=args.area_normalization
-        )
-
-    else:
-        raise NotImplementedError("xESMF-based mapping generation is not yet implemented.")
+    generate_ESMF_map_via_esmpy(
+        src_mesh_path=args.src_mesh,
+        dst_mesh_path=args.dst_mesh,
+        mapping_file=args.mapping_file,
+        method=args.method,
+        area_normalization=args.area_normalization
+    )
 
 
 if __name__ == "__main__":
@@ -637,8 +645,9 @@ if __name__ == "__main__":
                         help="Regridding method to use", default='nearest_d2s')
     parser.add_argument("--area_normalization", action="store_true", 
                         help="Whether to apply area normalization to the weights", default=False)
-    parser.add_argument("--use_esmpy", action="store_true", 
-                        help="Whether to use esmpy for regridding instead of xESMF", default=False)
+    parser.add_argument("--parallel", action="store_true",
+                        help="Run in parallel using MPI. Must also be run with mpirun.",
+                        default=False)
 
     args = parser.parse_args()
     main(args)
