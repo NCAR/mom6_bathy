@@ -5,6 +5,21 @@ import xarray as xr
 import numpy as np
 import scipy
 
+def normalize_deg(coord):
+    """Normalize a coordinate in degrees to the range [0, 360).
+
+    Parameters
+    ----------
+    coord : float or np.ndarray
+        Coordinate(s) in degrees.
+
+    Returns
+    -------
+    normalized_coord : float or np.ndarray
+        Normalized coordinate(s) in the range [0, 360).
+    """
+    return np.mod(coord + 360.0, 360.0)
+
 def get_mesh_dimensions(mesh):
     """Given an ESMF mesh where the grid metrics are stored in 1D (flattened) arrays,
     compute the dimensions of the 2D grid and return them as nx, ny.
@@ -27,54 +42,34 @@ def get_mesh_dimensions(mesh):
         mesh = xr.open_dataset(mesh)
 
     centerCoords = mesh['centerCoords'].values
+    econn = mesh['elementConn'].values
+    econn0 = econn[0]
 
-    x0, y0 = centerCoords[0]  # First coordinate
-    x0 = (x0 + 360) % 360  # Normalize longitude
-
-    coords = centerCoords[:, :2]
-    x, y = coords[:, 0], coords[:, 1]
-
-    # Compute distances in bulk
-    dists = (np.mod(x + 360 - x0, 360)) ** 2 + (y - y0) ** 2
-
-    # Diff of distances
-    diff = np.diff(dists)
+    nx = None
+    for i in range(2, len(econn)):
+        # if the number of shared nodes is 2, we are at the start of a new row
+        if len(np.intersect1d(econn[i], econn0)) == 2:
+            if i < len(econn) - 1 and len(np.intersect1d(econn[i + 1], econn0)) == 2:
+                nx = i+1    # domain is cyclic
+            else:
+                nx = i      # domain is Not cyclic
+            break
     
-    # Index of the first decrease in distances:
-    i = np.where(diff < 0)[0][0]
-    # Index of the first increase after the first decrease:
-    i = np.where(diff[i:] > 0)[0][0] + i 
+    if nx is None:
+        raise ValueError("Could not determine the number of points in the x-direction (nx).")
 
-    nx = i
     ny = len(centerCoords) // nx
 
     # Check that nx is indeed nx and not ny, and if not, swap them
+    coords = centerCoords[:, :2]  # Use only the first two columns for x and y coordinates
+    x0, y0 = centerCoords[0]  # First coordinate
+    x0 = normalize_deg(x0)  # Normalize to [0, 360)
     if np.abs(np.mod(coords[nx//2, 0] - x0, 360)) < np.abs(coords[nx//2, 1] - y0):
         nx, ny = ny, nx
 
-    assert nx * ny == len(centerCoords), "nx*ny must match the number of points in the mesh"
+    assert nx * ny == len(centerCoords), \
+        f"Mesh dimensions do not match the number of coordinates: {nx} * {ny} != {len(centerCoords)}"
     return nx, ny
-
-
-
-def _lonlat_to_unitvec(lon, lat):
-    """Convert longitude and latitude to unit vectors.
-    This functions is used for area computation
-
-    Parameters
-    ----------
-    lon : float or np.ndarray
-        Longitude in degrees.
-    lat : float or np.ndarray
-        Latitude in degrees.
-
-    Returns
-    -------
-    result : np.ndarray
-        Unit vectors (x, y, z)
-    """
-    
-
 
 
 def _spherical_angle(a, b):
