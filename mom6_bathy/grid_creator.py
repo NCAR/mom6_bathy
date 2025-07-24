@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
-class GridEditor(widgets.HBox):
+class GridCreator(widgets.HBox):
 
     def __init__(self, grid, repo_root=None):
         self.grid = grid
@@ -96,7 +96,7 @@ class GridEditor(widgets.HBox):
         )
 
         controls = widgets.VBox([
-            widgets.HTML("<h3>Grid Editor</h3>"),
+            widgets.HTML("<h3>Grid Creator</h3>"),
             self._resolution_slider,
             self._xstart_slider,
             self._lenx_slider,

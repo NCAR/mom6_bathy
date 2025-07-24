@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import threading
 from mom6_bathy.vgrid import VGrid
 
-class VGridEditor(widgets.HBox):
+class VGridCreator(widgets.HBox):
     """
-    Interactive editor for vertical grids (VGrid).
+    Interactive creator for vertical grids (VGrid).
     Allows creation, editing, saving, and loading of vertical grid profiles.
     """
 
@@ -135,7 +135,7 @@ class VGridEditor(widgets.HBox):
         )
 
         controls = widgets.VBox([
-            widgets.HTML("<h3>Vertical Grid Editor</h3>"),
+            widgets.HTML("<h3>Vertical Grid Creator</h3>"),
             self._type_toggle,
             self._nk_slider,
             self._depth_slider,
