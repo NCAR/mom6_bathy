@@ -61,6 +61,9 @@ def get_mesh_dimensions(mesh):
     ny = len(centerCoords) // nx
 
     # Check that nx is indeed nx and not ny, and if not, swap them
+    assert 'units' in mesh['centerCoords'].attrs, "centerCoords must have 'units' attribute"
+    assert 'degrees' in mesh['centerCoords'].attrs['units'], \
+        "get_mesh_dimensions() expects centerCoords in degrees"
     coords = centerCoords[:, :2]  # Use only the first two columns for x and y coordinates
     x0, y0 = centerCoords[0]  # First coordinate
     x0 = normalize_deg(x0)  # Normalize to [0, 360)
@@ -70,6 +73,29 @@ def get_mesh_dimensions(mesh):
     assert nx * ny == len(centerCoords), \
         f"Mesh dimensions do not match the number of coordinates: {nx} * {ny} != {len(centerCoords)}"
     return nx, ny
+
+def is_mesh_cyclic_x(mesh):
+    """Check if the mesh is cyclic in the x-direction.
+
+    Parameters
+    ----------
+    mesh : xr.Dataset or str or Path
+        The ESMF mesh dataset or the path to the mesh file.
+
+    Returns
+    -------
+    bool
+        True if the mesh is cyclic in the x-direction, False otherwise.
+    """
+    if not isinstance(mesh, xr.Dataset):
+        assert isinstance(mesh, (Path, str)) and Path(mesh).exists(), "mesh must be a path to an existing file"
+        mesh = xr.open_dataset(mesh)
+
+    nx, _ = get_mesh_dimensions(mesh)
+    econn = mesh['elementConn'].values
+    if len(np.intersect1d(econn[nx-1], econn[0])) == 2:
+        return True
+    return False
 
 
 def _spherical_angle(a, b):
