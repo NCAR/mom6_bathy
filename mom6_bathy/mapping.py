@@ -6,8 +6,7 @@ import xarray as xr
 import numpy as np
 from pathlib import Path
 from scipy.spatial import cKDTree
-from scipy.sparse import coo_matrix
-from sparse import COO
+from scipy.sparse import csc_matrix, coo_matrix
 
 MPI = None
 rank = lambda: MPI.COMM_WORLD.Get_rank() if MPI else 0
@@ -132,8 +131,8 @@ def _construct_vertex_coords(mesh):
     
     return xv_data, yv_data
 
-def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=None, weights_coo=None, area_normalization=False):
-    """Based on a given source mesh, destination mesh, and weights, generate an ESMF map file.
+def write_mapping_file(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=None, weights_coo=None, area_normalization=False):
+    """Based on a given source mesh, destination mesh, and weights, write out an ESMF map file.
     
     Parameters
     ----------
@@ -162,9 +161,9 @@ def generate_ESMF_map(src_mesh, dst_mesh, filename, weights=None, weights_esmpy=
     if rank() != 0:
         return # TODO: parallelize this function
 
-    if isinstance(src_mesh, str):
+    if isinstance(src_mesh, (str, Path)):
         src_mesh = xr.open_dataset(src_mesh)
-    if isinstance(dst_mesh, str):
+    if isinstance(dst_mesh, (str, Path)):
         dst_mesh = xr.open_dataset(dst_mesh)
     
     if weights is weights_esmpy is weights_coo is None:
@@ -493,7 +492,6 @@ def generate_ESMF_map_via_xesmf(src_mesh_path, dst_mesh_path, mapping_file, meth
         src_lon = normalize_deg(src_grid['lon'].data)
         src_lat = normalize_deg(src_grid['lat'].data)
 
-        print("Zeroing out the source grid mask outside the rectangle defined by the destination mesh.")
         src_grid['mask'].data = np.where(
             (src_lon < lon_min) | (src_lon > lon_max) |
             (src_lat < lat_min) | (src_lat > lat_max),
@@ -511,9 +509,7 @@ def generate_ESMF_map_via_xesmf(src_mesh_path, dst_mesh_path, mapping_file, meth
         periodic=dst_is_cyclic_x,
     )
 
-    print(f"Regridding weights from {src_mesh_path} to {dst_mesh_path} using method '{method}' created by xESMF.")
-
-    generate_ESMF_map(
+    write_mapping_file(
         src_mesh=src_mesh_path,
         dst_mesh=dst_mesh_path,
         weights=regridder.weights,
@@ -598,7 +594,7 @@ def generate_ESMF_map_via_esmpy(src_mesh_path, dst_mesh_path, mapping_file, meth
     # Now, read in the weights from the mapping file
     weights_ds = xr.open_dataset(mapping_file)
 
-    generate_ESMF_map(
+    write_mapping_file(
         src_mesh=src_mesh_path,
         dst_mesh=dst_mesh_path,
         filename=mapping_file,
@@ -679,6 +675,89 @@ def compute_smoothing_weights(mesh_ds, rmax, fold=1.0, xv_data=None, yv_data=Non
 
     weights = coo_matrix((data, (row_indices, col_indices)), shape=(len(coords), len(coords)))
     return weights
+
+def gen_rof_maps(rof_mesh_path, ocn_mesh_path, output_dir, mapping_file_prefix, rmax=None, fold=None):
+    """ Generate (1) nearest neighbor and (2) smoothed nearest neighbor mapping files
+    from a runoff mesh to an ocean mesh.
+
+    Parameters
+    ----------
+    rof_mesh_path : str or Path
+        Path to the ROF ESMF mesh file.
+    ocn_mesh_path : str or Path
+        Path to the OCN ESMF mesh file.
+    output_dir : str or Path
+        Directory where the mapping files will be saved.
+    mapping_file_prefix : str
+        Prefix for the mapping files to be created. Example: "rx1_to_t232" will create files
+        "rx1_to_t232_nn.nc" and "rx1_to_t232_nnsm.nc".
+    rmax : float, optional
+        Maximum distance for smoothing weights, in kilometers. If None, no smoothing is applied.
+    fold : float, optional
+        Fold factor (km) determining the strength of smoothing based on distance. If None, no smoothing is applied.
+    """
+
+    if rmax is None or fold is None:
+        assert rmax == fold == None, "If rmax is not provided, fold must also be None, and vice versa."
+
+    assert isinstance(ocn_mesh_path, (str, Path)) and Path(ocn_mesh_path).exists(), \
+        "ocn_mesh_path must be a path to an existing file"
+    assert isinstance(rof_mesh_path, (str, Path)) and Path(rof_mesh_path).exists(), \
+        "rof_mesh_path must be a path to an existing file"
+    assert isinstance(output_dir, (str, Path)), "output_dir must be a string or Path"
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    nn_map_file = output_dir / f"{mapping_file_prefix}_nn.nc"
+
+    generate_ESMF_map_via_xesmf(
+        src_mesh_path=rof_mesh_path,
+        dst_mesh_path=ocn_mesh_path,
+        mapping_file=nn_map_file,
+        method='nearest_d2s',
+        area_normalization=True
+    )
+
+    print(f"Generated nearest mapping file: {nn_map_file}")
+
+    nn_map = xr.open_dataset(nn_map_file)
+
+    # Compute and apply smoothing weights
+    if rmax is not None:
+
+        ocn_mesh = xr.open_dataset(ocn_mesh_path)
+
+        sw = compute_smoothing_weights(
+            mesh_ds=ocn_mesh,
+            rmax=rmax,
+            fold=fold,
+        )
+
+        # mesh dimensions
+        rof_nx = len(nn_map.ni_a)
+        rof_ny = len(nn_map.nj_a)
+        ocn_nx = len(nn_map.ni_b)
+        ocn_ny = len(nn_map.nj_b)
+
+        # Create a COO matrix of the mapping weights
+        S_coo = coo_matrix((nn_map.S.data, (nn_map.row.data-1, nn_map.col.data-1)), shape=(ocn_nx*ocn_ny, rof_nx*rof_ny))
+
+        # Apply smoothing by multiplying (transpose of) S_coo and smoothing weights (and taking transpose again):
+        S_smooth = S_coo.transpose().dot(sw).transpose()
+        assert isinstance(S_smooth, csc_matrix), "S_smooth should be a csc_matrix after multiplication"
+        S_smooth = S_smooth.tocoo()  # Convert to COO format again
+
+        nnsm_map_file = output_dir / f"{mapping_file_prefix}_nnsm.nc"
+
+        write_mapping_file(
+            src_mesh=rof_mesh_path,
+            dst_mesh=ocn_mesh_path,
+            filename=nnsm_map_file,
+            weights_coo=S_smooth,
+            area_normalization=False # No area normalization for smoothing
+        )
+
+        print(f"Generated smoothed mapping file: {nnsm_map_file}")
 
 
 def main(args):
