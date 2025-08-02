@@ -6,6 +6,7 @@ import numpy as np
 import xarray as xr
 from scipy.spatial import cKDTree
 from midas.rectgrid_gen import supergrid as MidasSupergrid
+from mom6_bathy.aux import normalize_deg
 
 
 class Grid:
@@ -306,8 +307,8 @@ class Grid:
             Supergrid to check for cyclic x.
         """
         return np.allclose(
-            (supergrid.x[:, 0] + 360.0) % 360.0,
-            (supergrid.x[:, -1] + 360.0) % 360.0,
+            normalize_deg(supergrid.x[:, 0]),
+            normalize_deg(supergrid.x[:, -1]),
             rtol=1e-5,
         )
 
