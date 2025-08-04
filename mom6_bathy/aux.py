@@ -74,6 +74,84 @@ def get_mesh_dimensions(mesh):
         f"Mesh dimensions do not match the number of coordinates: {nx} * {ny} != {len(centerCoords)}"
     return nx, ny
 
+def get_avg_resolution(mesh):
+    """Calculate the average resolution of the mesh.
+
+    Parameters
+    ----------
+    mesh : xr.Dataset or str or Path
+        The ESMF mesh dataset or the path to the mesh file.
+
+    Returns
+    -------
+    avg_resolution : float
+        Average resolution of the mesh in degrees.
+    """
+    if not isinstance(mesh, xr.Dataset):
+        assert isinstance(mesh, (Path, str)) and Path(mesh).exists(), "mesh must be a path to an existing file"
+        mesh = xr.open_dataset(mesh)
+
+    assert 'units' in mesh['centerCoords'].attrs, "centerCoords must have 'units' attribute"
+    assert 'degrees' in mesh['centerCoords'].attrs['units'], \
+        "get_mesh_dimensions() expects centerCoords in degrees"
+
+    centerCoords = mesh['centerCoords'].values
+    nx, ny = get_mesh_dimensions(mesh)
+    
+    coords = centerCoords.reshape(ny, nx, 2)
+    dy = np.diff(coords[:, :, 1], axis=0)  # y-direction
+    dx = np.diff(coords[:, :, 0], axis=1)  # x-direction
+    avg_resolution = np.mean(np.concatenate([dx.ravel(), dy.ravel()]))
+
+    return avg_resolution
+
+def get_avg_resolution_km(mesh):
+    """Calculate the average resolution of the mesh in kilometers.
+
+    Parameters
+    ----------
+    mesh : xr.Dataset or str or Path
+        The ESMF mesh dataset or the path to the mesh file.
+
+    Returns
+    -------
+    avg_resolution_km : float
+        Average resolution of the mesh in kilometers.
+    """
+
+    if not isinstance(mesh, xr.Dataset):
+        assert isinstance(mesh, (Path, str)) and Path(mesh).exists(), "mesh must be a path to an existing file"
+    mesh = xr.open_dataset(mesh)
+
+    assert 'units' in mesh['centerCoords'].attrs, "centerCoords must have 'units' attribute"
+    assert 'degrees' in mesh['centerCoords'].attrs['units'], \
+        "get_mesh_dimensions() expects centerCoords in degrees"
+
+    centerCoords = mesh['centerCoords'].values
+    nx, ny = get_mesh_dimensions(mesh)
+
+    earth_radius_km = 6371.0
+
+    # Compute distances between all neighboring points (both x and y directions)
+    coords = centerCoords.reshape(ny, nx, 2)
+    # Compute dx in km (longitude difference * cos(latitude) * earth_radius)
+    # and dy in km (latitude difference * earth_radius)
+    # Use the latitude at the midpoint for dx
+    lons = coords[:, :, 0]
+    lats = coords[:, :, 1]
+
+    # dx: shape (ny, nx-1)
+    dx_deg = np.diff(lons, axis=1)
+    lat_mid_dx = 0.5 * (lats[:, :-1] + lats[:, 1:])
+    dx_km = np.deg2rad(dx_deg) * earth_radius_km * np.cos(np.deg2rad(lat_mid_dx))
+
+    # dy: shape (ny-1, nx)
+    dy_deg = np.diff(lats, axis=0)
+    dy_km = np.deg2rad(dy_deg) * earth_radius_km
+
+    avg_resolution_km = np.mean(np.concatenate([dx_km.ravel(), dy_km.ravel()]))
+    return avg_resolution_km
+
 def is_mesh_cyclic_x(mesh):
     """Check if the mesh is cyclic in the x-direction.
 

@@ -11,7 +11,7 @@ from scipy.sparse import csc_matrix, coo_matrix
 MPI = None
 rank = lambda: MPI.COMM_WORLD.Get_rank() if MPI else 0
 
-from mom6_bathy.aux import get_mesh_dimensions, cell_area_rad, normalize_deg, is_mesh_cyclic_x
+from mom6_bathy.aux import get_mesh_dimensions, cell_area_rad, normalize_deg, is_mesh_cyclic_x, get_avg_resolution_km
 
 def grid_from_esmf_mesh(mesh: xr.Dataset | str | Path) -> "Grid":
     """Given an ESMF mesh where the grid metrics are stored in 1D (flattened) arrays,
@@ -724,6 +724,11 @@ def gen_rof_maps(rof_mesh_path, ocn_mesh_path, output_dir, mapping_file_prefix, 
 
     # Compute and apply smoothing weights
     if rmax is not None:
+
+        avg_dst_res_km = get_avg_resolution_km(ocn_mesh_path)
+        if rmax > avg_dst_res_km * 10:
+            print(f"Warning: rmax ({rmax} km) is significantly larger than the average resolution of the destination mesh ({avg_dst_res_km} km).")
+            print("This may lead to excessive memory usage, long computation times, or crashes.")
 
         ocn_mesh = xr.open_dataset(ocn_mesh_path)
 
