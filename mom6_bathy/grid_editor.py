@@ -5,10 +5,13 @@ import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from mom6_bathy.grid import Grid
 
 class GridEditor(widgets.HBox):
 
-    def __init__(self, grid, repo_root=None):
+    def __init__(self, grid = None, repo_root=None):
+        if grid is None:
+            grid = Grid(lenx=40.0, leny=40.0, resolution=1, xstart=270, ystart=12, name="default_grid")
         self.grid = grid
         self.repo_root = repo_root if repo_root is not None else os.getcwd()
         self.grids_dir = os.path.join(self.repo_root, "Grids")
@@ -20,9 +23,9 @@ class GridEditor(widgets.HBox):
             "ystart": grid.ystart,
             "name": grid.name
         }
-
-        self.construct_control_panel()
-        self.construct_observances()
+        self._domain_clicks_enabled = False
+        self._clicked_points = []
+       
 
         # --- Plot ---
         plt.ioff()
@@ -33,11 +36,13 @@ class GridEditor(widgets.HBox):
         self.fig.canvas.layout.min_width = "0"
         self.fig.canvas.toolbar_visible = True
         self.fig.canvas.toolbar_position = 'top'
-
+        self.construct_control_panel()
+        self.plot_grid()
+        self.construct_observances()
         super().__init__([self._control_panel, self.fig.canvas], layout=widgets.Layout(width="100%", align_items="flex-start"))
 
         self.refresh_commit_dropdown()
-        self.plot_grid()
+        self.fig.canvas.mpl_connect("button_press_event", self.on_map_click)
     
     def construct_control_panel(self):
         self._snapshot_name = widgets.Text(value='', placeholder='Enter grid name', description='Name:', layout={'width': '90%'})
@@ -47,12 +52,13 @@ class GridEditor(widgets.HBox):
         self._save_button = widgets.Button(description='Save Grid', layout={'width': '44%'})
         self._load_button = widgets.Button(description='Load Grid', layout={'width': '44%'})
         self._reset_button = widgets.Button(description='Reset', layout={'width': '100%'}, button_style='danger')
-        
+        self._select_domain_button = widgets.Button(description="Select Domain (2 clicks)", button_style='info')
+        self._select_domain_button.on_click(self.start_domain_selection)
         # Use initial values for slider ranges
         initial_xstart = float(self.grid.xstart) % 360
 
         # Handle longitude wrap-around and negative values for slider
-        slider_window = 30
+        slider_window = 360 
         slider_min = initial_xstart - slider_window
         slider_max = initial_xstart + slider_window
 
@@ -82,8 +88,8 @@ class GridEditor(widgets.HBox):
 
         self._ystart_slider = widgets.FloatSlider(
             value=initial_ystart,
-            min=max(initial_ystart - 30, -90),
-            max=min(initial_ystart + 30, 90),
+            min=max(initial_ystart - 360, -90),
+            max=min(initial_ystart + 360, 90),
             step=0.01,
             description="ystart"
         )
@@ -94,6 +100,12 @@ class GridEditor(widgets.HBox):
         self._resolution_slider = widgets.FloatSlider(
             value=self.grid.resolution, min=0.01, max=1.0, step=0.01, description="Resolution"
         )
+        self._output = widgets.Output(layout={ 'height': '60px', 'overflowY': 'auto'})
+        domain_section = widgets.VBox([
+            widgets.HTML("<h3>Domain Selection</h3>"),
+            self._select_domain_button,
+            self._output,
+        ], layout=widgets.Layout(margin='10px 0 10px 0'))
 
         controls = widgets.VBox([
             widgets.HTML("<h3>Grid Controls</h3>"),
@@ -116,6 +128,7 @@ class GridEditor(widgets.HBox):
 
         self._control_panel = widgets.VBox([
             controls,
+            domain_section,
             library_section,
         ], layout={'width': '45%', 'height': '100%'})
 
@@ -134,6 +147,45 @@ class GridEditor(widgets.HBox):
             self._leny_slider,
         ]:
             slider.observe(self._on_slider_change, names="value")
+        
+
+    def on_map_click(self, event):
+        if event.inaxes != self.ax:
+            return
+        if not self._domain_clicks_enabled:
+            # Normal click behavior or just ignore
+            return
+        
+        lon, lat = event.xdata, event.ydata
+        self._clicked_points.append((lon, lat))
+        with self._output:
+            print(f"Clicked point {len(self._clicked_points)}: lon={lon:.3f}, lat={lat:.3f}")
+            
+        if len(self._clicked_points) == 2:
+            self._domain_clicks_enabled = False
+            
+            # Create domain box from two points (min/max lon/lat)
+            lons, lats = zip(*self._clicked_points)
+            lon_min, lon_max = min(lons), max(lons)
+            lat_min, lat_max = min(lats), max(lats)
+            self._on_slider_change(change=None)
+            with self._output:
+                print(f"Domain defined:\n  Lon: {lon_min:.3f} to {lon_max:.3f}\n  Lat: {lat_min:.3f} to {lat_max:.3f}")
+            self._lenx_slider.value = lon_max - lon_min
+            self._leny_slider.value = lat_max - lat_min
+            
+            self._xstart_slider.value = lon_min
+            self._ystart_slider.value = lat_min
+            self.grid.name = "clicked_domain"
+
+            self._on_slider_change(change=None)
+
+    def start_domain_selection(self, _):
+        self._domain_clicks_enabled = True
+        self._clicked_points = []
+        with self._output:
+            self._output.clear_output()
+            print("Click exactly two points on the map to define the domain.")
 
     def plot_grid(self):
         self.ax.clear()
@@ -290,38 +342,38 @@ class GridEditor(widgets.HBox):
             leny_min, leny_max = 0.01, 50.0
             leny_val = min(max(float(self.grid.leny), leny_min), leny_max)
 
-            # Remove old observers
-            for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
-                slider.unobserve(self._on_slider_change, names="value")
+            # # Remove old observers
+            # for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
+            #     slider.unobserve(self._on_slider_change, names="value")
 
-            # Re-create all sliders
-            self._resolution_slider = widgets.FloatSlider(
-                value=resolution_val, min=res_min, max=res_max, step=0.01, description="Resolution"
-            )
-            self._xstart_slider = widgets.FloatSlider(
-                value=xstart_val, min=slider_min, max=slider_max, step=0.01, description="xstart"
-            )
-            self._lenx_slider = widgets.FloatSlider(
-                value=lenx_val, min=lenx_min, max=lenx_max, step=0.01, description="lenx"
-            )
-            self._ystart_slider = widgets.FloatSlider(
-                value=ystart_val, min=y_min, max=y_max, step=0.01, description="ystart"
-            )
-            self._leny_slider = widgets.FloatSlider(
-                value=leny_val, min=leny_min, max=leny_max, step=0.01, description="leny"
-            )
+            # # Re-create all sliders
+            # self._resolution_slider = widgets.FloatSlider(
+            #     value=resolution_val, min=res_min, max=res_max, step=0.01, description="Resolution"
+            # )
+            # self._xstart_slider = widgets.FloatSlider(
+            #     value=xstart_val, min=slider_min, max=slider_max, step=0.01, description="xstart"
+            # )
+            # self._lenx_slider = widgets.FloatSlider(
+            #     value=lenx_val, min=lenx_min, max=lenx_max, step=0.01, description="lenx"
+            # )
+            # self._ystart_slider = widgets.FloatSlider(
+            #     value=ystart_val, min=y_min, max=y_max, step=0.01, description="ystart"
+            # )
+            # self._leny_slider = widgets.FloatSlider(
+            #     value=leny_val, min=leny_min, max=leny_max, step=0.01, description="leny"
+            # )
 
-            # Add observers
-            for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
-                slider.observe(self._on_slider_change, names="value")
+            # # Add observers
+            # for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
+            #     slider.observe(self._on_slider_change, names="value")
 
-            # Update the control panel with the new sliders
-            controls = self._control_panel.children[0]
-            controls.children = (
-                controls.children[:1] +
-                (self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider) +
-                controls.children[-1:]
-            )
+            # # Update the control panel with the new sliders
+            # controls = self._control_panel.children[0]
+            # controls.children = (
+            #     controls.children[:1] +
+            #     (self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider) +
+            #     controls.children[-1:]
+            # )
         except Exception as e:
             print(f"Error in sync_sliders_to_grid: {e}")
                         
