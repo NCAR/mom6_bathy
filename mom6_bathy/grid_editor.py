@@ -6,7 +6,13 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from mom6_bathy.grid import Grid
+from pyproj import CRS, Transformer
 
+# Define transformer: projection coords -> projection meters (EPSG:3413)
+proj_crs = CRS.from_epsg(3413)
+geo_crs = CRS.from_epsg(4326)
+to_proj = Transformer.from_crs(geo_crs, proj_crs, always_xy=True)
+to_geo = Transformer.from_crs(proj_crs, geo_crs, always_xy=True)
 class GridEditor(widgets.HBox):
 
     def __init__(self, grid = None, repo_root=None):
@@ -25,12 +31,11 @@ class GridEditor(widgets.HBox):
         }
         self._domain_clicks_enabled = False
         self._clicked_points = []
-       
+        self._proj_clicked_points = []
 
         # --- Plot ---
         plt.ioff()
         self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
         plt.ion()
         self.fig.canvas.layout.width = "100%"
         self.fig.canvas.layout.min_width = "0"
@@ -45,6 +50,27 @@ class GridEditor(widgets.HBox):
         self.fig.canvas.mpl_connect("button_press_event", self.on_map_click)
     
     def construct_control_panel(self):
+        self._projection_dropdown = widgets.Dropdown(
+            options=[
+                ("PlateCarree (lat/lon)", ccrs.PlateCarree()),
+                ("Albers Equal Area (US)", ccrs.AlbersEqualArea(
+                    central_longitude=-96,
+                    central_latitude=37.5,
+                    standard_parallels=(29.5, 45.5)
+                )),
+                ("Lambert Conformal (US)", ccrs.LambertConformal(
+                    central_longitude=-96,
+                    central_latitude=37.5,
+                    standard_parallels=(33, 45)
+                )),
+                ("North Polar Stereographic", ccrs.NorthPolarStereo()),
+                
+            ],
+            value=ccrs.PlateCarree(),
+            description="Projection:"
+        )
+        
+
         self._snapshot_name = widgets.Text(value='', placeholder='Enter grid name', description='Name:', layout={'width': '90%'})
         self._commit_msg = widgets.Text(value='', placeholder='Enter grid message', description='Message:', layout={'width': '90%'})
         self._commit_dropdown = widgets.Dropdown(options=[], description='Grids:', layout={'width': '90%'})
@@ -70,8 +96,8 @@ class GridEditor(widgets.HBox):
 
         # If min >= max (e.g., initial_xstart near -180 or 360), set a default window
         if slider_min >= slider_max:
-            slider_min = max(-180.0, initial_xstart - 15)
-            slider_max = min(360.0, initial_xstart + 15)
+            slider_min = max(-180.0, initial_xstart - slider_window)
+            slider_max = min(360.0, initial_xstart + slider_window)
 
         self._xstart_slider = widgets.FloatSlider(
             value=initial_xstart,
@@ -88,8 +114,8 @@ class GridEditor(widgets.HBox):
 
         self._ystart_slider = widgets.FloatSlider(
             value=initial_ystart,
-            min=max(initial_ystart - 360, -90),
-            max=min(initial_ystart + 360, 90),
+            min=max(initial_ystart - slider_window, -90),
+            max=min(initial_ystart + slider_window, 90),
             step=0.01,
             description="ystart"
         )
@@ -103,6 +129,7 @@ class GridEditor(widgets.HBox):
         self._output = widgets.Output(layout={ 'height': '60px', 'overflowY': 'auto'})
         domain_section = widgets.VBox([
             widgets.HTML("<h3>Domain Selection</h3>"),
+            self._projection_dropdown,
             self._select_domain_button,
             self._output,
         ], layout=widgets.Layout(margin='10px 0 10px 0'))
@@ -138,7 +165,7 @@ class GridEditor(widgets.HBox):
         self._reset_button.on_click(self.reset_grid)
         self._snapshot_name.observe(lambda change: self.refresh_commit_dropdown(), names='value')
         self._commit_dropdown.observe(self.update_commit_details, names='value')
-
+        self._projection_dropdown.observe(self._on_projection_change, names="value")
         for slider in [
             self._resolution_slider,
             self._xstart_slider,
@@ -148,47 +175,64 @@ class GridEditor(widgets.HBox):
         ]:
             slider.observe(self._on_slider_change, names="value")
         
-
     def on_map_click(self, event):
         if event.inaxes != self.ax:
             return
         if not self._domain_clicks_enabled:
             # Normal click behavior or just ignore
             return
+            # Convert click to lon/lat first
+        lon, lat = ccrs.PlateCarree().transform_point(event.xdata, event.ydata, self.ax.projection)
+        # Then to projection meters
+        x_m, y_m = to_proj.transform(lon, lat)
         
-        lon, lat = event.xdata, event.ydata
+        
         self._clicked_points.append((lon, lat))
+        self._proj_clicked_points.append((x_m, y_m))
         with self._output:
             print(f"Clicked point {len(self._clicked_points)}: lon={lon:.3f}, lat={lat:.3f}")
+            print(f"Click {len(self._proj_clicked_points)}: {x_m:.0f} m, {y_m:.0f} m")
             
         if len(self._clicked_points) == 2:
             self._domain_clicks_enabled = False
-            
-            # Create domain box from two points (min/max lon/lat)
-            lons, lats = zip(*self._clicked_points)
-            lon_min, lon_max = min(lons), max(lons)
-            lat_min, lat_max = min(lats), max(lats)
-            self._on_slider_change(change=None)
-            with self._output:
-                print(f"Domain defined:\n  Lon: {lon_min:.3f} to {lon_max:.3f}\n  Lat: {lat_min:.3f} to {lat_max:.3f}")
-            self._lenx_slider.value = lon_max - lon_min
-            self._leny_slider.value = lat_max - lat_min
-            
-            self._xstart_slider.value = lon_min
-            self._ystart_slider.value = lat_min
-            self.grid.name = "clicked_domain"
+            if isinstance(self.ax.projection, ccrs.PlateCarree):
+                print("Projection is geographic (lat/lon).")
+                # Create domain box from two points (min/max lon/lat)
+                lons, lats = zip(*self._clicked_points)
+                lon_min, lon_max = min(lons), max(lons)
+                lat_min, lat_max = min(lats), max(lats)
+                with self._output:
+                    print(f"Domain defined:\n  Lon: {lon_min:.3f} to {lon_max:.3f}\n  Lat: {lat_min:.3f} to {lat_max:.3f}")
+                self._lenx_slider.value = lon_max - lon_min
+                self._leny_slider.value = lat_max - lat_min
+                
+                self._xstart_slider.value = lon_min
+                self._ystart_slider.value = lat_min
+                self.grid.name = "clicked_domain"
 
-            self._on_slider_change(change=None)
+                self._on_slider_change(change=None)
+            else:
+                print(f"Projection is {self.ax.projection.__class__.__name__} (projected).")
+                self.grid = Grid.make_grid_from_proj_rect(x_min=self._proj_clicked_points[0][0], x_max=self._proj_clicked_points[1][0], 
+                y_min=self._proj_clicked_points[0][1], y_max=self._proj_clicked_points[1][1], nx=81, ny=81, proj_epsg=3413)
+                self.plot_grid()
+            
 
     def start_domain_selection(self, _):
         self._domain_clicks_enabled = True
         self._clicked_points = []
+        self._proj_clicked_points = []
         with self._output:
             self._output.clear_output()
             print("Click exactly two points on the map to define the domain.")
+    def _on_projection_change(self, change):
+        self.plot_grid()
 
     def plot_grid(self):
-        self.ax.clear()
+        if hasattr(self, "ax"):
+            self.ax.clear()
+        proj = self._projection_dropdown.value
+        self.ax = self.fig.add_subplot(1, 1, 1, projection=proj)
         self.ax.coastlines(resolution='10m', linewidth=1)
         self.ax.add_feature(cfeature.LAND, facecolor='0.9')
         self.ax.add_feature(cfeature.BORDERS, linewidth=0.5)
@@ -199,10 +243,10 @@ class GridEditor(widgets.HBox):
         for j in range(n_jq):
             self.ax.plot(self.grid.qlon[j, :], self.grid.qlat[j, :], color='k', linewidth=0.1, transform=ccrs.PlateCarree())
         self.ax.set_title("Grid Editor")
-
+        self.ax.set_extent([-180, 180, 60, 90], crs=ccrs.PlateCarree()) 
         lon_min, lon_max = float(self.grid.qlon.min()), float(self.grid.qlon.max())
         lat_min, lat_max = float(self.grid.qlat.min()), float(self.grid.qlat.max())
-        self.ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+        #self.ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
 
         gl = self.ax.gridlines(draw_labels=True, linewidth=0, color='none')
         gl.top_labels = False

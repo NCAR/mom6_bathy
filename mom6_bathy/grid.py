@@ -6,6 +6,7 @@ import numpy as np
 import xarray as xr
 from scipy.spatial import cKDTree
 from midas.rectgrid_gen import supergrid as MidasSupergrid
+from pyproj import CRS, Transformer, Geod
 
 
 class Grid:
@@ -378,14 +379,19 @@ class Grid:
 
     @classmethod
     def from_supergrid(cls, path: str, name: Optional[str] = None, save_on_create: bool = False) -> "Grid":
-        ds = xr.open_dataset(path)
+
+        if type(path) is str:
+            ds = xr.open_dataset(path)
+        elif type(path) is xr.Dataset:
+            ds = path
+
         assert (
             ds.x.units == ds.y.units and "degree" in ds.x.units
         ), "Only degrees units are supported in supergrid files"
 
         Grid.check_supergrid(ds)
         srefine = 2
-
+        path = "prj_grid.nc"
         name = name or os.path.basename(path).replace(".nc", "") if os.path.basename(path).endswith(".nc") else os.path.basename(path)
 
         # Compute resolution for later assignment
@@ -621,6 +627,84 @@ class Grid:
         # reset _kdtree such that it is recomputed when self.kdtree is accessed again
         self._kdtree = None
 
+    @classmethod
+    def make_grid_from_proj_rect(cls,x_min, x_max, y_min, y_max, nx, ny, proj_epsg):
+        """
+        Create a rectangular grid in a given projected coordinate system, 
+        transform it to lat/lon, and calculate dx, dy, area, and angle_dx.
+
+        Parameters
+        ----------
+        x_min, x_max : float
+            Min/max X in projection coordinates (meters)
+        y_min, y_max : float
+            Min/max Y in projection coordinates (meters)
+        nx, ny : int
+            Number of grid points in X and Y directions
+        proj_epsg : int
+            EPSG code for the projection (default 3413 = NSIDC Arctic)
+        outfile : str
+            Output NetCDF file name
+        """
+        # Setup CRS and transformers
+        crs_proj = CRS.from_epsg(proj_epsg)
+        transformer = Transformer.from_crs(crs_proj, "EPSG:4326", always_xy=True)
+        geod = Geod(ellps="WGS84")
+
+        # Create regular grid in projection coordinates
+        new_x = np.linspace(x_min, x_max, nx)
+        new_y = np.linspace(y_min, y_max, ny)
+        xx, yy = np.meshgrid(new_x, new_y)
+
+        # Transform to lat/lon
+        lon, lat = transformer.transform(xx, yy)
+
+        # Calculate dx (meters) — spacing in X direction
+        dx = np.full((ny, nx-1), np.nan)
+        _, _, dist_x = geod.inv(
+            lon[:, :-1], lat[:, :-1],
+            lon[:, 1:],  lat[:, 1:]
+        )
+        dx[:, :] = dist_x
+
+        # Calculate dy (meters) — spacing in Y direction
+        dy = np.full((ny-1, nx), np.nan)
+        _, _, dist_y = geod.inv(
+            lon[:-1, :], lat[:-1, :],
+            lon[1:, :],  lat[1:, :]
+        )
+        dy[:, :] = dist_y
+
+        # Calculate cell area (m²)
+        area = np.full((ny-1, nx-1), np.nan)
+        for j in range(ny - 1):
+            for i in range(nx - 1):
+                lons = [lon[j, i], lon[j, i+1], lon[j+1, i+1], lon[j+1, i]]
+                lats = [lat[j, i], lat[j, i+1], lat[j+1, i+1], lat[j+1, i]]
+                area_cell, _ = geod.polygon_area_perimeter(lons, lats)
+                area[j, i] = abs(area_cell)
+
+        # Calculate angle_dx (radians)
+        angle_dx = np.full((ny, nx), np.nan)
+        az12, _, _ = geod.inv(
+            lon[:, :-1], lat[:, :-1],
+            lon[:, 1:],  lat[:, 1:]
+        )
+        angle_dx[:, :-1] = np.deg2rad(az12)
+
+        # Package into xarray Dataset
+        hgrid = xr.Dataset({
+            "x": (["nyp", "nxp"], lon, {"units": "degrees"}),
+            "y": (["nyp", "nxp"], lat, {"units": "degrees"}),
+            "dx": (["nyp", "nx"], dx, {"units": "meters"}),
+            "dy": (["ny", "nxp"], dy, {"units": "meters"}),
+            "area": (["ny", "nx"], area, {"units": "m2"}),
+            "angle_dx": (["nyp", "nxp"], angle_dx, {"units": "radians"}),
+        })
+
+        grid = cls.from_supergrid(hgrid,name = "proj_grid", save_on_create=False)
+
+        return grid
     def get_indices(self, tlat: float, tlon: float) -> tuple[int, int]:
         """
         Get the i, j indices of a given tlat and tlon pair.
