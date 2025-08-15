@@ -842,4 +842,4 @@ class Grid:
         ds["angle_dx"] = xr.DataArray(
             self._supergrid.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"}
         )
-        ds.to_netcdf(path)
+        ds.to_netcdf(path, format='NETCDF3_64BIT',)
