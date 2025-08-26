@@ -294,34 +294,6 @@ class GridCreator(widgets.HBox):
             for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
                 slider.unobserve(self._on_slider_change, names="value")
 
-            # Re-create all sliders
-            self._resolution_slider = widgets.FloatSlider(
-                value=resolution_val, min=res_min, max=res_max, step=0.01, description="Resolution"
-            )
-            self._xstart_slider = widgets.FloatSlider(
-                value=xstart_val, min=slider_min, max=slider_max, step=0.01, description="xstart"
-            )
-            self._lenx_slider = widgets.FloatSlider(
-                value=lenx_val, min=lenx_min, max=lenx_max, step=0.01, description="lenx"
-            )
-            self._ystart_slider = widgets.FloatSlider(
-                value=ystart_val, min=y_min, max=y_max, step=0.01, description="ystart"
-            )
-            self._leny_slider = widgets.FloatSlider(
-                value=leny_val, min=leny_min, max=leny_max, step=0.01, description="leny"
-            )
-
-            # Add observers
-            for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
-                slider.observe(self._on_slider_change, names="value")
-
-            # Update the control panel with the new sliders
-            controls = self._control_panel.children[0]
-            controls.children = (
-                controls.children[:1] +
-                (self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider) +
-                controls.children[-1:]
-            )
         except Exception as e:
             print(f"Error in sync_sliders_to_grid: {e}")
                         

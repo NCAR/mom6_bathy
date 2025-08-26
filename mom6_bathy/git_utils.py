@@ -8,9 +8,15 @@ def get_null_tree(repo):
 def get_domain_dir(grid, base_dir="Topos"):
     """
     Returns a unique directory path for a given grid object.
+    Works for both rectilinear and curvilinear grids.
     """
-    shape = f"{int(grid.leny/grid.resolution)}x{int(grid.lenx/grid.resolution)}"
     name = getattr(grid, "name", "unknown")
+    ny = getattr(grid, "ny", None)
+    nx = getattr(grid, "nx", None)
+    if ny is not None and nx is not None:
+        shape = f"{ny}x{nx}"
+    else:
+        shape = "unknownshape"
     return os.path.join(base_dir, f"domain_{name}_{shape}")
 
 def list_domain_dirs(base_dir="Topos"):
@@ -24,7 +30,7 @@ def list_domain_dirs(base_dir="Topos"):
         if os.path.isdir(os.path.join(base_dir, d)) and d.startswith("domain_")
     ]
 
-def repo_action(path):
+def get_repo(path):
     """
     Ensure a git repository exists at the given path. If not, initialize one.
     Returns the repo object.

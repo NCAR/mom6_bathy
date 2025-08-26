@@ -2,7 +2,7 @@ import os
 import numpy as np
 import xarray as xr
 import pytest
-from .grid import Grid
+from ..mom6_bathy.grid import Grid
 
 # CrocoDash/visualCaseGen/external/mom6_bathy/mom6_bathy/test_grid.py
 

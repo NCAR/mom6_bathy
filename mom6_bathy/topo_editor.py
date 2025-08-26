@@ -421,17 +421,19 @@ class TopoEditor(widgets.HBox):
             widgets.HTML("<h3>Edit History</h3>"),
             widgets.HBox([self._undo_button, self._redo_button, self._reset_button]),
         ])
-        snapshot_section = widgets.VBox([
+        git_section = widgets.VBox([
+            # Domain controls
             self._domain_dropdown,
             self._switch_domain_button,
             widgets.HTML("<hr>"),
+            # Snapshot controls
             self._snapshot_name,
             self._commit_msg,
             self._commit_dropdown,
             self._commit_details,
             widgets.HBox([self._save_button, self._load_button]),
-        ])
-        git_section = widgets.VBox([
+            widgets.HTML("<hr>"),
+            # Git controls
             self._git_branch_name,
             widgets.HBox([self._git_create_branch_button, self._git_delete_branch_button]),
             self._git_branch_dropdown,
@@ -448,9 +450,6 @@ class TopoEditor(widgets.HBox):
             basin_section,
             history_section,
         ])
-        snapshot_accordion = widgets.Accordion(children=[snapshot_section])
-        snapshot_accordion.set_title(0, 'Domains and Snapshots')
-        snapshot_accordion.selected_index = None  # collapsed by default
         git_accordion = widgets.Accordion(children=[git_section])
         git_accordion.set_title(0, 'Git Version Control')
         git_accordion.selected_index = None  # collapsed by default
@@ -459,7 +458,6 @@ class TopoEditor(widgets.HBox):
         self._control_panel = widgets.VBox([
             widgets.HTML("<h2>Topo Editor</h2>"),
             main_controls,
-            snapshot_accordion,
             git_accordion,
         ], layout={'width': '30%', 'height': '100%', 'overflow_y': 'auto'})
 
@@ -520,7 +518,7 @@ class TopoEditor(widgets.HBox):
                         alpha=0.8,
                         linewidth=2,
                         label='Selected cell',
-                        transform=ccrs.PlateCarree()  # <-- set transform here!
+                        transform=ccrs.PlateCarree() 
                     )
                     self.ax.add_patch(polygon)
                     self.fig.canvas.draw_idle()
@@ -678,7 +676,7 @@ class TopoEditor(widgets.HBox):
         self.nx = self.topo.depth.data.shape[1]
         self.SNAPSHOT_DIR = get_domain_dir(self.topo._grid)
         os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
-        self.repo = repo_action(self.SNAPSHOT_DIR)
+        self.repo = get_repo(self.SNAPSHOT_DIR)
         self.repo_root = self.SNAPSHOT_DIR
         self._original_depth = np.array(self.topo.depth.data)
         self._original_min_depth = self.topo.min_depth

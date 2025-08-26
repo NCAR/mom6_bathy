@@ -18,7 +18,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.11.10,<3.13',
+    python_requires='>=3.11.10,<3.12',
     install_requires=[
         "setuptools>=69.0,<69.1",
         "numpy>=1.26,<1.27",
@@ -32,6 +32,7 @@ setuptools.setup(
         "sphinx>=8.1,<8.2",
         "sphinx_rtd_theme>=3.0,<3.1",
         "black>=24.1,<24.2",
-        "pytest>=8.0"
+        "pytest>=8.0",
+        "gitpython>=3.1,<4.0"
     ]
 )

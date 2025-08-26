@@ -7,7 +7,7 @@ from datetime import datetime
 from scipy import interpolate
 from scipy.ndimage import label
 from mom6_bathy.aux import cell_area_rad
-from mom6_bathy.git_utils import get_domain_dir, repo_action
+from mom6_bathy.git_utils import get_domain_dir, get_repo
 from scipy.spatial import cKDTree
 
 
@@ -36,7 +36,7 @@ class Topo:
         if save_on_create:
             self.SNAPSHOT_DIR = get_domain_dir(self._grid, base_dir=snapshot_dir)
             os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
-            self.repo = repo_action(self.SNAPSHOT_DIR)
+            self.repo = get_repo(self.SNAPSHOT_DIR)
             self.repo_root = self.SNAPSHOT_DIR
 
             self.save_grid_definition(self.SNAPSHOT_DIR)
@@ -132,7 +132,7 @@ class Topo:
         shape_str = f"{shape[0]}x{shape[1]}"
         snapshot_dir = get_domain_dir(grid)
         os.makedirs(snapshot_dir, exist_ok=True)
-        repo = repo_action(snapshot_dir)
+        repo = get_repo(snapshot_dir)
 
         # Load min_depth if available
         original_min_depth_path = os.path.join(snapshot_dir, f"original_min_depth_{domain_id.get('grid_name')}_{shape_str}.json")

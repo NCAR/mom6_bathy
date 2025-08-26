@@ -39,10 +39,14 @@ class Dummy:
         return self
 
 class PatchedTopoEditor(TopoEditor):
-    def __init__(self, topo, build_ui=False, snapshot_dir=None, golden_dir=None):
-        assert golden_dir is not None, "golden_dir must be provided for tests"
+    """
+    A test-only subclass of TopoEditor that enforces the use of a provided snapshot_dir
+    and disables UI construction by default. This ensures all file operations are
+    isolated to the test environment and no interactive widgets are created.
+    """
+    def __init__(self, topo, build_ui=False, snapshot_dir=None):
         assert snapshot_dir is not None, "snapshot_dir must be provided for tests"
-        super().__init__(topo, build_ui=build_ui, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+        super().__init__(topo, build_ui=build_ui, snapshot_dir=snapshot_dir)
 
 def patch_all_widgets(editor):
     dummy_attrs = [
@@ -71,11 +75,9 @@ def setup_depth(editor, i=2, j=2, new_depth=777.0):
 
 def test_undo(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
 
     orig_depth, new_depth, i, j = setup_depth(editor)
@@ -87,11 +89,9 @@ def test_undo(minimal_grid_and_topo, tmp_path):
 
 def test_redo(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
 
     orig_depth, new_depth, i, j = setup_depth(editor)
@@ -104,11 +104,9 @@ def test_redo(minimal_grid_and_topo, tmp_path):
 
 def test_undo_redo_interleaving(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
 
     i, j = 2, 2
@@ -139,11 +137,9 @@ def test_undo_redo_interleaving(minimal_grid_and_topo, tmp_path):
 
 def test_redo_cleared_after_new_edit(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
 
     i, j = 2, 2
@@ -169,11 +165,9 @@ def test_redo_cleared_after_new_edit(minimal_grid_and_topo, tmp_path):
 
 def test_undo_redo_empty_history_noop(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
 
     i, j = 2, 2
@@ -186,13 +180,11 @@ def test_undo_redo_empty_history_noop(minimal_grid_and_topo, tmp_path):
     assert float(editor.topo.depth.data[j, i]) == orig
 
 def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_path):
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     topo = minimal_grid_and_topo
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
     orig_depth, new_depth, i, j = setup_depth(editor)
     editor.redo_last_edit()
@@ -203,7 +195,7 @@ def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_pat
 
     # Create a new topo/editor and load the history
     topo2 = minimal_grid_and_topo
-    editor2 = PatchedTopoEditor(topo2, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor2 = PatchedTopoEditor(topo2, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor2)
     editor2.command_manager.snapshot_dir = snapshot_dir
     from mom6_bathy.edit_command import COMMAND_REGISTRY
@@ -228,13 +220,11 @@ def test_save_and_load_histories_with_git(minimal_grid_and_topo, tmp_path):
     repo.index.add([str(dummy_file)])
     repo.index.commit("initial commit")
 
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     topo = minimal_grid_and_topo
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
 
     orig_depth, new_depth, i, j = setup_depth(editor)
@@ -248,7 +238,7 @@ def test_save_and_load_histories_with_git(minimal_grid_and_topo, tmp_path):
 
     # Create a new topo/editor and load the history
     topo2 = minimal_grid_and_topo
-    editor2 = PatchedTopoEditor(topo2, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor2 = PatchedTopoEditor(topo2, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor2)
     editor2.command_manager.snapshot_dir = snapshot_dir
     editor2.command_manager.repo_root = str(tmp_path)  # If needed by your logic
@@ -263,15 +253,13 @@ def test_save_and_load_histories_with_git(minimal_grid_and_topo, tmp_path):
     editor2.undo_last_edit()
     assert float(editor2.topo.depth.data[j, i]) == orig_depth
 
-def test_in_memory_replay_does_not_reset_to_golden(minimal_grid_and_topo, tmp_path):
-    """Replay should apply edits on top of current topo, not reset to golden."""
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+def test_in_memory_replay_does_not_reset_to_original(minimal_grid_and_topo, tmp_path):
+    """Replay should apply edits on top of current topo, not reset to original."""
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     topo = minimal_grid_and_topo
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
     i, j = 2, 2
     orig = float(editor.topo.depth.data[j, i])
@@ -285,19 +273,17 @@ def test_in_memory_replay_does_not_reset_to_golden(minimal_grid_and_topo, tmp_pa
     # Change topo directly (simulate user edit outside command stack)
     editor.topo.depth.data[j, i] = 777.0
 
-    # Replay should apply edits on top of current topo, not reset to golden
+    # Replay should apply edits on top of current topo, not reset to original
     editor.command_manager.replay()
     assert float(editor.topo.depth.data[j, i]) == 200.0
 
-def test_commit_load_resets_to_golden(minimal_grid_and_topo, tmp_path):
-    """Loading a commit should reset topo to golden before replaying history."""
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+def test_commit_load_resets_to_original(minimal_grid_and_topo, tmp_path):
+    """Loading a commit should reset topo to original before replaying history."""
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     topo = minimal_grid_and_topo
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
     i, j = 2, 2
     orig = float(editor.topo.depth.data[j, i])
@@ -310,7 +296,7 @@ def test_commit_load_resets_to_golden(minimal_grid_and_topo, tmp_path):
     # Change topo directly (simulate user edit outside command stack)
     editor.topo.depth.data[j, i] = 777.0
 
-    # Load commit, should reset to golden and replay history
+    # Load commit, should reset to original and replay history
     from mom6_bathy.edit_command import COMMAND_REGISTRY
     editor.command_manager.load_commit("test_commit", COMMAND_REGISTRY, editor.topo)
     editor.command_manager.replay()
@@ -318,13 +304,11 @@ def test_commit_load_resets_to_golden(minimal_grid_and_topo, tmp_path):
 
 def test_switching_between_flows_branches(minimal_grid_and_topo, tmp_path):
     """Switching between two histories should replay the correct one."""
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     topo = minimal_grid_and_topo
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
     i, j = 2, 2
     orig = float(editor.topo.depth.data[j, i])
@@ -354,13 +338,11 @@ def test_switching_between_flows_branches(minimal_grid_and_topo, tmp_path):
 
 def test_undo_redo_after_commit_load(minimal_grid_and_topo, tmp_path):
     """Undo/redo should work after loading a commit."""
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
 
     topo = minimal_grid_and_topo
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
+    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir)
     patch_all_widgets(editor)
     i, j = 2, 2
     orig = float(editor.topo.depth.data[j, i])
@@ -384,72 +366,85 @@ def test_undo_redo_after_commit_load(minimal_grid_and_topo, tmp_path):
     editor.redo_last_edit()
     assert float(editor.topo.depth.data[j, i]) == 200.0
 
-def test_domain_mismatch_warning(minimal_grid_and_topo, tmp_path, capsys):
-    """Warn if loaded commit's domain does not match current topo domain."""
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
-    os.makedirs(golden_dir, exist_ok=True)
-    os.makedirs(snapshot_dir, exist_ok=True)
-
-    topo = minimal_grid_and_topo
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
-    patch_all_widgets(editor)
-    i, j = 2, 2
-    orig = float(editor.topo.depth.data[j, i])
-
-    # Save a commit
-    edit_100 = DepthEditCommand(editor.topo, [(j, i)], [100.0], old_values=[orig])
-    editor.apply_edit(edit_100)
-    editor.command_manager.save_commit("test_commit")
-
-    # Create a new topo with a different domain
+def test_new_domain_creates_original_snapshot(tmp_path):
+    """A new domain should create its own original snapshot on initialization."""
+    import git
     from mom6_bathy.grid import Grid
     from mom6_bathy.topo import Topo
-    grid2 = Grid(
-        resolution=0.2,  # different resolution
-        xstart=278.0,
-        lenx=0.5,
-        ystart=7.0,
-        leny=0.5,
-        name="testpanama"
-    )
-    topo2 = Topo(grid=grid2, min_depth=10.0)
-    topo2.set_flat(50.0)
-    editor2 = PatchedTopoEditor(topo2, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
-    patch_all_widgets(editor2)
-    from mom6_bathy.edit_command import COMMAND_REGISTRY
 
-    with pytest.raises(IndexError):
-        editor2.command_manager.load_commit("test_commit", COMMAND_REGISTRY, editor2.topo)
-    captured = capsys.readouterr()
-    assert "loaded snapshot domain does not match" in captured.out.lower() or \
-        "loaded snapshot domain does not match" in captured.err.lower()
-
-def test_golden_snapshot_creation_and_use(minimal_grid_and_topo, tmp_path):
-    """Golden snapshot is created if missing and used as reset base."""
-    golden_dir = str(tmp_path / "original_topo")
-    snapshot_dir = str(tmp_path / "snapshots")
+    snapshot_dir = str(tmp_path / "Topos")
     os.makedirs(snapshot_dir, exist_ok=True)
 
-    # Do NOT create golden_dir yet
-    topo = minimal_grid_and_topo
-    # Should create golden snapshot automatically
-    editor = PatchedTopoEditor(topo, build_ui=False, snapshot_dir=snapshot_dir, golden_dir=golden_dir)
-    patch_all_widgets(editor)
-    i, j = 2, 2
-    orig = float(editor.topo.depth.data[j, i])
+    repo = git.Repo.init(tmp_path)
+    dummy_file = tmp_path / "README.md"
+    dummy_file.write_text("dummy")
+    repo.index.add([str(dummy_file)])
+    repo.index.commit("initial commit")
 
-    # Apply and save an edit
-    edit_100 = DepthEditCommand(editor.topo, [(j, i)], [100.0], old_values=[orig])
-    editor.apply_edit(edit_100)
-    editor.command_manager.save_commit("test_commit")
+    # First domain
+    grid1 = Grid(resolution=0.1, xstart=278.0, lenx=0.5, ystart=7.0, leny=0.5, name="testpanama")
+    topo1 = Topo(grid=grid1, min_depth=10.0)
+    topo1.set_flat(100.0)
+    dom_id1 = topo1.get_domain_id()
+    grid_name1 = dom_id1['grid_name']
+    shape1 = dom_id1['shape']
+    shape_str1 = f"{shape1[0]}x{shape1[1]}"
+    domain_dir1 = os.path.join(snapshot_dir, f"domain_{grid_name1}_{shape_str1}")
+    os.makedirs(domain_dir1, exist_ok=True)
+    topo1.SNAPSHOT_DIR = domain_dir1
+    topo1.repo_root = str(tmp_path)
+    from mom6_bathy.topo_editor import TopoEditor
+    editor1 = TopoEditor(topo1, build_ui=False, snapshot_dir=domain_dir1)
+    original_path1 = os.path.join(domain_dir1, f"original_{grid_name1}_{shape_str1}.json")
+    assert os.path.exists(original_path1)
 
-    # Remove the edit, reset to golden
-    editor.undo_last_edit()
-    assert float(editor.topo.depth.data[j, i]) == orig
+    # Second domain (different resolution)
+    grid2 = Grid(resolution=0.2, xstart=278.0, lenx=0.5, ystart=7.0, leny=0.5, name="testpanama")
+    topo2 = Topo(grid=grid2, min_depth=10.0)
+    topo2.set_flat(50.0)
+    dom_id2 = topo2.get_domain_id()
+    grid_name2 = dom_id2['grid_name']
+    shape2 = dom_id2['shape']
+    shape_str2 = f"{shape2[0]}x{shape2[1]}"
+    domain_dir2 = os.path.join(snapshot_dir, f"domain_{grid_name2}_{shape_str2}")
+    os.makedirs(domain_dir2, exist_ok=True)
+    topo2.SNAPSHOT_DIR = domain_dir2
+    topo2.repo_root = str(tmp_path)
+    editor2 = TopoEditor(topo2, build_ui=False, snapshot_dir=domain_dir2)
+    original_path2 = os.path.join(domain_dir2, f"original_{grid_name2}_{shape_str2}.json")
+    assert os.path.exists(original_path2)
+    assert original_path1 != original_path2
 
-    # Load commit, should reset to golden and replay history
-    from mom6_bathy.edit_command import COMMAND_REGISTRY
-    editor.command_manager.load_commit("test_commit", COMMAND_REGISTRY, editor.topo)
-    editor.command_manager.replay()
-    assert float(editor.topo.depth.data[j, i]) == 100.0
+def test_merge_branch(tmp_path):
+    import git
+    from mom6_bathy.git_utils import merge_branch
+
+    # Initialize a git repo
+    repo = git.Repo.init(tmp_path)
+    dummy_file = tmp_path / "README.md"
+    dummy_file.write_text("main branch")
+    repo.index.add([str(dummy_file)])
+    repo.index.commit("initial commit")
+
+    # Create and switch to a new branch
+    repo.git.checkout('-b', 'feature')
+    feature_file = tmp_path / "feature.txt"
+    feature_file.write_text("feature branch")
+    repo.index.add([str(feature_file)])
+    repo.index.commit("add feature file")
+
+    # Switch back to main branch
+    repo.git.checkout('master')
+
+    # Try to merge master into itself (should fail)
+    success, msg = merge_branch(str(tmp_path), "master")
+    assert not success
+    assert "Cannot merge a branch into itself" in msg
+
+    # Merge feature into master (should succeed)
+    success, msg = merge_branch(str(tmp_path), "feature")
+    assert success
+    assert "Merged branch 'feature' into 'master'" in msg
+
+    # After merge, feature.txt should exist in master
+    assert (tmp_path / "feature.txt").exists()
