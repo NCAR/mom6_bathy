@@ -6,7 +6,8 @@ from scipy import interpolate
 from scipy.ndimage import label
 from mom6_bathy.aux import cell_area_rad
 from scipy.spatial import cKDTree
-
+import xesmf as xe
+from scipy.ndimage import binary_fill_holes
 
 class Topo:
     """
@@ -427,6 +428,374 @@ class Topo:
                 )
             )
         )
+
+    def set_from_dataset(self, bathymetry_path,output_dir,latitude_extent, longitude_extent, longitude_coordinate_name, latitude_coordinate_name, vertical_coordinate_name, fill_channels = False, positive_down=False, write_to_file=True, regridding_method = "bilinear"):
+        """
+        Cut out and interpolate the chosen bathymetry and then fill inland lakes.
+
+        Users can optionally fill narrow channels (see ``fill_channels`` keyword argument
+        below). Note, however, that narrow channels are less of an issue for models that
+        are discretized on an Arakawa C grid, like MOM6.
+
+        Output is saved in the input directory of the experiment.
+
+        Arguments:
+            bathymetry_path (str): Path to the netCDF file with the bathymetry.
+            longitude_coordinate_name (Optional[str]): The name of the longitude coordinate in the bathymetry
+                dataset at ``bathymetry_path``. For example, for GEBCO bathymetry: ``'lon'`` (default).
+            latitude_coordinate_name (Optional[str]): The name of the latitude coordinate in the bathymetry
+                dataset at ``bathymetry_path``. For example, for GEBCO bathymetry: ``'lat'`` (default).
+            vertical_coordinate_name (Optional[str]): The name of the vertical coordinate in the bathymetry
+                dataset at ``bathymetry_path``. For example, for GEBCO bathymetry: ``'elevation'`` (default).
+            fill_channels (Optional[bool]): Whether or not to fill in
+                diagonal channels. This removes more narrow inlets,
+                but can also connect extra islands to land. Default: ``False``.
+            positive_down (Optional[bool]): If ``True``, it assumes that the
+                bathymetry vertical coordinate is positive downwards. Default: ``False``.
+            write_to_file (Optional[bool]): Whether to write the bathymetry to a file. Default: ``True``.
+            regridding_method (Optional[str]): The type of regridding method to use. Defaults to self.regridding_method
+        """
+        coordinate_names = {
+            "xh": longitude_coordinate_name,
+            "yh": latitude_coordinate_name,
+            "depth": vertical_coordinate_name,
+        }
+
+        bathymetry = xr.open_dataset(bathymetry_path, chunks="auto")[
+            coordinate_names["depth"]
+        ]
+
+        bathymetry = bathymetry.sel(
+            {
+                coordinate_names["yh"]: slice(
+                    latitude_extent[0] - 0.5, latitude_extent[1] + 0.5
+                )
+            }  # 0.5 degree latitude buffer (hardcoded) for regridding
+        ).astype("float")
+
+        ## Check if the original bathymetry provided has a longitude extent that goes around the globe
+        ## to take care of the longitude seam when we slice out the regional domain.
+
+        horizontal_resolution = (
+            bathymetry[coordinate_names["xh"]][1]
+            - bathymetry[coordinate_names["xh"]][0]
+        )
+
+        horizontal_extent = (
+            bathymetry[coordinate_names["xh"]][-1]
+            - bathymetry[coordinate_names["xh"]][0]
+            + horizontal_resolution
+        )
+
+        longitude_buffer = 0.5  # 0.5 degree longitude buffer (hardcoded) for regridding
+
+        if np.isclose(horizontal_extent, 360):
+            ## longitude extent that goes around the globe -- use longitude_slicer
+            bathymetry = longitude_slicer(
+                bathymetry,
+                np.array(longitude_extent)
+                + np.array([-longitude_buffer, longitude_buffer]),
+                coordinate_names["xh"],
+            )
+        else:
+            ## otherwise, slice normally
+            bathymetry = bathymetry.sel(
+                {
+                    coordinate_names["xh"]: slice(
+                        longitude_extent[0] - longitude_buffer,
+                        longitude_extent[1] + longitude_buffer,
+                    )
+                }
+            )
+
+        bathymetry.attrs["missing_value"] = -1e20  # missing value expected by FRE tools
+        bathymetry_output = xr.Dataset({"depth": bathymetry})
+        bathymetry.close()
+
+        bathymetry_output = bathymetry_output.rename(
+            {coordinate_names["xh"]: "lon", coordinate_names["yh"]: "lat"}
+        )
+
+        bathymetry_output.depth.attrs["_FillValue"] = -1e20
+        bathymetry_output.depth.attrs["units"] = "meters"
+        bathymetry_output.depth.attrs["standard_name"] = (
+            "height_above_reference_ellipsoid"
+        )
+        bathymetry_output.depth.attrs["long_name"] = "Elevation relative to sea level"
+        bathymetry_output.depth.attrs["coordinates"] = "lon lat"
+        if write_to_file:
+            bathymetry_output.to_netcdf(
+                output_dir / "bathymetry_original.nc",
+                mode="w",
+                engine="netcdf4",
+            )
+
+        empty_bathy = xr.Dataset(
+                {
+                    "lon": self._grid.tlon,
+                    "lat": self._grid.tlat,
+                }
+            )
+        
+        empty_bathy = empty_bathy.set_coords(("lon", "lat"))
+        empty_bathy["depth"] = xr.zeros_like(empty_bathy["lon"])
+        empty_bathy.lon.attrs["units"] = "degrees_east"
+        empty_bathy.lon.attrs["_FillValue"] = 1e20
+        empty_bathy.lat.attrs["units"] = "degrees_north"
+        empty_bathy.lat.attrs["_FillValue"] = 1e20
+        empty_bathy.depth.attrs["units"] = "meters"
+        empty_bathy.depth.attrs["coordinates"] = "lon lat"
+        if write_to_file:
+            empty_bathy.to_netcdf(
+                output_dir / "bathymetry_unfinished.nc",
+                mode="w",
+                engine="netcdf4",
+            )
+            empty_bathy.close()
+
+        bathymetry_output = bathymetry_output.load()
+        print(
+            "Begin regridding bathymetry...\n\n"
+            + f"Original bathymetry size: {bathymetry_output.nbytes/1e6:.2f} Mb\n"
+            + f"Regridded size: {empty_bathy.nbytes/1e6:.2f} Mb\n"
+            + "Automatic regridding may fail if your domain is too big! If this process hangs or crashes,"
+            + "make sure function argument write_to_file = True and,"
+            + "open a terminal with appropriate computational and resources try calling ESMF "
+            + f"directly in the input directory {output_dir} via\n\n"
+            + "`mpirun -np NUMBER_OF_CPUS ESMF_Regrid -s bathymetry_original.nc -d bathymetry_unfinished.nc -m bilinear --src_var depth --dst_var depth --netcdf4 --src_regional --dst_regional`\n\n"
+            + "For details see https://xesmf.readthedocs.io/en/latest/large_problems_on_HPC.html\n\n"
+            + "Afterwards, we run the 'tidy_bathymetry' method to skip the expensive interpolation step, and finishing metadata, encoding and cleanup.\n\n\n"
+        )
+        regridder = xe.Regridder(
+            bathymetry_output,
+            empty_bathy,
+            method=regridding_method,
+            locstream_out=False,
+            periodic=False,
+        )
+        bathymetry = regridder(bathymetry_output)
+        if write_to_file:
+            bathymetry.to_netcdf(
+                output_dir / "bathymetry_unfinished.nc",
+                mode="w",
+                engine="netcdf4",
+            )
+        print(
+            "Regridding successful! Now calling `tidy_bathymetry` method for some finishing touches..."
+        )
+
+        print("setup bathymetry has finished successfully.")
+        return self.tidy_dataset_bathymetry(
+            fill_channels,
+            positive_down,
+            bathymetry=bathymetry,
+            write_to_file=write_to_file,
+        )
+
+    def tidy_dataset_bathymetry(
+        self,
+        fill_channels=False,
+        positive_down=False,
+        vertical_coordinate_name="depth",
+        bathymetry=None,
+        write_to_file=True,
+        longitude_coordinate_name="lon",
+        latitude_coordinate_name="lat"):
+        """
+        An auxiliary method for bathymetry used to fix up the metadata and remove inland
+        lakes after regridding the bathymetry. Having :func:`~tidy_bathymetry` as a separate
+        method from :func:`~setup_bathymetry` allows for the regridding to be done separately,
+        since regridding can be really expensive for large domains.
+
+        If the bathymetry is already regridded and what is left to be done is fixing the metadata
+        or fill in some channels, then :func:`~tidy_bathymetry` directly can read the existing
+        ``bathymetry_unfinished.nc`` file that should be in the input directory.
+
+        Arguments:
+            fill_channels (Optional[bool]): Whether to fill in diagonal channels.
+                This removes more narrow inlets, but can also connect extra islands to land.
+                Default: ``False``.
+            positive_down (Optional[bool]): If ``False`` (default), assume that
+                bathymetry vertical coordinate is positive down, as is the case in GEBCO for example.
+            bathymetry (Optional[xr.Dataset]): The bathymetry dataset to tidy up. If not provided,
+                it will read the bathymetry from the file ``bathymetry_unfinished.nc`` in the input directory
+                that was created by :func:`~setup_bathymetry`.
+        """
+        ## reopen bathymetry to modify
+        print(
+            "Tidy bathymetry: Reading in regridded bathymetry to fix up metadata...",
+            end="",
+        )
+        if read_bathy_from_file := bathymetry is None:
+            bathymetry = xr.open_dataset(
+                output_dir / "bathymetry_unfinished.nc", engine="netcdf4"
+            )
+
+        ## Ensure correct encoding
+        bathymetry = xr.Dataset(
+            {"depth": (["ny", "nx"], bathymetry[vertical_coordinate_name].values)},
+            coords={
+                "lon": (["ny", "nx"], bathymetry[longitude_coordinate_name].values),
+                "lat": (["ny", "nx"], bathymetry[latitude_coordinate_name].values),
+            },
+        )
+        bathymetry.attrs["depth"] = "meters"
+        bathymetry.attrs["standard_name"] = "bathymetric depth at T-cell centers"
+        bathymetry.attrs["coordinates"] = "zi"
+
+        bathymetry.expand_dims("tiles", 0)
+
+        if not positive_down:
+            ## Ensure that coordinate is positive down!
+            bathymetry["depth"] *= -1
+
+        ## Make a land mask based on the bathymetry
+        ocean_mask = xr.where(bathymetry.depth <= 0, 0, 1)
+        land_mask = np.abs(ocean_mask - 1)
+
+        ## REMOVE INLAND LAKES
+        print("done. Filling in inland lakes and channels... ", end="")
+
+        changed = True  ## keeps track of whether solution has converged or not
+
+        forward = True  ## only useful for iterating through diagonal channel removal. Means iteration goes SW -> NE
+
+        while changed == True:
+            ## First fill in all lakes.
+            ## scipy.ndimage.binary_fill_holes fills holes made of 0's within a field of 1's
+            land_mask[:, :] = binary_fill_holes(land_mask.data)
+            ## Get the ocean mask instead of land- easier to remove channels this way
+            ocean_mask = np.abs(land_mask - 1)
+
+            ## Now fill in all one-cell-wide channels
+            newmask = xr.where(
+                ocean_mask * (land_mask.shift(nx=1) + land_mask.shift(nx=-1)) == 2, 1, 0
+            )
+            newmask += xr.where(
+                ocean_mask * (land_mask.shift(ny=1) + land_mask.shift(ny=-1)) == 2, 1, 0
+            )
+
+            if fill_channels == True:
+                ## fill in all one-cell-wide horizontal channels
+                newmask = xr.where(
+                    ocean_mask * (land_mask.shift(nx=1) + land_mask.shift(nx=-1)) == 2,
+                    1,
+                    0,
+                )
+                newmask += xr.where(
+                    ocean_mask * (land_mask.shift(ny=1) + land_mask.shift(ny=-1)) == 2,
+                    1,
+                    0,
+                )
+                ## Diagonal channels
+                if forward == True:
+                    ## horizontal channels
+                    newmask += xr.where(
+                        (ocean_mask * ocean_mask.shift(nx=1))
+                        * (
+                            land_mask.shift({"nx": 1, "ny": 1})
+                            + land_mask.shift({"ny": -1})
+                        )
+                        == 2,
+                        1,
+                        0,
+                    )  ## up right & below
+                    newmask += xr.where(
+                        (ocean_mask * ocean_mask.shift(nx=1))
+                        * (
+                            land_mask.shift({"nx": 1, "ny": -1})
+                            + land_mask.shift({"ny": 1})
+                        )
+                        == 2,
+                        1,
+                        0,
+                    )  ## down right & above
+                    ## Vertical channels
+                    newmask += xr.where(
+                        (ocean_mask * ocean_mask.shift(ny=1))
+                        * (
+                            land_mask.shift({"nx": 1, "ny": 1})
+                            + land_mask.shift({"nx": -1})
+                        )
+                        == 2,
+                        1,
+                        0,
+                    )  ## up right & left
+                    newmask += xr.where(
+                        (ocean_mask * ocean_mask.shift(ny=1))
+                        * (
+                            land_mask.shift({"nx": -1, "ny": 1})
+                            + land_mask.shift({"nx": 1})
+                        )
+                        == 2,
+                        1,
+                        0,
+                    )  ## up left & right
+
+                    forward = False
+
+                if forward == False:
+                    ## Horizontal channels
+                    newmask += xr.where(
+                        (ocean_mask * ocean_mask.shift(nx=-1))
+                        * (
+                            land_mask.shift({"nx": -1, "ny": 1})
+                            + land_mask.shift({"ny": -1})
+                        )
+                        == 2,
+                        1,
+                        0,
+                    )  ## up left & below
+                    newmask += xr.where(
+                        (ocean_mask * ocean_mask.shift(nx=-1))
+                        * (
+                            land_mask.shift({"nx": -1, "ny": -1})
+                            + land_mask.shift({"ny": 1})
+                        )
+                        == 2,
+                        1,
+                        0,
+                    )  ## down left & above
+                    ## Vertical channels
+                    newmask += xr.where(
+                        (ocean_mask * ocean_mask.shift(ny=-1))
+                        * (
+                            land_mask.shift({"nx": 1, "ny": -1})
+                            + land_mask.shift({"nx": -1})
+                        )
+                        == 2,
+                        1,
+                        0,
+                    )  ## down right & left
+                    newmask += xr.where(
+                        (ocean_mask * ocean_mask.shift(ny=-1))
+                        * (
+                            land_mask.shift({"nx": -1, "ny": -1})
+                            + land_mask.shift({"nx": 1})
+                        )
+                        == 2,
+                        1,
+                        0,
+                    )  ## down left & right
+
+                    forward = True
+
+            newmask = xr.where(newmask > 0, 1, 0)
+            changed = np.max(newmask) == 1
+            land_mask += newmask
+
+        ocean_mask = np.abs(land_mask - 1)
+
+        bathymetry["depth"] *= ocean_mask
+
+        ## Now, any points in the bathymetry that are shallower than minimum depth are set to minimum depth.
+        ## This preserves the true land/ocean mask.
+        bathymetry["depth"] = bathymetry["depth"].where(bathymetry["depth"] > 0, np.nan)
+        bathymetry["depth"] = bathymetry["depth"].where(
+            ~(bathymetry.depth <= self.min_depth), self.min_depth + 0.1
+        )
+        self._depth = bathymetry.depth
+        return bathymetry
 
     def apply_ridge(self, height, width, lon, ilat):
         """
@@ -944,3 +1313,116 @@ class Topo:
 
         self.mesh_path = file_path
         ds.to_netcdf(self.mesh_path)
+
+def longitude_slicer(data, longitude_extent, longitude_coords):
+    """
+    Slices longitudes while handling periodicity and the 'seams', that is the
+    longitude values where the data wraps around in a global domain (for example,
+    longitudes are defined, usually, within domain [0, 360] or [-180, 180]).
+
+    The algorithm works in five steps:
+
+    - Determine whether we need to add or subtract 360 to get the middle of the
+      ``longitude_extent`` to lie within ``data``'s longitude range (hereby ``old_lon``).
+
+    - Shift the dataset so that its midpoint matches the midpoint of
+      ``longitude_extent`` (up to a multiple of 360). Now, the modified ``old_lon``
+      does not increase monotonically from West to East since the 'seam'
+      has moved.
+
+    - Fix ``old_lon`` to make it monotonically increasing again. This uses
+      the information we have about the way the dataset was shifted/rolled.
+
+    - Slice the ``data`` index-wise. We know that ``|longitude_extent[1] - longitude_extent[0]| / 360``
+      multiplied by the number of discrete longitude points in the global input data gives
+      the number of longitude points in our slice, and we've already set the midpoint
+      to be the middle of the target domain.
+
+    - Add back the correct multiple of 360 so the whole domain matches the target.
+
+    Arguments:
+        data (xarray.Dataset): The global data you want to slice in longitude.
+        longitude_extent (Tuple[float, float]): The target longitudes (in degrees)
+            we want to slice to. Must be in increasing order.
+        longitude_coords (Union[str, list[str]): The name or list of names of the
+            longitude coordinates(s) in ``data``.
+
+    Returns:
+        xarray.Dataset: The sliced ``data``.
+    """
+
+    if isinstance(longitude_coords, str):
+        longitude_coords = [longitude_coords]
+
+    for lon in longitude_coords:
+        central_longitude = np.mean(longitude_extent)  ## Midpoint of target domain
+
+        ## Find a corresponding value for the intended domain midpoint in our data.
+        ## It's assumed that data has equally-spaced longitude values.
+
+        lons = data[lon].data
+        dlons = lons[1] - lons[0]
+
+        assert np.allclose(
+            np.diff(lons), dlons * np.ones(np.size(lons) - 1)
+        ), "provided longitude coordinate must be uniformly spaced"
+
+        for i in range(-1, 2, 1):
+            if data[lon][0] <= central_longitude + 360 * i <= data[lon][-1]:
+
+                ## Shifted version of target midpoint; e.g., could be -90 vs 270
+                ## integer i keeps track of what how many multiples of 360 we need to shift entire
+                ## grid by to match central_longitude
+                _central_longitude = central_longitude + 360 * i
+
+                ## Midpoint of the data
+                central_data = data[lon][data[lon].shape[0] // 2].values
+
+                ## Number of indices between the data midpoint and the target midpoint.
+                ## Sign indicates direction needed to shift.
+                shift = int(
+                    -(data[lon].shape[0] * (_central_longitude - central_data)) // 360
+                )
+
+                ## Shift data so that the midpoint of the target domain is the middle of
+                ## the data for easy slicing.
+                new_data = data.roll({lon: 1 * shift}, roll_coords=True)
+
+                ## Create a new longitude coordinate.
+                ## We'll modify this to remove any seams (i.e., jumps like -270 -> 90)
+                new_lon = new_data[lon].values
+
+                ## Take the 'seam' of the data, and either backfill or forward fill based on
+                ## whether the data was shifted F or west
+                if shift > 0:
+                    new_seam_index = shift
+
+                    new_lon[0:new_seam_index] -= 360
+
+                if shift < 0:
+                    new_seam_index = data[lon].shape[0] + shift
+
+                    new_lon[new_seam_index:] += 360
+
+                ## new_lon is used to re-centre the midpoint to match that of target domain
+                new_lon -= i * 360
+
+                new_data = new_data.assign_coords({lon: new_lon})
+
+                ## Choose the number of lon points to take from the middle, including a buffer.
+                ## Use this to index the new global dataset
+                num_lonpoints = (
+                    int(data[lon].shape[0] * (central_longitude - longitude_extent[0]))
+                    // 360
+                )
+
+        data = new_data.isel(
+            {
+                lon: slice(
+                    data[lon].shape[0] // 2 - num_lonpoints,
+                    data[lon].shape[0] // 2 + num_lonpoints,
+                )
+            }
+        )
+
+    return data
