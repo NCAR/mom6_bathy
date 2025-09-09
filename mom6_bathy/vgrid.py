@@ -213,7 +213,7 @@ class VGrid:
                     self.zi, 
                     {
                         'units': 'meter',
-                        'long_name': 'nominal thickness of layer',
+                        'long_name': 'Cell Interface Depths',
                         'valid_min': np.min(self.zi),
                         'valid_max': np.max(self.zi),
                     }
@@ -223,7 +223,7 @@ class VGrid:
                     self.zl, 
                     {
                         'units': 'meter',
-                        'long_name': 'nominal thickness of layer',
+                        'long_name': 'Cell Center Depths',
                         'valid_min': np.min(self.zl),
                         'valid_max': np.max(self.zl),
                     }
