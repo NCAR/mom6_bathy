@@ -1,23 +1,21 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>mom6_bathy.topo module &mdash; mom6_bathy 0.1 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script src="_static/doctools.js"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=2709fde1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -92,10 +90,10 @@
            <div itemprop="articleBody">
              
   <section id="module-mom6_bathy.topo">
-<span id="mom6-bathy-topo-module"></span><h1>mom6_bathy.topo module<a class="headerlink" href="#module-mom6_bathy.topo" title="Permalink to this heading"></a></h1>
+<span id="mom6-bathy-topo-module"></span><h1>mom6_bathy.topo module<a class="headerlink" href="#module-mom6_bathy.topo" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mom6_bathy.topo.</span></span><span class="sig-name descname"><span class="pre">Topo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_depth</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mom6_bathy.topo.</span></span><span class="sig-name descname"><span class="pre">Topo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_depth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Topos'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_on_create</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Bathymetry Generator for MOM6 grids (mom6_bathy.grid.Grid).</p>
 <p>MOM6 Simpler Models bathymetry constructor.</p>
@@ -108,8 +106,13 @@
 </dd>
 </dl>
 <dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.apply_edit">
+<span class="sig-name descname"><span class="pre">apply_edit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.apply_edit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.apply_land_frac">
-<span class="sig-name descname"><span class="pre">apply_land_frac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">landfrac_filepath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">landfrac_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xcoord_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ycoord_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth_fillval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff_frac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'bilinear'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.apply_land_frac" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">apply_land_frac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">landfrac_filepath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">landfrac_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xcoord_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ycoord_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth_fillval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff_frac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'bilinear'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.apply_land_frac" title="Link to this definition"></a></dt>
 <dd><p>Given a dataset containing land fraction, generate and apply ocean mask.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -128,7 +131,7 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.apply_ridge">
-<span class="sig-name descname"><span class="pre">apply_ridge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">height</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ilat</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.apply_ridge" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">apply_ridge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">height</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ilat</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.apply_ridge" title="Link to this definition"></a></dt>
 <dd><p>Apply a ridge to the bathymetry.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -136,47 +139,153 @@
 <li><p><strong>height</strong> (<em>float</em>) – Height of the ridge to be added.</p></li>
 <li><p><strong>width</strong> (<em>float</em>) – Width of the ridge to be added.</p></li>
 <li><p><strong>lon</strong> (<em>float</em>) – Longitude where the ridge is to be centered.</p></li>
-<li><p><strong>ilat</strong> (<em>pair of integers</em>) – Initial and final latitude indices for the ridge.</p></li>
+<li><p><strong>ilat</strong> (<em>pair</em><em> of </em><em>integers</em>) – Initial and final latitude indices for the ridge.</p></li>
 </ul>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.depth">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">depth</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.depth" title="Permalink to this definition"></a></dt>
-<dd><p>MOM6 grid depth array. Positive below MSL.</p>
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.basintmask">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basintmask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.basintmask" title="Link to this definition"></a></dt>
+<dd><p>Ocean domain mask at T grid. Seperate number for each connected water cell, 0 if land.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.check_restore_last_domain">
+<span class="sig-name descname"><span class="pre">check_restore_last_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_topo_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">restore_last</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.check_restore_last_domain" title="Link to this definition"></a></dt>
+<dd><p>Restore last domain/grid only if it matches the current topo’s grid_name and shape.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.copy_grid_files_to_snapshot">
+<span class="sig-name descname"><span class="pre">copy_grid_files_to_snapshot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.copy_grid_files_to_snapshot" title="Link to this definition"></a></dt>
+<dd><p>Copy the grid NetCDF and JSON files into the snapshot directory if they exist.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.depth">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">depth</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.depth" title="Link to this definition"></a></dt>
+<dd><p>MOM6 grid depth array (m). Positive below MSL.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.ensure_original_state">
+<span class="sig-name descname"><span class="pre">ensure_original_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">command_manager</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">repo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">repo_root</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.ensure_original_state" title="Link to this definition"></a></dt>
+<dd><p>Ensure that the original (reference) topography and minimum depth files exist for the current grid/domain.
+Also ensures an original snapshot commit and git tracking.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.from_domain_dir">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_domain_dir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_min_depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9.5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.from_domain_dir" title="Link to this definition"></a></dt>
+<dd><p>Create a Topo instance from a domain directory.
+Loads grid, min_depth, and original topo if available.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.from_snapshot">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_snapshot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_depth</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.from_snapshot" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.from_snapshot_file">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_snapshot_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.from_snapshot_file" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.from_topo_file">
-<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_topo_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">topo_file_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.from_topo_file" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_topo_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">topo_file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.from_topo_file" title="Link to this definition"></a></dt>
 <dd><p>Create a bathymetry object from an existing topog file.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>grid</strong> (<a class="reference internal" href="mom6_bathy.grid.html#mom6_bathy.grid.Grid" title="mom6_bathy.grid.Grid"><em>mom6_bathy.grid.Grid</em></a>) – horizontal grid instance for which the bathymetry is to be created.</p></li>
 <li><p><strong>topo_file_path</strong> (<em>str</em>) – Path to an existing MOM6 topog file.</p></li>
+<li><p><strong>min_depth</strong> (<em>float</em><em>, </em><em>optional</em>) – Minimum water column depth (m). Columns with shallower depths are to be masked out.</p></li>
 </ul>
 </dd>
 </dl>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.get_current_domain">
+<span class="sig-name descname"><span class="pre">get_current_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain_options</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.get_current_domain" title="Link to this definition"></a></dt>
+<dd><p>Return the value of the current domain if present in options, else None.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.get_domain_id">
+<span class="sig-name descname"><span class="pre">get_domain_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.get_domain_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.get_domain_options">
+<span class="sig-name descname"><span class="pre">get_domain_options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.get_domain_options" title="Link to this definition"></a></dt>
+<dd><p>Return a list of (label, value) tuples for available domains.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.load_grid_definition">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">load_grid_definition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.load_grid_definition" title="Link to this definition"></a></dt>
+<dd><p>Load the associated grid from the topo’s snapshot directory.</p>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.max_depth">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">max_depth</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.max_depth" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">max_depth</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.max_depth" title="Link to this definition"></a></dt>
 <dd><p>Maximum water column depth.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.min_depth">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">min_depth</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.min_depth" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">min_depth</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.min_depth" title="Link to this definition"></a></dt>
 <dd><p>Minimum water column depth. Columns with shallow depths are to be masked out.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.persist_last_domain">
+<span class="sig-name descname"><span class="pre">persist_last_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snapshot_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.persist_last_domain" title="Link to this definition"></a></dt>
+<dd><p>Save or load the last used domain and snapshot to/from a JSON file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.point_is_ocean">
+<span class="sig-name descname"><span class="pre">point_is_ocean</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lons</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lats</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.point_is_ocean" title="Link to this definition"></a></dt>
+<dd><p>Given a list of coordinates, return a list of booleans indicating if the coordinates are in the ocean (True) or land (False)</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.qmask">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">qmask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.qmask" title="Link to this definition"></a></dt>
+<dd><p>Ocean domain mask on Q grid. 1 if ocean, 0 if land.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.redo_last_edit">
+<span class="sig-name descname"><span class="pre">redo_last_edit</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.redo_last_edit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.restore_last_domain">
+<span class="sig-name descname"><span class="pre">restore_last_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_topo_id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.restore_last_domain" title="Link to this definition"></a></dt>
+<dd><p>Restore the last used domain/grid and snapshot, if available. Returns snapshot_name if present, else None.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.save_grid_definition">
+<span class="sig-name descname"><span class="pre">save_grid_definition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot_dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.save_grid_definition" title="Link to this definition"></a></dt>
+<dd><p>Save the associated grid NetCDF path in the topo’s snapshot directory.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.save_snapshot">
+<span class="sig-name descname"><span class="pre">save_snapshot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_metadata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.save_snapshot" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.set_bowl">
-<span class="sig-name descname"><span class="pre">set_bowl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_depth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dedge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rad_earth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6378000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expdecay</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_bowl" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">set_bowl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_depth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dedge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rad_earth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6378000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expdecay</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_bowl" title="Link to this definition"></a></dt>
 <dd><p>Create a bowl-shaped bathymetry. Same effect as setting the TOPO_CONFIG parameter to “bowl”.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -192,7 +301,7 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.set_depth_via_topog_file">
-<span class="sig-name descname"><span class="pre">set_depth_via_topog_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">topog_file_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_depth_via_topog_file" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">set_depth_via_topog_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">topog_file_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_depth_via_topog_file" title="Link to this definition"></a></dt>
 <dd><p>Apply a bathymetry read from an existing topog file</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -203,7 +312,7 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.set_flat">
-<span class="sig-name descname"><span class="pre">set_flat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_flat" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">set_flat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_flat" title="Link to this definition"></a></dt>
 <dd><p>Create a flat bottom bathymetry with a given depth D.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -214,7 +323,7 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.set_spoon">
-<span class="sig-name descname"><span class="pre">set_spoon</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_depth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dedge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rad_earth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6378000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expdecay</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_spoon" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">set_spoon</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_depth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dedge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rad_earth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6378000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expdecay</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_spoon" title="Link to this definition"></a></dt>
 <dd><p>Create a spoon-shaped bathymetry. Same effect as setting the TOPO_CONFIG
 parameter to “spoon”.</p>
 <dl class="field-list simple">
@@ -230,14 +339,42 @@ parameter to “spoon”.</p>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.supergridmask">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">supergridmask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.supergridmask" title="Link to this definition"></a></dt>
+<dd><p>Ocean domain mask on supergrid. 1 if ocean, 0 if land.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.tmask">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">tmask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.tmask" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">tmask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.tmask" title="Link to this definition"></a></dt>
 <dd><p>Ocean domain mask at T grid. 1 if ocean, 0 if land.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.to_snapshot_dict">
+<span class="sig-name descname"><span class="pre">to_snapshot_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.to_snapshot_dict" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.umask">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">umask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.umask" title="Link to this definition"></a></dt>
+<dd><p>Ocean domain mask on U grid. 1 if ocean, 0 if land.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.undo_last_edit">
+<span class="sig-name descname"><span class="pre">undo_last_edit</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.undo_last_edit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.vmask">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">vmask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.vmask" title="Link to this definition"></a></dt>
+<dd><p>Ocean domain mask on V grid. 1 if ocean, 0 if land.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.write_cice_grid">
-<span class="sig-name descname"><span class="pre">write_cice_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.write_cice_grid" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">write_cice_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.write_cice_grid" title="Link to this definition"></a></dt>
 <dd><p>Write the CICE grid file in netcdf format. The written file is
 to be read in by CICE during runtime.</p>
 <dl class="field-list simple">
@@ -249,7 +386,7 @@ to be read in by CICE during runtime.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.write_esmf_mesh">
-<span class="sig-name descname"><span class="pre">write_esmf_mesh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.write_esmf_mesh" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">write_esmf_mesh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.write_esmf_mesh" title="Link to this definition"></a></dt>
 <dd><p>Write the ESMF mesh file</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -263,8 +400,10 @@ to be read in by CICE during runtime.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.write_scrip_grid">
-<span class="sig-name descname"><span class="pre">write_scrip_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.write_scrip_grid" title="Permalink to this definition"></a></dt>
-<dd><p>Write the SCRIP grid file</p>
+<span class="sig-name descname"><span class="pre">write_scrip_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.write_scrip_grid" title="Link to this definition"></a></dt>
+<dd><p>Write the SCRIP grid file. In latest CESM versions, SCRIP grid files are
+no longer required and are replaced by ESMF mesh files. However, SCRIP
+files are still needed to generate custom ocean-runoff mapping files.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -277,7 +416,7 @@ to be read in by CICE during runtime.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.write_topo">
-<span class="sig-name descname"><span class="pre">write_topo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.write_topo" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">write_topo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.write_topo" title="Link to this definition"></a></dt>
 <dd><p>Write the TOPO_FILE (bathymetry file) in netcdf format. The written file is
 to be read in by MOM6 during runtime.</p>
 <dl class="field-list simple">
