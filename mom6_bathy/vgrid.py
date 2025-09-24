@@ -52,7 +52,6 @@ class VGrid:
         Assumes there is a surface interface at 0 meters."""
         return np.insert(np.cumsum(self.dz), 0, 0)
         
-        
     @classmethod
     def sanitize_name(self, name):
         import re
