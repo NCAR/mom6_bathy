@@ -5,6 +5,7 @@ import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from mom6_bathy.grid import Grid
 
 class GridCreator(widgets.HBox):
 
@@ -311,7 +312,6 @@ class GridCreator(widgets.HBox):
         self.plot_grid()
 
     def reset_grid(self, b=None):
-        from mom6_bathy.grid import Grid
         params = self._initial_params
         name = self._snapshot_name.value.strip() or params["name"]
         sanitized_name = self.grid.sanitize_name(name)
