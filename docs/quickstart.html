@@ -1,23 +1,21 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quickstart Guide &mdash; mom6_bathy 0.1 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script src="_static/doctools.js"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=2709fde1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -68,6 +66,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#esmf-mesh-file"><em>ESMF Mesh file</em></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#step-5-editing-grids-and-bathymetry">Step 5: Editing Grids and Bathymetry</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#further-steps">Further steps</a></li>
 </ul>
 </li>
@@ -104,25 +103,25 @@
            <div itemprop="articleBody">
              
   <section id="quickstart-guide">
-<h1>Quickstart Guide<a class="headerlink" href="#quickstart-guide" title="Permalink to this heading"></a></h1>
+<h1>Quickstart Guide<a class="headerlink" href="#quickstart-guide" title="Link to this heading"></a></h1>
 <p><cite>mom6_tools</cite> library can be utilized via its Python API, i.e., directly within Python
 scripts or within Jupyter notebooks. In this quickstart guide, we describe how
 the tool can be utilized within a Jupyter Notebook, but the majority of
 these instructions apply to Python scripts as well.</p>
 <section id="step-1-import-modules">
-<h2>Step 1: Import modules<a class="headerlink" href="#step-1-import-modules" title="Permalink to this heading"></a></h2>
+<h2>Step 1: Import modules<a class="headerlink" href="#step-1-import-modules" title="Link to this heading"></a></h2>
 <p>The first step is to import the <code class="docutils literal notranslate"><span class="pre">Grid</span></code> and <code class="docutils literal notranslate"><span class="pre">Topo</span></code> classes of the
 <cite>mom6_bathy</cite> package. The <code class="docutils literal notranslate"><span class="pre">Grid</span></code> class represents
 horizontal MOM6 grids, and is to be instantiated with the desired grid
 configuration and resolution. After creating a grid instance, a <code class="docutils literal notranslate"><span class="pre">Topo</span></code> class
 instance is to be created to generate an associated bathymetry.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">mom6_bathy.grid</span> <span class="kn">import</span> <span class="n">Grid</span>
-<span class="kn">from</span> <span class="nn">mom6_bathy.topo</span> <span class="kn">import</span> <span class="n">Topo</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mom6_bathy.grid</span><span class="w"> </span><span class="kn">import</span> <span class="n">Grid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mom6_bathy.topo</span><span class="w"> </span><span class="kn">import</span> <span class="n">Topo</span>
 </pre></div>
 </div>
 </section>
 <section id="step-2-create-the-horizontal-grid">
-<h2>Step 2: Create the horizontal grid<a class="headerlink" href="#step-2-create-the-horizontal-grid" title="Permalink to this heading"></a></h2>
+<h2>Step 2: Create the horizontal grid<a class="headerlink" href="#step-2-create-the-horizontal-grid" title="Link to this heading"></a></h2>
 <p>After having imported the modules, we can now create a horizontal grid.
 An example Grid instantiation:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grid</span> <span class="o">=</span> <span class="n">Grid</span><span class="p">(</span>
@@ -171,7 +170,7 @@ displace_pole : bool, optional
 <p>Note that tripolar and displaced pole grids cannot yet be created from scratch,
 but existing tripolar and displaced pole grids can be modified via mom6_bathy.</p>
 <section id="avoiding-singularity-points">
-<h3><em>Avoiding singularity points</em><a class="headerlink" href="#avoiding-singularity-points" title="Permalink to this heading"></a></h3>
+<h3><em>Avoiding singularity points</em><a class="headerlink" href="#avoiding-singularity-points" title="Link to this heading"></a></h3>
 <dl class="simple">
 <dt>To avoid singularity points within the ocean grid:</dt><dd><ul class="simple">
 <li><p>The grid poles (which may be different than the true poles) must be left out of the grid,
@@ -189,7 +188,7 @@ left out the geographic extent of the grid.</p></li>
 to the pose of hiding the singularity points of spherical ocean grids within the CESM framework.</p>
 </section>
 <section id="grid-metrics-and-attributes">
-<h3><em>Grid Metrics and Attributes</em><a class="headerlink" href="#grid-metrics-and-attributes" title="Permalink to this heading"></a></h3>
+<h3><em>Grid Metrics and Attributes</em><a class="headerlink" href="#grid-metrics-and-attributes" title="Link to this heading"></a></h3>
 <p>When a <code class="docutils literal notranslate"><span class="pre">Grid</span></code> instance gets created, several grid metrics and attributes
 on all staggerings are automatically computed and populated. These metrics and attributes
 are accessible via the accessor operator (<code class="docutils literal notranslate"><span class="pre">.</span></code>). For example, to access “the array
@@ -218,7 +217,7 @@ of t-grid longitutes” of <code class="docutils literal notranslate"><span clas
 </ul>
 </section>
 <section id="supergrid">
-<h3><em>Supergrid</em><a class="headerlink" href="#supergrid" title="Permalink to this heading"></a></h3>
+<h3><em>Supergrid</em><a class="headerlink" href="#supergrid" title="Link to this heading"></a></h3>
 <p>In addition to above grid metrics and attributes, the <code class="docutils literal notranslate"><span class="pre">Grid</span></code> class incorporates an
 underlying <a class="reference internal" href="glossary.html#term-supergrid"><span class="xref std std-term">supergrid</span></a> instance associated the grid instance, which is again
 accessible via the (<code class="docutils literal notranslate"><span class="pre">.</span></code>) operator:</p>
@@ -243,7 +242,7 @@ a python library developed by M. Harrison (GFDL).</p>
 </section>
 </section>
 <section id="step-3-create-bathymetry">
-<h2>Step 3: Create Bathymetry<a class="headerlink" href="#step-3-create-bathymetry" title="Permalink to this heading"></a></h2>
+<h2>Step 3: Create Bathymetry<a class="headerlink" href="#step-3-create-bathymetry" title="Link to this heading"></a></h2>
 <p>After having generated the horizontal grid, we can now create an associated bathymetry
 using the <code class="docutils literal notranslate"><span class="pre">Topo</span></code> class of the <cite>mom6_bathy</cite> tool. We instantiate a bathymetry
 object as follows:</p>
@@ -259,7 +258,7 @@ assignment operator. For example:</p>
 </pre></div>
 </div>
 <section id="predefined-bathymetry-configurations">
-<h3><em>Predefined Bathymetry Configurations</em><a class="headerlink" href="#predefined-bathymetry-configurations" title="Permalink to this heading"></a></h3>
+<h3><em>Predefined Bathymetry Configurations</em><a class="headerlink" href="#predefined-bathymetry-configurations" title="Link to this heading"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">Topo</span></code> class provides three predefined bathymetry configurations, which are also
 available in MOM6 as idealized configurations. (See <cite>TOPO_CONFIG</cite> parameter in MOM_input)</p>
 <blockquote>
@@ -285,10 +284,10 @@ and minimum depth, respectively.</p>
 <p>Check out the following notebook to see examples of above predefined bathymetry options: <a class="reference external" href="https://github.com/NCAR/mom6_bathy/blob/master/notebooks/1_spherical_grid.ipynb">1_spherical_grid.ipynb</a></p>
 </section>
 <section id="custom-bathymetry">
-<h3><em>Custom Bathymetry</em><a class="headerlink" href="#custom-bathymetry" title="Permalink to this heading"></a></h3>
+<h3><em>Custom Bathymetry</em><a class="headerlink" href="#custom-bathymetry" title="Link to this heading"></a></h3>
 <p>In addition to the above predefined configurations, users may provide their own depth arrays. For
 example:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
 <span class="c1"># define a custom depth</span>
 <span class="n">i</span> <span class="o">=</span> <span class="n">grid</span><span class="o">.</span><span class="n">tlat</span><span class="o">.</span><span class="n">nx</span><span class="o">.</span><span class="n">data</span>                <span class="c1"># array of x-indices</span>
@@ -301,7 +300,7 @@ example:</p>
 </div>
 </section>
 <section id="adding-ridges">
-<h3><em>Adding ridges</em><a class="headerlink" href="#adding-ridges" title="Permalink to this heading"></a></h3>
+<h3><em>Adding ridges</em><a class="headerlink" href="#adding-ridges" title="Link to this heading"></a></h3>
 <p>Simpler model bathymetry configurations typically include ridges to represent straits and
 continents in an idealized manner. The <code class="docutils literal notranslate"><span class="pre">Topo</span></code> class provides <code class="docutils literal notranslate"><span class="pre">apply_ridge</span></code> method
 to add ridges to the bathymetry. Example usage:</p>
@@ -312,11 +311,11 @@ to add ridges to the bathymetry. Example usage:</p>
 </section>
 </section>
 <section id="step-4-write-model-input-files">
-<h2>Step 4: Write Model Input Files<a class="headerlink" href="#step-4-write-model-input-files" title="Permalink to this heading"></a></h2>
+<h2>Step 4: Write Model Input Files<a class="headerlink" href="#step-4-write-model-input-files" title="Link to this heading"></a></h2>
 <p>The final step of <cite>mom6_bathy</cite> workflow is to write out the netcdf files containing grid
 and bathymetry data. These files are to be read in by CESM and MOM6 during runtime.</p>
 <section id="supergrid-file">
-<h3><em>Supergrid File</em><a class="headerlink" href="#supergrid-file" title="Permalink to this heading"></a></h3>
+<h3><em>Supergrid File</em><a class="headerlink" href="#supergrid-file" title="Link to this heading"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">write_supergrid</span></code> method of a <code class="docutils literal notranslate"><span class="pre">Grid</span></code> instance writes out the MOM6 supergrid file
 in netcdf format. The <code class="docutils literal notranslate"><span class="pre">GRID_FILE</span></code> parameter in <code class="docutils literal notranslate"><span class="pre">MOM_input</span></code> file can then be set to
 the path of the supergrid file written by the <code class="docutils literal notranslate"><span class="pre">Grid</span></code> instance.</p>
@@ -328,7 +327,7 @@ input files require either topography (depth) or mask information. Hence, they a
 written by the <cite>Topo</cite> class.</p>
 </section>
 <section id="topography-bathymetry-file">
-<h3><em>Topography (Bathymetry) File</em><a class="headerlink" href="#topography-bathymetry-file" title="Permalink to this heading"></a></h3>
+<h3><em>Topography (Bathymetry) File</em><a class="headerlink" href="#topography-bathymetry-file" title="Link to this heading"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">write_topo</span></code> method of the <code class="docutils literal notranslate"><span class="pre">Topo</span></code> class writes out the MOM6 bathymetry file in netcdf format.
 <code class="docutils literal notranslate"><span class="pre">TOPO_FILE</span></code> parameter in <code class="docutils literal notranslate"><span class="pre">MOM_input</span></code> file can then be set to the path of the topography file
 written by the <code class="docutils literal notranslate"><span class="pre">Topo</span></code> instance.</p>
@@ -337,7 +336,7 @@ written by the <code class="docutils literal notranslate"><span class="pre">Topo
 </div>
 </section>
 <section id="cice-grid-file">
-<h3><em>CICE grid file</em><a class="headerlink" href="#cice-grid-file" title="Permalink to this heading"></a></h3>
+<h3><em>CICE grid file</em><a class="headerlink" href="#cice-grid-file" title="Link to this heading"></a></h3>
 <p>If the model is to be run with the CICE component, the <code class="docutils literal notranslate"><span class="pre">write_cice_grid</span></code> method of the
 <code class="docutils literal notranslate"><span class="pre">Topo</span></code> class writes out the CICE grid file in netcdf format. The relevant CICE namelist
 parameters can then be updated to read in the CICE grid file written by the <code class="docutils literal notranslate"><span class="pre">Topo</span></code> instance.</p>
@@ -346,7 +345,7 @@ parameters can then be updated to read in the CICE grid file written by the <cod
 </div>
 </section>
 <section id="esmf-mesh-file">
-<h3><em>ESMF Mesh file</em><a class="headerlink" href="#esmf-mesh-file" title="Permalink to this heading"></a></h3>
+<h3><em>ESMF Mesh file</em><a class="headerlink" href="#esmf-mesh-file" title="Link to this heading"></a></h3>
 <p>In addition to the MOM6 supergrid file, MOM6 topography file and CICE grid file, an
 ESMF mesh file is required when running CESM. The ESMF mesh file is used
 by the NUOPC coupler to acquire grid and mask information. The <code class="docutils literal notranslate"><span class="pre">write_esmf_mesh</span></code> method
@@ -356,8 +355,22 @@ of the <code class="docutils literal notranslate"><span class="pre">Topo</span><
 </div>
 </section>
 </section>
+<section id="step-5-editing-grids-and-bathymetry">
+<h2>Step 5: Editing Grids and Bathymetry<a class="headerlink" href="#step-5-editing-grids-and-bathymetry" title="Link to this heading"></a></h2>
+<p>Beyond creating standard grids and simple topographies, mom6_bathy provides advanced tools
+for interactively editing and creating complex model domains. These features are designed to
+facilitate reproducible workflows for custom model configurations and model tuning. These
+domain configurators can be used for tasks such as:</p>
+<ul class="simple">
+<li><p>Editing Bathymetry: Manually or programmatically modifying ocean depths.</p></li>
+<li><p>Creating New Grids: Defining entirely new horizontal grid structures.</p></li>
+<li><p>Creating Vertical Grids: Specifying the vertical layering of the ocean model.</p></li>
+</ul>
+<p>Check out the notebook for examples of these advanced features:
+<a class="reference external" href="https://github.com/NCAR/mom6_bathy/blob/master/notebooks/6_demo_editors.ipynb">6_demo_editors.ipynb</a></p>
+</section>
 <section id="further-steps">
-<h2>Further steps<a class="headerlink" href="#further-steps" title="Permalink to this heading"></a></h2>
+<h2>Further steps<a class="headerlink" href="#further-steps" title="Link to this heading"></a></h2>
 <p>The remaining steps of configuring the model, which include specifying initial conditions,
 forcings, and runtime parameters, are beyond the scope of the <cite>mom6_bathy</cite> tool. Note that a
 complementary tool called <cite>visualCaseGen</cite>, which includes <cite>mom6_bathy</cite> as a submodule, can be used
