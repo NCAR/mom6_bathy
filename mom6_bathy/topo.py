@@ -210,6 +210,13 @@ class Topo:
                         file_path=original_path, commit_msg=f"Update original snapshot {original_name}")
     
     def get_domain_id(self):
+        """
+        Collects essential metadata from the associated grid object
+        and the topography data array. The resulting dictionary serves as a
+        unique identifier for the specific model domain configuration, which
+        can be used for serialization, snapshot management, and restoring
+        application states.
+        """
         grid = self._grid
         grid_name = getattr(grid, "name", getattr(grid, "_name", None))
         shape = [int(v) for v in self.depth.data.shape]
