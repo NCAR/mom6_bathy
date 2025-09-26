@@ -390,12 +390,12 @@ class TopoEditor(widgets.HBox):
             layout={'width': '90%'}
         )
         self._git_checkout_button = widgets.Button(description='Checkout', layout={'width': '44%'})
-        self._git_merge_source_dropdown = widgets.Dropdown(
-            options=list_branches(self.repo_root),
-            description='Merge from:',
-            layout={'width': '90%'}
-        )
-        self._git_merge_button = widgets.Button(description='Merge Branch', layout={'width': '44%'})
+        # self._git_merge_source_dropdown = widgets.Dropdown(
+        #     options=list_branches(self.repo_root),
+        #     description='Merge from:',
+        #     layout={'width': '90%'}
+        # )
+        # self._git_merge_button = widgets.Button(description='Merge Branch', layout={'width': '44%'})
 
         # --- Group controls into logical sections ---
         display_section = widgets.VBox([
@@ -868,15 +868,15 @@ class TopoEditor(widgets.HBox):
         except Exception as e:
             print(f"Error checking out branch: {str(e)}")
 
-    def on_git_merge(self, b):
-        """Merge the selected branch into the current branch."""
-        source = self._git_merge_source_dropdown.value
-        if not source:
-            print("Select a branch to merge from.")
-            return
-        success, msg = merge_branch(self.repo_root, source)
-        print(msg)
-        self._git_branch_dropdown.options = list_branches(self.repo_root)
-        self._git_branch_dropdown.value = get_current_branch(self.repo_root)
-        self._git_merge_source_dropdown.options = list_branches(self.repo_root)
-        self.refresh_commit_dropdown()
+    # def on_git_merge(self, b):
+    #     """Merge the selected branch into the current branch."""
+    #     source = self._git_merge_source_dropdown.value
+    #     if not source:
+    #         print("Select a branch to merge from.")
+    #         return
+    #     success, msg = merge_branch(self.repo_root, source)
+    #     print(msg)
+    #     self._git_branch_dropdown.options = list_branches(self.repo_root)
+    #     self._git_branch_dropdown.value = get_current_branch(self.repo_root)
+    #     self._git_merge_source_dropdown.options = list_branches(self.repo_root)
+    #     self.refresh_commit_dropdown()
