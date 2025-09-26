@@ -1,10 +1,6 @@
 import os
 import git
 
-def get_null_tree(repo):
-    # Create an empty tree object in memory
-    return repo.tree(repo.git.hash_object('-t', 'tree', '/dev/null'))
-
 def get_domain_dir(grid, base_dir="Topos"):
     """
     Returns a unique directory path for a given grid object.
@@ -110,7 +106,16 @@ def commit_info(
     branch=None,
 ):
     """
-    Generalized git commit info for both grid and topo editors.
+    Retrieves and formats commit information from a Git repository for the
+    Topo Editor.
+
+    This function operates in two primary modes. In 'list' mode, it scans a
+    branch's history to find commits that match specific file patterns and
+    change types, returning a filtered list. This mode is particularly useful
+    for populating UI elements like dropdowns for restoring files. In 'details'
+    mode, it provides a formatted HTML string with detailed information about a
+    single commit, for the display panels in Topo Editor.
+
     """
     import fnmatch
     repo_root = os.path.abspath(repo_root)
@@ -173,6 +178,7 @@ def delete_branch_and_switch(branch, repo_root):
     return repo.active_branch.name
 
 def merge_branch(repo_root, source_branch):
+    """Needs to be tested further."""
     repo = git.Repo(repo_root)
     current = repo.active_branch.name
     if source_branch == current:
