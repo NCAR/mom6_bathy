@@ -813,7 +813,8 @@ class Grid:
         ds = xr.Dataset()
 
         # global attrs:
-        ds.attrs["filename"] = os.path.basename(path)
+        if path is not None:
+            ds.attrs["filename"] = os.path.basename(path)
         ds.attrs["type"] = "MOM6 supergrid"
         ds.attrs["Created"] = datetime.now().isoformat()
         if author:
@@ -842,4 +843,7 @@ class Grid:
         ds["angle_dx"] = xr.DataArray(
             self._supergrid.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"}
         )
-        ds.to_netcdf(path)
+
+        if path is not None:
+            ds.to_netcdf(path)
+        return ds

@@ -605,8 +605,11 @@ class Topo:
             dims=["ny", "nx"],
             attrs={"long_name": "t-grid cell depth", "units": "m"},
         )
+    
+        if file_path is not None:
+            ds.to_netcdf(file_path)
 
-        ds.to_netcdf(file_path)
+        return ds
 
     def write_cice_grid(self, file_path):
         """
@@ -724,7 +727,7 @@ class Topo:
                 "coordinates": "TLON TLAT",
             },
         )
-
+    
         ds.to_netcdf(file_path)
 
     def write_scrip_grid(self, file_path, title=None):
