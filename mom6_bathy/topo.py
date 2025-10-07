@@ -549,19 +549,15 @@ class Topo:
             mask_mapped > cutoff_frac, depth_fillval, self._depth
         )
 
-    def write_topo(self, file_path, title=None):
+    def gen_topo_ds(self, title=None):
         """
-        Write the TOPO_FILE (bathymetry file) in netcdf format. The written file is
-        to be read in by MOM6 during runtime.
+        Write the TOPO_FILE (bathymetry file) in xarray Dataset. 
 
         Parameters
         ----------
-        file_path: str
-            Path to TOPO_FILE to be written.
         title: str, optional
             File title.
         """
-
         ds = xr.Dataset()
 
         # global attrs:
@@ -605,8 +601,25 @@ class Topo:
             dims=["ny", "nx"],
             attrs={"long_name": "t-grid cell depth", "units": "m"},
         )
+    
 
-        ds.to_netcdf(file_path, format='NETCDF3_64BIT',)
+        return ds
+
+    def write_topo(self, file_path, title=None):
+        """
+        Write the TOPO_FILE (bathymetry file) in netcdf format. The written file is
+        to be read in by MOM6 during runtime.
+
+        Parameters
+        ----------
+        file_path: str
+            Path to TOPO_FILE to be written.
+        title: str, optional
+            File title.
+        """
+
+        ds = self.gen_topo_ds(title=title)
+        ds.to_netcdf(file_path, format='NETCDF3_64BIT')
 
     def write_cice_grid(self, file_path):
         """
