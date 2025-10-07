@@ -619,7 +619,7 @@ class Topo:
         """
 
         ds = self.gen_topo_ds(title=title)
-        ds.to_netcdf(file_path)
+        ds.to_netcdf(file_path, format='NETCDF3_64BIT')
 
     def write_cice_grid(self, file_path):
         """
@@ -737,8 +737,8 @@ class Topo:
                 "coordinates": "TLON TLAT",
             },
         )
-    
-        ds.to_netcdf(file_path)
+
+        ds.to_netcdf(file_path, format='NETCDF3_64BIT',)
 
     def write_scrip_grid(self, file_path, title=None):
         """
@@ -818,7 +818,7 @@ class Topo:
             attrs={"units": "radians^2"},
         )
 
-        ds.to_netcdf(file_path)
+        ds.to_netcdf(file_path, format='NETCDF3_64BIT',)
 
     def write_esmf_mesh(self, file_path, title=None):
         """
@@ -956,4 +956,4 @@ class Topo:
         )
 
         self.mesh_path = file_path
-        ds.to_netcdf(self.mesh_path)
+        ds.to_netcdf(self.mesh_path, format='NETCDF3_64BIT',)

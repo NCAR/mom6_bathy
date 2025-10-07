@@ -858,4 +858,4 @@ class Grid:
         """
 
         ds = self.gen_supergrid_ds(author=author)
-        ds.to_netcdf(path)
+        ds.to_netcdf(path, format='NETCDF3_64BIT')
