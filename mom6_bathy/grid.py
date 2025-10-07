@@ -794,21 +794,18 @@ class Grid:
 
         self.supergrid = new_supergrid
 
-    def write_supergrid(
-        self, path: Optional[str] = None, author: Optional[str] = None
-    ) -> None:
+    def gen_supergrid_ds(
+        self, author: Optional[str] = None
+    ) -> xr.Dataset:
         """
-        Write supergrid to a netcdf file. The supergrid file is to be read in by MOM6
+        Generate supergrid to a xarray Dataset file. The supergrid file is to be read in by MOM6
         during runtime.
 
         Parameters
         ----------
-        path: str, optional
-            Path to the supergrid file to be written.
         author: str, optional
             Name of the author. If provided, the name will appear in files as metadata.
         """
-
         # initialize the dataset:
         ds = xr.Dataset()
 
@@ -842,8 +839,23 @@ class Grid:
         )
         ds["angle_dx"] = xr.DataArray(
             self._supergrid.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"}
-        )
-
-        if path is not None:
-            ds.to_netcdf(path)
+        )            
         return ds
+
+    def write_supergrid(
+        self, path: Optional[str] = None, author: Optional[str] = None
+    ) -> None:
+        """
+        Write supergrid to a netcdf file. The supergrid file is to be read in by MOM6
+        during runtime.
+
+        Parameters
+        ----------
+        path: str, optional
+            Path to the supergrid file to be written.
+        author: str, optional
+            Name of the author. If provided, the name will appear in files as metadata.
+        """
+
+        ds = self.gen_supergrid_ds(author=author)
+        ds.to_netcdf(path)
