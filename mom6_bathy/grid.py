@@ -810,8 +810,6 @@ class Grid:
         ds = xr.Dataset()
 
         # global attrs:
-        if path is not None:
-            ds.attrs["filename"] = os.path.basename(path)
         ds.attrs["type"] = "MOM6 supergrid"
         ds.attrs["Created"] = datetime.now().isoformat()
         if author:
@@ -858,4 +856,5 @@ class Grid:
         """
 
         ds = self.gen_supergrid_ds(author=author)
+        ds.attrs["filename"] = os.path.basename(path)
         ds.to_netcdf(path, format='NETCDF3_64BIT')
