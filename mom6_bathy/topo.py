@@ -324,6 +324,10 @@ class Topo:
         else:
             pass # the depth array is the right size
 
+        # Set all NaNs to land
+        depth = depth.fillna(0)
+
+        # Save to object
         self.depth = depth
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
