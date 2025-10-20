@@ -495,7 +495,7 @@ class Topo:
             output_dir=output_dir,
             write_to_file=write_to_file,
         )
-        sself.tidy_dataset(
+        self.tidy_dataset(
             fill_channels=fill_channels,
             positive_down=positive_down,
             vertical_coordinate_name=vertical_coordinate_name,
