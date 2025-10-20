@@ -325,6 +325,10 @@ class Topo:
         else:
             pass # the depth array is the right size
 
+        # Set all NaNs to land
+        depth = depth.fillna(0)
+
+        # Save to object
         self.depth = depth
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
@@ -918,19 +922,15 @@ class Topo:
             mask_mapped > cutoff_frac, depth_fillval, self._depth
         )
 
-    def write_topo(self, file_path, title=None):
+    def gen_topo_ds(self, title=None):
         """
-        Write the TOPO_FILE (bathymetry file) in netcdf format. The written file is
-        to be read in by MOM6 during runtime.
+        Write the TOPO_FILE (bathymetry file) in xarray Dataset. 
 
         Parameters
         ----------
-        file_path: str
-            Path to TOPO_FILE to be written.
         title: str, optional
             File title.
         """
-
         ds = xr.Dataset()
 
         # global attrs:
@@ -974,8 +974,25 @@ class Topo:
             dims=["ny", "nx"],
             attrs={"long_name": "t-grid cell depth", "units": "m"},
         )
+    
 
-        ds.to_netcdf(file_path)
+        return ds
+
+    def write_topo(self, file_path, title=None):
+        """
+        Write the TOPO_FILE (bathymetry file) in netcdf format. The written file is
+        to be read in by MOM6 during runtime.
+
+        Parameters
+        ----------
+        file_path: str
+            Path to TOPO_FILE to be written.
+        title: str, optional
+            File title.
+        """
+
+        ds = self.gen_topo_ds(title=title)
+        ds.to_netcdf(file_path, format='NETCDF3_64BIT')
 
     def write_cice_grid(self, file_path):
         """
@@ -1094,7 +1111,7 @@ class Topo:
             },
         )
 
-        ds.to_netcdf(file_path)
+        ds.to_netcdf(file_path, format='NETCDF3_64BIT',)
 
     def write_scrip_grid(self, file_path, title=None):
         """
@@ -1174,7 +1191,7 @@ class Topo:
             attrs={"units": "radians^2"},
         )
 
-        ds.to_netcdf(file_path)
+        ds.to_netcdf(file_path, format='NETCDF3_64BIT',)
 
     def write_esmf_mesh(self, file_path, title=None):
         """
@@ -1312,7 +1329,7 @@ class Topo:
         )
 
         self.mesh_path = file_path
-        ds.to_netcdf(self.mesh_path)
+        ds.to_netcdf(self.mesh_path, format='NETCDF3_64BIT')
 
 def longitude_slicer(data, longitude_extent, longitude_coords):
     """

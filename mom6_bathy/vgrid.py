@@ -194,8 +194,7 @@ class VGrid:
         ds.attrs['title'] = f'Vertical grid for MOM6 simulation'
         ds.attrs['maximum_depth'] = self.depth
         ds.attrs['history'] = f'Created on {datetime.now()}'
-        if filename != None:
-            ds.to_netcdf(filename)
+        ds.to_netcdf(filename, format='NETCDF3_64BIT',)
         return ds
 
     def write_z_file(self, filename: str):
@@ -234,10 +233,10 @@ class VGrid:
         ds.attrs['title'] = f'Vertical grid for MOM6 simulation'
         ds.attrs['maximum_depth'] = self.depth
         ds.attrs['history'] = f'Created on {datetime.now()}'
-        if filename != None:
-            ds.to_netcdf(filename)
+        ds.to_netcdf(filename, format='NETCDF3_64BIT',)
         return ds
 
+        
 
 
 def _cell_center_to_layer_thickness(
