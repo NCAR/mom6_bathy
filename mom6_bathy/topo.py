@@ -608,6 +608,7 @@ class Topo:
         positive_down=False,
         vertical_coordinate_name="depth",
         bathymetry=None,
+        output_dir = Path(""),
         write_to_file=True,
         longitude_coordinate_name="lon",
         latitude_coordinate_name="lat"):
@@ -805,7 +806,6 @@ class Topo:
             ~(bathymetry.depth <= self.min_depth), self.min_depth + 0.1
         )
         self._depth = bathymetry.depth
-        return bathymetry
 
     def apply_ridge(self, height, width, lon, ilat):
         """
