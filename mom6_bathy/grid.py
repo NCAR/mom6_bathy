@@ -5,186 +5,8 @@ from typing import Optional
 import numpy as np
 import xarray as xr
 from scipy.spatial import cKDTree
-from midas.rectgrid_gen import supergrid as MidasSupergrid
+from mom6_bathy._supergrid import *
 from mom6_bathy.aux import normalize_deg
-
-
-def angle_between(v1, v2, v3):
-    """Return the angle ``v2``-``v1``-``v3`` (in radians), where
-    ``v1``, ``v2``, ``v3`` are 3-vectors. That is, the angle that
-    is formed between vectors ``v2 - v1`` and vector ``v3 - v1``.
-
-    Example:
-
-        >>> from regional_mom6.utils import angle_between
-        >>> v1 = (0, 0, 1)
-        >>> v2 = (1, 0, 0)
-        >>> v3 = (0, 1, 0)
-        >>> angle_between(v1, v2, v3)
-        1.5707963267948966
-        >>> from numpy import rad2deg
-        >>> rad2deg(angle_between(v1, v2, v3))
-        90.0
-    """
-
-    v1xv2 = np.cross(v1, v2)
-    v1xv3 = np.cross(v1, v3)
-
-    norm_v1xv2 = np.sqrt(vecdot(v1xv2, v1xv2))
-    norm_v1xv3 = np.sqrt(vecdot(v1xv3, v1xv3))
-
-    cosangle = vecdot(v1xv2, v1xv3) / (norm_v1xv2 * norm_v1xv3)
-
-    return np.arccos(cosangle)
-
-
-def vecdot(v1, v2):
-    """Return the dot product of vectors ``v1`` and ``v2``.
-    ``v1`` and ``v2`` can be either numpy vectors or numpy.ndarrays
-    in which case the last dimension is considered the dimension
-    over which the dot product is taken.
-    """
-    return np.sum(v1 * v2, axis=-1)
-
-
-def latlon_to_cartesian(lat, lon, R=1):
-    """Convert latitude and longitude (in degrees) to Cartesian coordinates on
-    a sphere of radius ``R``. By default ``R = 1``.
-
-    Arguments:
-        lat (float): Latitude (in degrees).
-        lon (float): Longitude (in degrees).
-        R (float): The radius of the sphere; default: 1.
-
-    Returns:
-        tuple: Tuple with the Cartesian coordinates ``x, y, z``
-
-    Examples:
-
-        Find the Cartesian coordinates that correspond to point with
-        ``(lat, lon) = (0, 0)`` on a sphere with unit radius.
-
-        >>> from regional_mom6.utils import latlon_to_cartesian
-        >>> latlon_to_cartesian(0, 0)
-        (1.0, 0.0, 0.0)
-
-        Now let's do the same on a sphere with Earth's radius
-
-        >>> from regional_mom6.utils import latlon_to_cartesian
-        >>> R = 6371e3
-        >>> latlon_to_cartesian(0, 0, R)
-        (6371000.0, 0.0, 0.0)
-    """
-
-    x = R * np.cos(np.deg2rad(lat)) * np.cos(np.deg2rad(lon))
-    y = R * np.cos(np.deg2rad(lat)) * np.sin(np.deg2rad(lon))
-    z = R * np.sin(np.deg2rad(lat))
-
-    return x, y, z
-
-
-def quadrilateral_areas(lat, lon, R=1):
-    """Return the area of spherical quadrilaterals on a sphere of radius ``R``.
-    By default, ``R = 1``. The quadrilaterals are formed by constant latitude and
-    longitude lines on the ``lat``-``lon`` grid provided.
-
-    Arguments:
-        lat (numpy.array): Array of latitude points (in degrees).
-        lon (numpy.array): Array of longitude points (in degrees).
-        R (float): The radius of the sphere; default: 1.
-
-    Returns:
-        numpy.array: Array with the areas of the quadrilaterals defined by the ``lat``-``lon`` grid
-        provided. If the provided ``lat``, ``lon`` arrays are of dimension *m* :math:`\\times` *n*
-        then returned areas array is of dimension (*m-1*) :math:`\\times` (*n-1*).
-
-    Example:
-
-        Let's construct a lat-lon grid on the sphere with 60 degree spacing.
-        Then we compute the areas of each grid cell and confirm that the
-        sum of the areas gives us the total area of the sphere.
-
-        >>> from regional_mom6.utils import quadrilateral_areas
-        >>> import numpy as np
-        >>> λ = np.linspace(0, 360, 7)
-        >>> φ = np.linspace(-90, 90, 4)
-        >>> lon, lat = np.meshgrid(λ, φ)
-        >>> lon
-        array([[  0.,  60., 120., 180., 240., 300., 360.],
-               [  0.,  60., 120., 180., 240., 300., 360.],
-               [  0.,  60., 120., 180., 240., 300., 360.],
-               [  0.,  60., 120., 180., 240., 300., 360.]])
-        >>> lat
-        array([[-90., -90., -90., -90., -90., -90., -90.],
-               [-30., -30., -30., -30., -30., -30., -30.],
-               [ 30.,  30.,  30.,  30.,  30.,  30.,  30.],
-               [ 90.,  90.,  90.,  90.,  90.,  90.,  90.]])
-        >>> R = 6371e3
-        >>> areas = quadrilateral_areas(lat, lon, R)
-        >>> areas
-        array([[1.96911611e+13, 1.96911611e+13, 1.96911611e+13, 1.96911611e+13,
-                1.96911611e+13, 1.96911611e+13],
-               [4.56284230e+13, 4.56284230e+13, 4.56284230e+13, 4.56284230e+13,
-                4.56284230e+13, 4.56284230e+13],
-               [1.96911611e+13, 1.96911611e+13, 1.96911611e+13, 1.96911611e+13,
-                1.96911611e+13, 1.96911611e+13]])
-        >>> np.isclose(areas.sum(), 4 * np.pi * R**2, atol=np.finfo(areas.dtype).eps)
-        True
-    """
-
-    coords = np.dstack(latlon_to_cartesian(lat, lon, R))
-
-    return quadrilateral_area(
-        coords[:-1, :-1, :], coords[:-1, 1:, :], coords[1:, 1:, :], coords[1:, :-1, :]
-    )
-
-
-def quadrilateral_area(v1, v2, v3, v4):
-    """Return the area of a spherical quadrilateral on the unit sphere that
-    has vertices on the 3-vectors ``v1``, ``v2``, ``v3``, ``v4``
-    (counter-clockwise orientation is implied). The area is computed via
-    the excess of the sum of the spherical angles of the quadrilateral from 2π.
-
-    Example:
-
-        Calculate the area that corresponds to half the Northern hemisphere
-        of a sphere of radius *R*. This should be 1/4 of the sphere's total area,
-        that is π *R*:sup:`2`.
-
-        >>> from regional_mom6.utils import quadrilateral_area, latlon_to_cartesian
-        >>> R = 434.3
-        >>> v1 = latlon_to_cartesian(0, 0, R)
-        >>> v2 = latlon_to_cartesian(0, 90, R)
-        >>> v3 = latlon_to_cartesian(90, 0, R)
-        >>> v4 = latlon_to_cartesian(0, -90, R)
-        >>> quadrilateral_area(v1, v2, v3, v4)
-        592556.1793298927
-        >>> from numpy import pi
-        >>> quadrilateral_area(v1, v2, v3, v4) == pi * R**2
-        True
-    """
-
-    v1 = np.array(v1)
-    v2 = np.array(v2)
-    v3 = np.array(v3)
-    v4 = np.array(v4)
-
-    if not (
-        np.all(np.isclose(vecdot(v1, v1), vecdot(v2, v2)))
-        & np.all(np.isclose(vecdot(v1, v1), vecdot(v2, v2)))
-        & np.all(np.isclose(vecdot(v1, v1), vecdot(v3, v3)))
-        & np.all(np.isclose(vecdot(v1, v1), vecdot(v4, v4)))
-    ):
-        raise ValueError("vectors provided must have the same length")
-
-    R = np.sqrt(vecdot(v1, v1))
-
-    a1 = angle_between(v1, v2, v4)
-    a2 = angle_between(v2, v3, v1)
-    a3 = angle_between(v3, v4, v2)
-    a4 = angle_between(v4, v1, v3)
-
-    return (a1 + a2 + a3 + a4 - 2 * np.pi) * R**2
 
 
 class Grid:
@@ -241,8 +63,6 @@ class Grid:
         xstart: float = 0.0,
         ystart: Optional[float] = None,
         cyclic_x: bool = False,
-        tripolar_n: bool = False,
-        displace_pole: bool = False,
         name: Optional[str] = None,
     ) -> None:
         """
@@ -302,25 +122,17 @@ class Grid:
         assert 0 < leny <= 180.0, "leny must be in the range (0, 180]"
         assert -90.0 <= ystart <= 90.0, "ystart must be in the range [-90, 90]"
         assert leny + ystart <= 90.0, "leny + ystart must be less than 90"
-        assert tripolar_n is False, "tripolar not supported yet"
-        assert displace_pole is False, "displaced pole not supported yet"
         self.name = name
 
         srefine = 2  # supergrid refinement factor
 
-        self.supergrid = MidasSupergrid(
-            nxtot=nx * srefine,
-            nytot=ny * srefine,
-            config="spherical",
-            axis_units="degrees",
-            ystart=ystart,
-            leny=leny,
-            xstart=xstart,
-            lenx=lenx,
-            cyclic_x=cyclic_x,
-            cyclic_y=False,  # todo
-            tripolar_n=tripolar_n,
-            displace_pole=displace_pole,
+        # TODO: Cyclic x
+        self.supergrid = EqualDegreeSupergrid(
+            lon_min=xstart,
+            len_x=lenx,
+            lat_min=ystart,
+            len_y=leny,
+            resolution=resolution,
         )
 
     @property
@@ -441,6 +253,9 @@ class Grid:
         s_i_high = (i_high) * srefine + 1
 
         # Create a sub-supergrid with the sliced data
+        raise ValueError(
+            "Needs to be replaced with base class which is done when xdat ydat are done."
+        )
         sub_supergrid = MidasSupergrid(
             config=self.supergrid.dict["config"],
             axis_units=self.supergrid.dict["axis_units"],
@@ -506,7 +321,7 @@ class Grid:
 
         Parameters
         ----------
-        supergrid : xr.DataArray or np.array or MidasSupergrid
+        supergrid : xr.DataArray or np.array or SupergridBase
             Supergrid to check for cyclic x.
         """
         return np.allclose(
@@ -521,7 +336,7 @@ class Grid:
 
         Parameters
         ----------
-        supergrid : xr.DataArray or np.array or MidasSupergrid
+        supergrid : xr.DataArray or np.array or SupergridBase
             Supergrid to check if tripolar.
         """
 
@@ -560,99 +375,14 @@ class Grid:
         return False
 
     @classmethod
-    def even_spacing_grid(cls, latitude_extent, longitude_extent, resolution):
-        # longitudes are evenly spaced based on resolution and bounds
-        nx = int((longitude_extent[1] - longitude_extent[0]) / (resolution / 2))
-        if nx % 2 != 1:
-            nx += 1
-
-        lons = np.linspace(
-            longitude_extent[0], longitude_extent[1], nx
-        )  # longitudes in degrees
-
-        # Latitudes evenly spaced by dx * cos(central_latitude)
-        central_latitude = np.mean(latitude_extent)  # degrees
-        latitudinal_resolution = resolution * np.cos(np.deg2rad(central_latitude))
-
-        ny = (
-            int(
-                (latitude_extent[1] - latitude_extent[0]) / (latitudinal_resolution / 2)
-            )
-            + 1
+    def even_spacing_grid(cls, lon_min, lon_max, lat_min, lat_max, resolution):
+        self.supergrid = EvenSpacingSupergrid(
+            lon_min=lon_min,
+            lon_max=lon_max,
+            lat_min=lat_min,
+            lat_max=lat_max,
+            resolution=resolution,
         )
-
-        if ny % 2 != 1:
-            ny += 1
-
-        lats = np.linspace(
-            latitude_extent[0], latitude_extent[1], ny
-        )  # latitudes in degrees
-
-        assert np.all(
-            np.diff(lons) > 0
-        ), "longitudes array lons must be monotonically increasing"
-        assert np.all(
-            np.diff(lats) > 0
-        ), "latitudes array lats must be monotonically increasing"
-
-        R = 6371e3  # mean radius of the Earth; https://en.wikipedia.org/wiki/Earth_radius
-
-        # compute longitude spacing and ensure that longitudes are uniformly spaced
-        dlons = lons[1] - lons[0]
-
-        assert np.allclose(
-            np.diff(lons), dlons * np.ones(np.size(lons) - 1)
-        ), "provided array of longitudes must be uniformly spaced"
-
-        # dx = R * cos(np.deg2rad(lats)) * np.deg2rad(dlons) / 2
-        # Note: division by 2 because we're on the supergrid
-        dx = np.broadcast_to(
-            R * np.cos(np.deg2rad(lats)) * np.deg2rad(dlons) / 2,
-            (lons.shape[0] - 1, lats.shape[0]),
-        ).T
-
-        # dy = R * np.deg2rad(dlats) / 2
-        # Note: division by 2 because we're on the supergrid
-        dy = np.broadcast_to(
-            R * np.deg2rad(np.diff(lats)) / 2, (lons.shape[0], lats.shape[0] - 1)
-        ).T
-
-        lon, lat = np.meshgrid(lons, lats)
-
-        area = quadrilateral_areas(lat, lon, R)
-
-        attrs = {
-            "x": {"standard_name": "geographic_longitude", "units": "degrees"},
-            "y": {"standard_name": "geographic_latitude", "units": "degrees"},
-            "dx": {
-                "standard_name": "grid_edge_x_distance",
-                "units": "meters",
-            },
-            "dy": {
-                "standard_name": "grid_edge_y_distance",
-                "units": "meters",
-            },
-            "area": {
-                "standard_name": "grid_cell_area",
-                "units": "m**2",
-            },
-            "angle_dx": {
-                "standard_name": "grid_vertex_x_angle_WRT_geographic_east",
-                "units": "degrees_east",
-            },
-        }
-
-        hgrid = xr.Dataset(
-            {
-                "x": (["nyp", "nxp"], lon, attrs["x"]),
-                "y": (["nyp", "nxp"], lat, attrs["y"]),
-                "dx": (["nyp", "nx"], dx, attrs["dx"]),
-                "dy": (["ny", "nxp"], dy, attrs["dy"]),
-                "area": (["ny", "nx"], area, attrs["area"]),
-                "angle_dx": (["nyp", "nxp"], lon * 0, attrs["angle_dx"]),
-            }
-        )
-        return Grid.from_supergrid(hgrid, "even_spacing")
 
     @classmethod
     def from_supergrid(cls, path: str, name: Optional[str] = None) -> "Grid":
@@ -760,16 +490,14 @@ class Grid:
         return subgrid
 
     @property
-    def supergrid(self) -> MidasSupergrid:
+    def supergrid(self) -> SupergridBase:
         """MOM6 supergrid contains the grid metrics and the areas at twice the
         nominal resolution (by default) of the actual computational grid."""
         return self._supergrid
 
     @supergrid.setter
-    def supergrid(self, new_supergrid: MidasSupergrid) -> None:
-        assert isinstance(new_supergrid, MidasSupergrid)
+    def supergrid(self, new_supergrid: SupergridBase) -> None:
         self._supergrid = new_supergrid
-        self._supergrid.grid_metrics()
         self._compute_MOM6_grid_metrics()
 
     @property
@@ -1090,21 +818,7 @@ class Grid:
             2-dimensional array of the new y coordinates.
         """
 
-        new_supergrid = MidasSupergrid(
-            config=self._supergrid.dict["config"],
-            axis_units=self._supergrid.dict["axis_units"],
-            xdat=xdat,
-            ydat=ydat,
-            cyclic_x=self._supergrid.dict["cyclic_x"],
-            cyclic_y=self._supergrid.dict["cyclic_y"],
-            tripolar_n=self._supergrid.dict["tripolar_n"],
-            r0_pole=self._supergrid.dict["r0_pole"],
-            lon0_pole=self._supergrid.dict["lon0_pole"],
-            doughnut=self._supergrid.dict["doughnut"],
-            radius=self._supergrid.dict["radius"],
-        )
-
-        self.supergrid = new_supergrid
+        raise ValueError("To Be implemented")
 
     def gen_supergrid_ds(self, author: Optional[str] = None) -> xr.Dataset:
         """
