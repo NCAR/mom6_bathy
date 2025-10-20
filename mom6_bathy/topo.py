@@ -8,7 +8,7 @@ from mom6_bathy.aux import cell_area_rad, longitude_slicer
 from scipy.spatial import cKDTree
 import xesmf as xe
 from scipy.ndimage import binary_fill_holes
-
+from pathib import Path
 class Topo:
     """
     Bathymetry Generator for MOM6 grids (mom6_bathy.grid.Grid).
@@ -184,8 +184,6 @@ class Topo:
         qmask[-1, -1] = 0
 
         return qmask
-          
-
         
     @property
     def basintmask(self):
@@ -433,7 +431,7 @@ class Topo:
             )
         )
 
-    def set_from_dataset(self, bathymetry_path,output_dir,latitude_extent, longitude_extent, longitude_coordinate_name, latitude_coordinate_name, vertical_coordinate_name, fill_channels = False, positive_down=False, write_to_file=True, regridding_method = "bilinear"):
+    def set_from_dataset(self, bathymetry_path, longitude_coordinate_name, latitude_coordinate_name, vertical_coordinate_name, fill_channels = False, positive_down=False,output_dir = Path(""), write_to_file=True, regridding_method = "bilinear"):
         """
         Cut out and interpolate the chosen bathymetry and then fill inland lakes.
 
@@ -464,6 +462,14 @@ class Topo:
             "yh": latitude_coordinate_name,
             "depth": vertical_coordinate_name,
         }
+        longitude_extent = (
+                    float(self._grid.qlon.min()),
+                    float(self._grid.qlon.max()),
+        )
+        latitude_extent = (
+                    float(self._grid.qlat.min()),
+                    float(self._grid.qlat.max()),
+        )
 
         bathymetry = xr.open_dataset(bathymetry_path, chunks="auto")[
             coordinate_names["depth"]
