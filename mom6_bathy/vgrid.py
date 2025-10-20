@@ -168,7 +168,7 @@ class VGrid:
         return cls(dz)
 
     def write(self, filename: str):
-        """Write the vertical grid to a NetCDF file.
+        """Write the vertical grid (in thickness) to a NetCDF file.
         
         Parameters
         ----------
