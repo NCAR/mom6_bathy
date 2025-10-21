@@ -182,6 +182,40 @@ def test_from_file_cell_interface(get_realistic_vgrid_elements, tmp_path):
         assert np.allclose(vgrid.dz, layer_thickness)
         assert np.allclose(vgrid.z, cell_center)
         assert np.allclose(vgrid.zi, cell_interface)
+@pytest.mark.parametrize(
+    ("nlayers", "total_depth"),
+    [
+        (23, 2000),
+        (50, 1000),
+        (50, 3000),
+    ],
+)
+def test_hyperbolictan_thickness_profile_equispaced(nlayers, total_depth):
+    
+    assert np.isclose(
+       VGrid.hyperbolic(nlayers, total_depth, 1).dz,
+        np.ones(nlayers) * total_depth / nlayers,
+    ).all()
+
+@pytest.mark.parametrize(
+    ("nlayers", "ratio", "total_depth"),
+    [
+        (20, 1 / 3, 1000),
+        (20, 2, 1000),
+        (20, 10, 1000),
+        (20, 2, 3000),
+        (50, 1 / 3, 1000),
+        (50, 2, 1000),
+        (50, 10, 1000),
+        (50, 2, 3000),
+    ],
+)
+def test_hyperbolictan_thickness_profile_symmetric(nlayers, ratio, total_depth):
+    assert np.isclose(
+         VGrid.hyperbolic(nlayers, total_depth, ratio).dz,
+        np.flip(VGrid.hyperbolic(nlayers, total_depth, 1 / ratio).dz),
+    ).all()
+
 
 if __name__ == "__main__":
     test_default_init()
