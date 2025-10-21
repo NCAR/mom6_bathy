@@ -452,6 +452,9 @@ class Topo:
         output_dir=Path(""),
         write_to_file=True,
         regridding_method="bilinear",
+        run_config_dataset=True,
+        run_regrid_dataset=True,
+        run_tidy_dataset=True,
     ):
         """
         Cut out and interpolate the chosen bathymetry and then fill inland lakes.
@@ -477,8 +480,90 @@ class Topo:
                 bathymetry vertical coordinate is positive downwards. Default: ``False``.
             write_to_file (Optional[bool]): Whether to write the bathymetry to a file. Default: ``True``.
             regridding_method (Optional[str]): The type of regridding method to use. Defaults to self.regridding_method
+            run_* (Optional[bool]): Whether to run the respective step in the bathymetry processing. Default: ``True``.
+
         """
-        bathymetry_output, empty_bathy = self.config_bathymetry(
+        print(
+            """**NOTE**
+            If bathymetry setup fails (e.g. kernel crashes), restart the kernel and edit this cell.
+            Call ``topo.mpi_set_from_dataset()`` instead. Follow the given instructions for using mpi 
+            and ESMF_Regrid outside of a python environment. This breaks up the process, so be sure to call
+            ``topo.tidy_dataset() after regridding with mpi."""
+        )
+        if run_config_dataset:
+            self.bathymetry_output, self.empty_bathy = self.config_dataset(
+                bathymetry_path=bathymetry_path,
+                longitude_coordinate_name=longitude_coordinate_name,
+                latitude_coordinate_name=latitude_coordinate_name,
+                vertical_coordinate_name=vertical_coordinate_name,
+                fill_channels=fill_channels,
+                positive_down=positive_down,
+                output_dir=output_dir,
+                write_to_file=write_to_file,
+            )
+
+        if run_regrid_dataset:
+            self.regridded_bathy = self.regrid_dataset(
+                bathymetry_output=self.bathymetry_output,
+                empty_bathy=self.empty_bathy,
+                regridding_method=regridding_method,
+                output_dir=output_dir,
+                write_to_file=write_to_file,
+            )
+
+        if run_tidy_dataset:
+            # Set directly into self.depth in this function
+            self.tidy_dataset(
+                fill_channels=fill_channels,
+                positive_down=positive_down,
+                vertical_coordinate_name=vertical_coordinate_name,
+                bathymetry=self.regridded_bathymetry,
+                output_dir=output_dir,
+                write_to_file=write_to_file,
+                longitude_coordinate_name=longitude_coordinate_name,
+                latitude_coordinate_name=latitude_coordinate_name,
+            )
+
+    def mpi_set_from_dataset(
+        self,
+        *,
+        bathymetry_path,
+        longitude_coordinate_name,
+        latitude_coordinate_name,
+        vertical_coordinate_name,
+        fill_channels=False,
+        positive_down=False,
+        output_dir=Path(""),
+        write_to_file=True,
+        verbose=True,
+    ):
+
+        if verbose:
+            print(
+                f"""
+            *MANUAL REGRIDDING INSTRUCTIONS*
+            
+            Calling `mpi_interpolate_from_file` sets up the files necessary for regridding
+            the bathymetry using mpirun and ESMF_Regrid. See below for the step-by-step instructions:
+            
+            1. There should be two files: `bathymetry_original.nc` and `bathymetry_unfinished.nc` located at
+            {output_dir}. 
+            
+            2. Open a terminal and change to this directory (e.g. `cd {output_dir}`).
+            
+            3. Request appropriate computational resources (see example script below), and run the command:
+            
+            `mpirun -np NUMBER_OF_CPUS ESMF_Regrid -s bathymetry_original.nc -d bathymetry_unfinished.nc -m bilinear --src_var depth --dst_var depth --netcdf4 --src_regional --dst_regional`
+            
+            4. Run Topo_object.tidy_bathymetry(args) to finish processing the bathymetry. 
+            
+            Example PBS script using NCAR's Casper Machine: https://gist.github.com/AidanJanney/911290acaef62107f8e2d4ccef9d09be
+            
+            For additional details see: https://xesmf.readthedocs.io/en/latest/large_problems_on_HPC.html
+            """
+            )
+
+        self.bathymetry_output, self.empty_bathy = self.config_dataset(
             bathymetry_path=bathymetry_path,
             longitude_coordinate_name=longitude_coordinate_name,
             latitude_coordinate_name=latitude_coordinate_name,
@@ -488,22 +573,9 @@ class Topo:
             output_dir=output_dir,
             write_to_file=write_to_file,
         )
-        regridded_bathy = self.regrid_dataset(
-            bathymetry_output=bathymetry_output,
-            empty_bathy=empty_bathy,
-            regridding_method=regridding_method,
-            output_dir=output_dir,
-            write_to_file=write_to_file,
-        )
-        self.tidy_dataset(
-            fill_channels=fill_channels,
-            positive_down=positive_down,
-            vertical_coordinate_name=vertical_coordinate_name,
-            bathymetry=regridded_bathymetry,
-            output_dir=output_dir,
-            write_to_file=write_to_file,
-            longitude_coordinate_name=longitude_coordinate_name,
-            latitude_coordinate_name=latitude_coordinate_name,
+
+        print(
+            "Configuration complete. Ready for regridding with MPI. See documentation for more details."
         )
 
     def config_dataset(
