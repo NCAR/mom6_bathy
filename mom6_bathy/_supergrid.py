@@ -5,6 +5,22 @@ class SupergridBase:
     """Abstract base class defining the MOM6-style supergrid interface."""
 
     def __init__(self, x, y, dx, dy, area, angle, axis_units):
+        """
+        Initialize a generic supergrid.
+
+        Parameters
+        ----------
+        x, y : 2D arrays
+            Grid point longitudes and latitudes (or x/y positions).
+        dx, dy : 2D arrays
+            Cell widths in x and y directions.
+        area : 2D array
+            Grid cell areas.
+        angle : 2D array
+            Local grid angle relative to east.
+        axis_units : str
+            Units of x and y (e.g. "degrees" or "meters").
+        """
         self.x = x
         self.y = y
         self.dx = dx
@@ -14,7 +30,7 @@ class SupergridBase:
         self.axis_units = axis_units
 
     def summary(self):
-        """Quick summary of grid geometry."""
+        """Print a short summary of the grid geometry (shape and dx/dy ranges)."""
         print(
             f"{self.__class__.__name__}: shape={self.x.shape}, "
             f"dx=({self.dx.min()}–{self.dx.max()}), "
@@ -23,40 +39,35 @@ class SupergridBase:
 
     def to_ds(self, author: Optional[str] = None) -> xr.Dataset:
         """
-        Generate supergrid to a xarray Dataset file. The supergrid file is to be read in by MOM6
-        during runtime.
+        Export the supergrid to an xarray.Dataset compatible with MOM6.
 
         Parameters
         ----------
-        author: str, optional
-            Name of the author. If provided, the name will appear in files as metadata.
+        author : str, optional
+            If provided, stored as metadata in the output dataset.
         """
-        # initialize the dataset:
         ds = xr.Dataset()
 
-        # global attrs:
+        # ---- Metadata ----
         ds.attrs["type"] = "MOM6 supergrid"
         ds.attrs["Created"] = datetime.now().isoformat()
         if author:
             ds.attrs["Author"] = author
 
-        # data arrays:
+        # ---- Data variables ----
         ds["y"] = xr.DataArray(
-            self.y,
-            dims=["nyp", "nxp"],
-            attrs={"units": self.axis_units},
+            self.y, dims=["nyp", "nxp"], attrs={"units": self.axis_units}
         )
         ds["x"] = xr.DataArray(
-            self.x,
-            dims=["nyp", "nxp"],
-            attrs={"units": self.axis_units},
+            self.x, dims=["nyp", "nxp"], attrs={"units": self.axis_units}
         )
         ds["dy"] = xr.DataArray(self.dy, dims=["ny", "nxp"], attrs={"units": "meters"})
         ds["dx"] = xr.DataArray(self.dx, dims=["nyp", "nx"], attrs={"units": "meters"})
         ds["area"] = xr.DataArray(self.area, dims=["ny", "nx"], attrs={"units": "m2"})
         ds["angle_dx"] = xr.DataArray(
-            self.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"}
+            self.angle_dx, dims=["nyp", "nxp"], attrs={"units": "radians"}
         )
+
         return ds
 
 
