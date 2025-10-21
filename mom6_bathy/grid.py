@@ -63,6 +63,7 @@ class Grid:
         ystart: Optional[float] = None,
         cyclic_x: bool = False,
         name: Optional[str] = None,
+        even_spacing_grid: bool = False,
     ) -> None:
         """
         Grid instance constructor.
@@ -87,12 +88,11 @@ class Grid:
             starting y coordinate. -0.5*leny by default.
         cyclic_x : bool, optional
             flag to make the grid cyclic in x direction. False by default.
-        tripolar_n : bool, optional
-            flag to make the grid tripolar. False by default.
-        displace_pole : bool, optional
-            flag to make the grid displaced polar. False by default.
         name : str, optional
             name of the grid. None by default.
+        even_spacing_grid : bool, optional
+            If True, creates an evenly spaced in distance(m) grid.
+            If False, creates a generic grid equal-degree spaced. False by default.
         """
 
         # default ystart value (centers the domain at the Equator)
@@ -124,13 +124,22 @@ class Grid:
         self.name = name
 
         # TODO: Cyclic x
-        self.supergrid = EqualDegreeSupergrid.from_extents(
-            lon_min=xstart,
-            len_x=lenx,
-            lat_min=ystart,
-            len_y=leny,
-            resolution=resolution,
-        )
+        if not even_spacing_grid:
+            self.supergrid = EqualDegreeSupergrid.from_extents(
+                lon_min=xstart,
+                len_x=lenx,
+                lat_min=ystart,
+                len_y=leny,
+                resolution=resolution,
+            )
+        else:
+            self.supergrid = EvenSpacingSupergrid(
+                lon_min=xstart,
+                len_x=lenx,
+                lat_min=ystart,
+                len_y=leny,
+                resolution=resolution,
+            )
 
     @property
     def name(self) -> str:
@@ -361,16 +370,6 @@ class Grid:
         ):
             return True
         return False
-
-    @classmethod
-    def even_spacing_grid(cls, lon_min, lon_max, lat_min, lat_max, resolution):
-        self.supergrid = EvenSpacingSupergrid(
-            lon_min=lon_min,
-            lon_max=lon_max,
-            lat_min=lat_min,
-            lat_max=lat_max,
-            resolution=resolution,
-        )
 
     @classmethod
     def from_supergrid(cls, path: str, name: Optional[str] = None) -> "Grid":
@@ -826,3 +825,4 @@ class Grid:
         ds = self.supergrid.to_ds(author=author)
         ds.attrs["filename"] = os.path.basename(path)
         ds.to_netcdf(path, format="NETCDF3_64BIT")
+        return ds

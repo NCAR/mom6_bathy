@@ -3,6 +3,7 @@ import xarray as xr
 from datetime import datetime
 from typing import Optional
 
+
 class SupergridBase:
     """Abstract base class defining the MOM6-style supergrid interface."""
 
@@ -201,23 +202,25 @@ class EqualDegreeSupergrid(SupergridBase):
 class EvenSpacingSupergrid(SupergridBase):
     """MOM6-style supergrid with uniform Cartesian spacing (x/y in meters). Originally by Ashley Barnes in regional_mom6"""
 
-    def __init__(self, lon_min, lon_max, lat_min, lat_max, resolution):
+    def __init__(self, lon_min, len_x, lat_min, len_y, resolution):
         x, y, dx, dy, area, angle, axis_units = self._build_grid(
-            lon_min, lon_max, lat_min, lat_max, resolution
+            lon_min, len_x, lat_min, len_y, resolution
         )
         super().__init__(x, y, dx, dy, area, angle, axis_units)
 
-    def _build_grid(self, lon_min, lon_max, lat_min, lat_max, resolution):
+    def _build_grid(self, lon_min, len_x, lat_min, len_y, resolution):
         """Compute full grid geometry for even physical spacing."""
+        lon_max = lon_min + len_x
+        lat_max = lat_min + len_y
 
-        nx = int((lon_max - lon_min) / (resolution / 2))
+        nx = int(len_x / (resolution / 2))
         if nx % 2 != 1:
             nx += 1
 
         lons = np.linspace(lon_min, lon_max, nx)  # longitudes in degrees
 
         # Latitudes evenly spaced by dx * cos(central_latitude)
-        central_latitude = np.mean(latitude_extent)  # degrees
+        central_latitude = np.mean([lat_min, lat_max])  # degrees
         latitudinal_resolution = resolution * np.cos(np.deg2rad(central_latitude))
 
         ny = int((lat_max - lat_min) / (latitudinal_resolution / 2)) + 1
@@ -263,7 +266,7 @@ class EvenSpacingSupergrid(SupergridBase):
 
         axis_units = "degrees"
 
-        return x, y, dx, dy, area, angle, axis_units
+        return lon, lat, dx, dy, area, angle_dx, axis_units
 
 
 # Helper Functions

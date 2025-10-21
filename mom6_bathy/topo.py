@@ -8,7 +8,7 @@ from mom6_bathy.aux import cell_area_rad, longitude_slicer
 from scipy.spatial import cKDTree
 import xesmf as xe
 from scipy.ndimage import binary_fill_holes
-from pathib import Path
+from pathlib import Path
 
 
 class Topo:
