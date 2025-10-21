@@ -464,7 +464,7 @@ class Topo:
         below). Note, however, that narrow channels are less of an issue for models that
         are discretized on an Arakawa C grid, like MOM6.
 
-        Output is saved in the input directory of the experiment.
+        Output is saved in the output_dir.
 
         Arguments:
             bathymetry_path (str): Path to the netCDF file with the bathymetry.
@@ -592,7 +592,7 @@ class Topo:
     ):
         """
         Sets up necessary objects/files for regridding bathymetry. Can be flexibly used with
-        experiment.regrid_bathymetry() or user can manually regrid with ESMF_regrid.
+        regrid_dataset() or user can manually regrid with ESMF_regrid.
 
         If manual regridding is necessary, write_to_file must be set to True.
 
@@ -733,11 +733,11 @@ class Topo:
         Args:
             bathymetry_output (Xarray Dataset): Refactor of original bathymetry with proper  metadata and structure for ESMF regridding.
             empty_bathy (Xarray Dataset): Template for the regridded bathymetry regridding_method: (Optional[str]) The type of regridding method to use. Defaults to self.regridding_method.
-            write_to_file (Optional[bool]): Files saved to ``experiment.mom_input_dir`` Defaults to ``True``. Must be set to true if using manual regridding methods with ESMF_regrid.
+            write_to_file (Optional[bool]): Files saved to ``output_dir`` Defaults to ``True``. Must be set to true if using manual regridding methods with ESMF_regrid.
 
         Returns:
             regridded_bathymetry (Dataset): Still needs to be cleaned and processed
-            with ``experiment.tidy_bathymetry``.
+            with ``tidy_dataset``.
         """
         output_dir = Path(output_dir)
 
@@ -784,12 +784,12 @@ class Topo:
     ):
         """
         An auxiliary method for bathymetry used to fix up the metadata and remove inland
-        lakes after regridding the bathymetry. Having :func:`~tidy_bathymetry` as a separate
+        lakes after regridding the bathymetry. Having :func:`~tidy_dataset` as a separate
         method from :func:`~setup_bathymetry` allows for the regridding to be done separately,
         since regridding can be really expensive for large domains.
 
         If the bathymetry is already regridded and what is left to be done is fixing the metadata
-        or fill in some channels, then :func:`~tidy_bathymetry` directly can read the existing
+        or fill in some channels, then :func:`~tidy_dataset` directly can read the existing
         ``bathymetry_unfinished.nc`` file that should be in the input directory.
 
         Arguments:
@@ -971,10 +971,11 @@ class Topo:
 
         ## Now, any points in the bathymetry that are shallower than minimum depth are set to minimum depth.
         ## This preserves the true land/ocean mask.
-        bathymetry["depth"] = bathymetry["depth"].where(bathymetry["depth"] > 0, np.nan)
+        bathymetry["depth"] = bathymetry["depth"].where(bathymetry["depth"] > 0, 0)
         bathymetry["depth"] = bathymetry["depth"].where(
             ~(bathymetry.depth <= self.min_depth), self.min_depth + 0.1
         )
+        bathymetry = bathymetry.fillna(0)
         self._depth = bathymetry.depth
 
     def apply_ridge(self, height, width, lon, ilat):
