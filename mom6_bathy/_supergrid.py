@@ -78,9 +78,9 @@ class EqualDegreeSupergrid(SupergridBase):
     """MOM6-style supergrid with constant-degree spacing (lon/lat grid)."""
 
     @classmethod
-    def from_extents(cls, lon_min, len_x, lat_min, len_y, resolution):
+    def from_extents(cls, lon_min, len_x, lat_min, len_y, nx, ny):
         """Create a grid from domain extents (lon/lat degrees)."""
-        x, y = cls._calc_xy_from_extents(lon_min, len_x, lat_min, len_y, resolution)
+        x, y = cls._calc_xy_from_extents(lon_min, len_x, lat_min, len_y, nx, ny)
         dx, dy, area, angle_dx, axis_units = cls._calc_geometry(x, y)
         return cls(x, y, dx, dy, area, angle_dx, axis_units)
 
@@ -91,7 +91,7 @@ class EqualDegreeSupergrid(SupergridBase):
         return cls(x, y, dx, dy, area, angle_dx, axis_units)
 
     @classmethod
-    def _calc_xy_from_extents(cls, lon_min, len_x, lat_min, len_y, resolution):
+    def _calc_xy_from_extents(cls, lon_min, len_x, lat_min, len_y, nx, ny):
         """Compute full grid geometry for equal-degree spacing."""
         # This builds all geometric quantities (x, y, dx, dy, area, angle)
         # for a supergrid defined in equal-degree (lon/lat) coordinates.
@@ -99,23 +99,23 @@ class EqualDegreeSupergrid(SupergridBase):
         # ---------------------------------------------------------------------
         # Determine grid resolution and index arrays
         # ---------------------------------------------------------------------
-        nx = int(len_x / resolution) * 2  # number of longitudinal cells
-        ny = int(len_y / resolution) * 2  # number of latitudinal cells
+        nx_total = nx * 2  # number of longitudinal cells
+        ny_total = ny * 2  # number of latitudinal cells
 
-        jind = np.arange(ny)  # latitude cell indices
-        iind = np.arange(nx)  # longitude cell indices
-        jindp = np.arange(ny + 1)  # latitude point indices (cell edges)
-        iindp = np.arange(nx + 1)  # longitude point indices (cell edges)
+        jind = np.arange(ny_total)  # latitude cell indices
+        iind = np.arange(nx_total)  # longitude cell indices
+        jindp = np.arange(ny_total + 1)  # latitude point indices (cell edges)
+        iindp = np.arange(nx_total + 1)  # longitude point indices (cell edges)
 
         # ---------------------------------------------------------------------
         # Compute grid coordinates in degrees
         # ---------------------------------------------------------------------
-        grid_y = lat_min + jindp * len_y / ny  # latitude edges
-        grid_x = lon_min + iindp * len_x / nx  # longitude edges
+        grid_y = lat_min + jindp * len_y / ny_total  # latitude edges
+        grid_x = lon_min + iindp * len_x / nx_total  # longitude edges
 
         # Form full 2D coordinate arrays for all cell corners
-        x = np.tile(grid_x, (ny + 1, 1))
-        y = np.tile(grid_y.reshape((ny + 1, 1)), (1, nx + 1))
+        x = np.tile(grid_x, (ny_total + 1, 1))
+        y = np.tile(grid_y.reshape((ny_total + 1, 1)), (1, nx_total + 1))
 
         return x, y
 

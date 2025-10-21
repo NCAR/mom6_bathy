@@ -5,6 +5,7 @@ from datetime import datetime
 from scipy import interpolate
 from scipy.ndimage import label
 from mom6_bathy.aux import cell_area_rad, longitude_slicer
+from mom6_bathy.grid import Grid
 from scipy.spatial import cKDTree
 import xesmf as xe
 from scipy.ndimage import binary_fill_holes
@@ -360,8 +361,8 @@ class Topo:
         south_lat = self._grid.tlat[0, 0]
         nx = self._grid.nx
         ny = self._grid.ny
-        lenx = self._grid.supergrid.dict["lenx"]
-        leny = self._grid.supergrid.dict["leny"]
+        lenx = self._grid.supergrid.x.max() - self._grid.supergrid.x.min()
+        leny = self._grid.supergrid.y.max() - self._grid.supergrid.y.min()
         self._depth = xr.DataArray(
             np.full((ny, nx), max_depth),
             dims=["ny", "nx"],
@@ -404,8 +405,8 @@ class Topo:
 
         west_lon = self._grid.tlon[0, 0]
         south_lat = self._grid.tlat[0, 0]
-        len_lon = self._grid.supergrid.dict["lenx"]
-        len_lat = self._grid.supergrid.dict["leny"]
+        len_lon = self._grid.supergrid.x.max() - self._grid.supergrid.x.min()
+        len_lat = self._grid.supergrid.y.max() - self._grid.supergrid.y.min()
         self._depth = xr.DataArray(
             np.full((self._grid.ny, self._grid.nx), max_depth),
             dims=["ny", "nx"],
@@ -1090,7 +1091,7 @@ class Topo:
         )
 
         regridder = xe.Regridder(
-            ds, ds_mapped, method, periodic=self._grid.supergrid.dict["cyclic_x"]
+            ds, ds_mapped, method, periodic=Grid.is_cyclic_x(self._grid.supergrid)
         )
         mask_mapped = regridder(ds.landfrac)
         self._depth.data = np.where(
@@ -1319,12 +1320,12 @@ class Topo:
         ds["grid_center_lat"] = xr.DataArray(
             self._grid.tlat.data.flatten(),
             dims=["grid_size"],
-            attrs={"units": self._grid.supergrid.dict["axis_units"]},
+            attrs={"units": self._grid.supergrid.axis_units},
         )
         ds["grid_center_lon"] = xr.DataArray(
             self._grid.tlon.data.flatten(),
             dims=["grid_size"],
-            attrs={"units": self._grid.supergrid.dict["axis_units"]},
+            attrs={"units": self._grid.supergrid.axis_units},
         )
         ds["grid_imask"] = xr.DataArray(
             self.tmask.data.astype(np.int32).flatten(),
@@ -1335,12 +1336,12 @@ class Topo:
         ds["grid_corner_lat"] = xr.DataArray(
             np.zeros((ds.sizes["grid_size"], 4)),
             dims=["grid_size", "grid_corners"],
-            attrs={"units": self._grid.supergrid.dict["axis_units"]},
+            attrs={"units": self._grid.supergrid.axis_units},
         )
         ds["grid_corner_lon"] = xr.DataArray(
             np.zeros((ds.sizes["grid_size"], 4)),
             dims=["grid_size", "grid_corners"],
-            attrs={"units": self._grid.supergrid.dict["axis_units"]},
+            attrs={"units": self._grid.supergrid.axis_units},
         )
 
         i_range = range(self._grid.nx)
@@ -1403,7 +1404,7 @@ class Topo:
         tlat_flat = self._grid.tlat.data.flatten()
         ncells = len(tlon_flat)  # i.e., elementCount in ESMF mesh nomenclature
 
-        coord_units = self._grid.supergrid.dict["axis_units"]
+        coord_units = self._grid.supergrid.axis_units
 
         ds["centerCoords"] = xr.DataArray(
             [[tlon_flat[i], tlat_flat[i]] for i in range(ncells)],
@@ -1464,7 +1465,7 @@ class Topo:
 
                 return [ll, lr, ur, ul]
 
-        elif self._grid.supergrid.dict["cyclic_x"] == True:
+        elif Grid.is_cyclic_x(self._grid.supergrid) == True:
 
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()

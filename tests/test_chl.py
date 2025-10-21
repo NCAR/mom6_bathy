@@ -3,7 +3,7 @@ from mom6_bathy.topo import Topo
 from mom6_bathy.chl import interpolate_and_fill_seawifs
 import pytest
 import os
-from .utils import on_cisl_machine
+from utils import on_cisl_machine
 
 
 def test_chl(tmp_path):
@@ -12,7 +12,7 @@ def test_chl(tmp_path):
         pytest.skip("This test is only for the derecho and casper machines")
     # attempt to create a regional grid object from scratch
     grid = Grid.from_supergrid(
-        "/glade/u/home/manishrv/croc_input/panama-chl/ocnice/ocean_hgrid_panama1_889d3f.nc"
+        "/glade/u/home/manishrv/scratch/croc_input/panama-chl/ocnice/ocean_hgrid_panama1_889d3f.nc"
     )
     grid.name = "pan2"
     # create a corresponding bathymetry object

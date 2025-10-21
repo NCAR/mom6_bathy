@@ -21,7 +21,7 @@ def test_default_init(get_realistic_vgrid_elements, get_faulty_vgrid_elements):
     layer_thickness, cell_center, cell_interface = get_realistic_vgrid_elements
     vgrid = VGrid(dz = layer_thickness)
     assert np.allclose(vgrid.dz, layer_thickness)
-    assert np.allclose(vgrid.z, cell_center)
+    assert np.allclose(vgrid.zl, cell_center)
     assert np.allclose(vgrid.zi, cell_interface)
     
     # Test all negative layer_thickness
@@ -83,7 +83,7 @@ def test_from_file_layer_thickness(get_realistic_vgrid_elements, tmp_path):
         vgrid = VGrid.from_file(filename=tmpfile.name)
         
         assert np.allclose(vgrid.dz, layer_thickness)
-        assert np.allclose(vgrid.z, cell_center)
+        assert np.allclose(vgrid.zl, cell_center)
         assert np.allclose(vgrid.zi, cell_interface)
     
     # Different variable name for layer_thickness
@@ -99,7 +99,7 @@ def test_from_file_layer_thickness(get_realistic_vgrid_elements, tmp_path):
             variable_type='layer_thickness')
         
         assert np.allclose(vgrid.dz, layer_thickness)
-        assert np.allclose(vgrid.z, cell_center)
+        assert np.allclose(vgrid.zl, cell_center)
         assert np.allclose(vgrid.zi, cell_interface)
 
     
@@ -124,7 +124,7 @@ def test_from_file_cell_center(get_realistic_vgrid_elements, tmp_path):
             variable_type='cell_center')
         
         assert np.allclose(vgrid.dz, layer_thickness)
-        assert np.allclose(vgrid.z, cell_center)
+        assert np.allclose(vgrid.zl, cell_center)
         assert np.allclose(vgrid.zi, cell_interface)
         
     # Negative depth from file
@@ -140,7 +140,7 @@ def test_from_file_cell_center(get_realistic_vgrid_elements, tmp_path):
             variable_type='cell_center')
         
         assert np.allclose(vgrid.dz, layer_thickness)
-        assert np.allclose(vgrid.z, cell_center)
+        assert np.allclose(vgrid.zl, cell_center)
         assert np.allclose(vgrid.zi, cell_interface)
     
 def test_from_file_cell_interface(get_realistic_vgrid_elements, tmp_path):
@@ -164,7 +164,7 @@ def test_from_file_cell_interface(get_realistic_vgrid_elements, tmp_path):
             variable_type='cell_interface')
         
         assert np.allclose(vgrid.dz, layer_thickness)
-        assert np.allclose(vgrid.z, cell_center)
+        assert np.allclose(vgrid.zl, cell_center)
         assert np.allclose(vgrid.zi, cell_interface)
         
     # Example
@@ -180,7 +180,7 @@ def test_from_file_cell_interface(get_realistic_vgrid_elements, tmp_path):
             variable_type='cell_interface')
         
         assert np.allclose(vgrid.dz, layer_thickness)
-        assert np.allclose(vgrid.z, cell_center)
+        assert np.allclose(vgrid.zl, cell_center)
         assert np.allclose(vgrid.zi, cell_interface)
 @pytest.mark.parametrize(
     ("nlayers", "total_depth"),

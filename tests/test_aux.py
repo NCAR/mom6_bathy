@@ -1,6 +1,8 @@
 import pytest
 from mom6_bathy.aux import get_avg_resolution, get_avg_resolution_km, longitude_slicer
-from .utils import on_cisl_machine
+from utils import on_cisl_machine
+import xarray as xr
+import numpy as np 
 
 def test_avg_resolution():
     """Test the average resolution calculation for a grid."""

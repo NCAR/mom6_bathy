@@ -110,6 +110,9 @@ class Grid:
             ), "resolution must be provided if nx and ny are not"
             nx = int(lenx / resolution)
             ny = int(leny / resolution)
+        
+        if type == "even_spacing" and resolution is None:
+            raise ValueError("resolution must be provided for even_spacing grid type")
 
         # consistency checks for constructor arguments
         assert nx > 0, "nx must be a positive integer"
@@ -122,6 +125,7 @@ class Grid:
         assert -90.0 <= ystart <= 90.0, "ystart must be in the range [-90, 90]"
         assert leny + ystart <= 90.0, "leny + ystart must be less than 90"
         self.name = name
+        self.cyclic_x = cyclic_x
 
         # TODO: Cyclic x
         if type == "equal_degree":
@@ -130,7 +134,8 @@ class Grid:
                 len_x=lenx,
                 lat_min=ystart,
                 len_y=leny,
-                resolution=resolution,
+                nx=nx,
+                ny=ny
             )
         elif type == "even_spacing":
             self.supergrid = EvenSpacingSupergrid(
