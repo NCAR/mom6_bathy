@@ -85,7 +85,7 @@ class EqualDegreeSupergrid(SupergridBase):
         # ---------------------------------------------------------------------
         # Determine grid resolution and index arrays
         # ---------------------------------------------------------------------
-        nx = int(lenx / resolution) * 2 # number of longitudinal cells
+        nx = int(lenx / resolution) * 2  # number of longitudinal cells
         ny = int(leny / resolution) * 2  # number of latitudinal cells
 
         jind = np.arange(ny)  # latitude cell indices
@@ -201,27 +201,18 @@ class EvenSpacingSupergrid(SupergridBase):
         if nx % 2 != 1:
             nx += 1
 
-        lons = np.linspace(
-            lon_min, lon_max, nx
-        )  # longitudes in degrees
+        lons = np.linspace(lon_min, lon_max, nx)  # longitudes in degrees
 
         # Latitudes evenly spaced by dx * cos(central_latitude)
         central_latitude = np.mean(latitude_extent)  # degrees
         latitudinal_resolution = resolution * np.cos(np.deg2rad(central_latitude))
 
-        ny = (
-            int(
-                (lat_max - lat_min) / (latitudinal_resolution / 2)
-            )
-            + 1
-        )
+        ny = int((lat_max - lat_min) / (latitudinal_resolution / 2)) + 1
 
         if ny % 2 != 1:
             ny += 1
 
-        lats = np.linspace(
-            lat_min, lat_max, ny
-        )  # latitudes in degrees
+        lats = np.linspace(lat_min, lat_max, ny)  # latitudes in degrees
 
         assert np.all(
             np.diff(lons) > 0

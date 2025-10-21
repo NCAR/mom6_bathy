@@ -123,7 +123,7 @@ class Grid:
         assert -90.0 <= ystart <= 90.0, "ystart must be in the range [-90, 90]"
         assert leny + ystart <= 90.0, "leny + ystart must be less than 90"
         self.name = name
-        
+
         # TODO: Cyclic x
         self.supergrid = EqualDegreeSupergrid.from_extents(
             lon_min=xstart,
