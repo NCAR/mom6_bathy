@@ -223,11 +223,10 @@ class EvenSpacingSupergrid(SupergridBase):
         central_latitude = np.mean([lat_min, lat_max])  # degrees
         latitudinal_resolution = resolution * np.cos(np.deg2rad(central_latitude))
 
-        ny = int((lat_max - lat_min) / (latitudinal_resolution / 2)) + 1
+        ny = int(len_y / (latitudinal_resolution / 2)) + 1
 
         if ny % 2 != 1:
             ny += 1
-
         lats = np.linspace(lat_min, lat_max, ny)  # latitudes in degrees
 
         assert np.all(
@@ -237,7 +236,7 @@ class EvenSpacingSupergrid(SupergridBase):
             np.diff(lats) > 0
         ), "latitudes array lats must be monotonically increasing"
 
-        R = 6371e6  # mean radius of the Earth; https://en.wikipedia.org/wiki/Earth_radius in m
+        R = 6.371e6  # mean radius of the Earth; https://en.wikipedia.org/wiki/Earth_radius in m
 
         # compute longitude spacing and ensure that longitudes are uniformly spaced
         dlons = lons[1] - lons[0]
@@ -262,10 +261,9 @@ class EvenSpacingSupergrid(SupergridBase):
 
         area = quadrilateral_areas(lat, lon, R)
 
-        angle_dx = np.zeros_like(area)
+        angle_dx = np.zeros_like(lon)
 
         axis_units = "degrees"
-
         return lon, lat, dx, dy, area, angle_dx, axis_units
 
 

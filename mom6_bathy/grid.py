@@ -63,7 +63,7 @@ class Grid:
         ystart: Optional[float] = None,
         cyclic_x: bool = False,
         name: Optional[str] = None,
-        even_spacing_grid: bool = False,
+        type: str = "equal_degree",
     ) -> None:
         """
         Grid instance constructor.
@@ -124,7 +124,7 @@ class Grid:
         self.name = name
 
         # TODO: Cyclic x
-        if not even_spacing_grid:
+        if type == "equal_degree":
             self.supergrid = EqualDegreeSupergrid.from_extents(
                 lon_min=xstart,
                 len_x=lenx,
@@ -132,7 +132,7 @@ class Grid:
                 len_y=leny,
                 resolution=resolution,
             )
-        else:
+        elif type == "even_spacing":
             self.supergrid = EvenSpacingSupergrid(
                 lon_min=xstart,
                 len_x=lenx,
@@ -140,6 +140,8 @@ class Grid:
                 len_y=leny,
                 resolution=resolution,
             )
+        else:
+            raise ValueError(f"Unsupported grid type: {type}")
 
     @property
     def name(self) -> str:
