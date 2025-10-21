@@ -486,9 +486,9 @@ class Topo:
         print(
             """**NOTE**
             If bathymetry setup fails (e.g. kernel crashes), restart the kernel and edit this cell.
-            Call ``topo.mpi_set_from_dataset()`` instead. Follow the given instructions for using mpi 
+            Call ``[topo_object_name].mpi_set_from_dataset()`` instead. Follow the given instructions for using mpi 
             and ESMF_Regrid outside of a python environment. This breaks up the process, so be sure to call
-            ``topo.tidy_dataset() after regridding with mpi."""
+            ``[topo_object_name].tidy_dataset() after regridding with mpi."""
         )
         if run_config_dataset:
             self.bathymetry_output, self.empty_bathy = self.config_dataset(
@@ -516,8 +516,8 @@ class Topo:
             self.tidy_dataset(
                 fill_channels=fill_channels,
                 positive_down=positive_down,
-                vertical_coordinate_name=vertical_coordinate_name,
-                bathymetry=self.regridded_bathymetry,
+                vertical_coordinate_name="depth",
+                bathymetry=self.regridded_bathy,
                 output_dir=output_dir,
                 write_to_file=write_to_file,
                 longitude_coordinate_name=longitude_coordinate_name,
@@ -543,7 +543,7 @@ class Topo:
                 f"""
             *MANUAL REGRIDDING INSTRUCTIONS*
             
-            Calling `mpi_interpolate_from_file` sets up the files necessary for regridding
+            Calling `[object_name].mpi_set_from_dataset` sets up the files necessary for regridding
             the bathymetry using mpirun and ESMF_Regrid. See below for the step-by-step instructions:
             
             1. There should be two files: `bathymetry_original.nc` and `bathymetry_unfinished.nc` located at
@@ -749,13 +749,6 @@ class Topo:
             "Begin regridding bathymetry...\n\n"
             + f"Original bathymetry size: {bathymetry_output.nbytes/1e6:.2f} Mb\n"
             + f"Regridded size: {empty_bathy.nbytes/1e6:.2f} Mb\n"
-            + "Automatic regridding may fail if your domain is too big! If this process hangs or crashes,"
-            + "make sure function argument write_to_file = True and,"
-            + "open a terminal with appropriate computational and resources try calling ESMF "
-            + f"directly in the input directory {output_dir} via\n\n"
-            + "`mpirun -np NUMBER_OF_CPUS ESMF_Regrid -s bathymetry_original.nc -d bathymetry_unfinished.nc -m bilinear --src_var depth --dst_var depth --netcdf4 --src_regional --dst_regional`\n\n"
-            + "For details see https://xesmf.readthedocs.io/en/latest/large_problems_on_HPC.html\n\n"
-            + "Afterwards, we run the 'tidy_bathymetry' method to skip the expensive interpolation step, and finishing metadata, encoding and cleanup.\n\n\n"
         )
 
         regridder = xe.Regridder(
