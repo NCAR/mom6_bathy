@@ -123,11 +123,9 @@ class Grid:
         assert -90.0 <= ystart <= 90.0, "ystart must be in the range [-90, 90]"
         assert leny + ystart <= 90.0, "leny + ystart must be less than 90"
         self.name = name
-
-        srefine = 2  # supergrid refinement factor
-
+        
         # TODO: Cyclic x
-        self.supergrid = EqualDegreeSupergrid(
+        self.supergrid = EqualDegreeSupergrid.from_extents(
             lon_min=xstart,
             len_x=lenx,
             lat_min=ystart,
@@ -256,18 +254,9 @@ class Grid:
         raise ValueError(
             "Needs to be replaced with base class which is done when xdat ydat are done."
         )
-        sub_supergrid = MidasSupergrid(
-            config=self.supergrid.dict["config"],
-            axis_units=self.supergrid.dict["axis_units"],
-            xdat=self.supergrid.x[s_j_low:s_j_high:j_step, s_i_low:s_i_high:i_step],
-            ydat=self.supergrid.y[s_j_low:s_j_high:j_step, s_i_low:s_i_high:i_step],
-            cyclic_x=cyclic_x,
-            cyclic_y=cyclic_y,
-            tripolar_n=tripolar_n,
-            r0_pole=self.supergrid.dict["r0_pole"],
-            lon0_pole=self.supergrid.dict["lon0_pole"],
-            doughnut=self.supergrid.dict["doughnut"],
-            radius=self.supergrid.dict["radius"],
+        sub_supergrid = EqualDegreeSupergrid.from_xy(
+            x=self.supergrid.x[s_j_low:s_j_high:j_step, s_i_low:s_i_high:i_step],
+            y=self.supergrid.y[s_j_low:s_j_high:j_step, s_i_low:s_i_high:i_step],
         )
 
         # Create a name for the subgrid based on the slices
@@ -818,7 +807,7 @@ class Grid:
             2-dimensional array of the new y coordinates.
         """
 
-        raise ValueError("To Be implemented")
+        self.supergrid = EqualDegreeSupergrid.from_xy(xdat, ydat)
 
     def gen_supergrid_ds(self, author: Optional[str] = None) -> xr.Dataset:
         """

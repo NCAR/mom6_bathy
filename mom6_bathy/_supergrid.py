@@ -63,13 +63,21 @@ class SupergridBase:
 class EqualDegreeSupergrid(SupergridBase):
     """MOM6-style supergrid with constant-degree spacing (lon/lat grid)."""
 
-    def __init__(self, lon_min, len_x, lat_min, len_y, resolution):
-        x, y, dx, dy, area, angle, axis, axis_units = self._build_grid(
-            lon_min, lon_max, lat_min, lat_max, resolution
-        )
-        super().__init__(x, y, dx, dy, area, angle, axis_units)
+    @classmethod
+    def from_extents(cls, lon_min, len_x, lat_min, len_y, resolution):
+        """Create a grid from domain extents (lon/lat degrees)."""
+        x, y = cls._calc_xy_from_extents(lon_min, len_x, lat_min, len_y, resolution)
+        dx, dy, area, angle_dx, axis_units = cls._calc_geometry(x, y)
+        return cls(x, y, dx, dy, area, angle_dx, axis_units)
 
-    def _build_grid(self, lon_min, len_x, lat_min, len_y, resolution):
+    @classmethod
+    def from_xy(cls, x, y):
+        """Create a grid directly from coordinate arrays."""
+        dx, dy, area, angle_dx, axis_units = cls._calc_geometry(x, y)
+        return cls(x, y, dx, dy, area, angle_dx, axis_units)
+
+    @classmethod
+    def _calc_xy_from_extents(cls, lon_min, len_x, lat_min, len_y, resolution):
         """Compute full grid geometry for equal-degree spacing."""
         # This builds all geometric quantities (x, y, dx, dy, area, angle)
         # for a supergrid defined in equal-degree (lon/lat) coordinates.
@@ -88,12 +96,18 @@ class EqualDegreeSupergrid(SupergridBase):
         # ---------------------------------------------------------------------
         # Compute grid coordinates in degrees
         # ---------------------------------------------------------------------
-        grid_y = ystart + jindp * leny / ny  # latitude edges
-        grid_x = xstart + iindp * lenx / nx  # longitude edges
+        grid_y = ystart + jindp * len_y / ny  # latitude edges
+        grid_x = xstart + iindp * len_x / nx  # longitude edges
 
         # Form full 2D coordinate arrays for all cell corners
         x = np.tile(grid_x, (ny + 1, 1))
         y = np.tile(grid_y.reshape((ny + 1, 1)), (1, nx + 1))
+
+        return x, y
+
+    @classmethod
+    def _calc_geometry(cls, grid_x, grid_y):
+        """Compute full grid geometry for equal-degree spacing."""
 
         # Update cell counts (used later for shape-dependent arrays)
         nx = grid_x.shape[0] - 1
@@ -168,7 +182,7 @@ class EqualDegreeSupergrid(SupergridBase):
         # ---------------------------------------------------------------------
         axis_units = "degrees"
 
-        return x, y, dx, dy, area, angle, axis_units
+        return dx, dy, area, angle_dx, axis_units
 
 
 class EvenSpacingSupergrid(SupergridBase):
