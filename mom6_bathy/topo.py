@@ -458,6 +458,8 @@ class Topo:
         run_tidy_dataset=True,
     ):
         """
+        This code was originally written by Ashley Barnes in regional_mom6(https://github.com/COSIMA/regional-mom6) and adapted for this package. 
+
         Cut out and interpolate the chosen bathymetry and then fill inland lakes.
 
         Users can optionally fill narrow channels (see ``fill_channels`` keyword argument

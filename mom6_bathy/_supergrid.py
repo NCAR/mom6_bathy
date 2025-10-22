@@ -1,3 +1,14 @@
+"""
+This module defines MOM6-style supergrid classes and associated utilities. It sits underneath the mom6_bathy.grid class and fills the roll of calculating the grid geometry: angle_dx, area, dx, dy, x, and y. 
+
+Classes defined here:
+- SupergridBase: Abstract base class defining the MOM6-style supergrid interface.
+- EqualDegreeSupergrid: MOM6-style supergrid with constant-degree spacing (lon/lat grid).
+- EvenSpacingSupergrid: MOM6-style supergrid with (as close to) uniform Cartesian spacing (still a lat/lon grid).
+
+The code for these classes does not originally come from mom6_bathy, but was adapted: EqualDegreeSupergrid by Mathew Harrison in MIDAS (https://github.com/mjharriso/MIDAS) and EvenSpacingSupergrid by Ashley Barnes in regional_mom6 (https://github.com/COSIMA/regional-mom6).
+"""
+
 import numpy as np
 import xarray as xr
 from datetime import datetime
