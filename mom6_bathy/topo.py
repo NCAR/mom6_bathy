@@ -458,7 +458,7 @@ class Topo:
         run_tidy_dataset=True,
     ):
         """
-        This code was originally written by Ashley Barnes in regional_mom6(https://github.com/COSIMA/regional-mom6) and adapted for this package. 
+        This code was originally written by Ashley Barnes in regional_mom6(https://github.com/COSIMA/regional-mom6) and adapted for this package.
 
         Cut out and interpolate the chosen bathymetry and then fill inland lakes.
 
@@ -973,11 +973,14 @@ class Topo:
 
         ## Now, any points in the bathymetry that are shallower than minimum depth are set to minimum depth.
         ## This preserves the true land/ocean mask.
-        bathymetry["depth"] = bathymetry["depth"].where(bathymetry["depth"] > 0, 0)
+        bathymetry["depth"] = bathymetry["depth"].where(bathymetry["depth"] > 0, np.nan)
         bathymetry["depth"] = bathymetry["depth"].where(
             ~(bathymetry.depth <= self.min_depth), self.min_depth + 0.1
         )
-        bathymetry = bathymetry.fillna(0)
+        bathymetry = bathymetry.fillna(
+            0
+        )  # After min_depth filtering, move the land values to zero
+        bathymetry.depth.attrs["units"] = "meters"
         self._depth = bathymetry.depth
 
     def apply_ridge(self, height, width, lon, ilat):
