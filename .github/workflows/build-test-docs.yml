@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-            submodules: recursive
+          submodules: recursive
 
       - name: Set up Micromamba (with caching)
         uses: mamba-org/setup-micromamba@v2
