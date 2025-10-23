@@ -56,6 +56,24 @@ jobs:
         run: |
           sphinx-build -b html .docstr docs
 
+      - name: Deploy PR preview to GitHub Pages
+        if: github.event_name == 'pull_request'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: docs
+          destination_dir: pr-${{ github.event.number }}
+          keep_files: false 
+
+      - name: Comment PR with preview link
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          message: |
+            📄 Preview your docs here:
+            👉 https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/index.html
+
       - name: Deploy main to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
