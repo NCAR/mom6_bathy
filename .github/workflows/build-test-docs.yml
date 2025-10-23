@@ -22,6 +22,8 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
+          cache-environment: true
+          cache-downloads: true
           micromamba-version: "latest"
 
       - name: Run pytest
@@ -38,11 +40,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Set up Micromamba (reuse cached env)
+      - name: Set up Micromamba (with caching)
         uses: mamba-org/setup-micromamba@v2
         with:
-          environment-file: environment.yml
+          environment-file: environment.yml    
+          cache-environment: true
+          cache-downloads: true
           micromamba-version: "latest"
 
       - name: Build Sphinx docs
