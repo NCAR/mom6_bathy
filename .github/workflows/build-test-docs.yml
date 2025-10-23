@@ -22,8 +22,8 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
-          cache-environment-key: environment-1
-          cache-downloads-key: downloads-1
+          cache-environment-key: environment--${{ github.sha }}
+          cache-downloads-key: downloads--${{ github.sha }}
           micromamba-version: "latest"
 
       - name: Run pytest
