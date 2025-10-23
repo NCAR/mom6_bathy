@@ -22,7 +22,6 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
-          cache-downloads: true
           micromamba-version: "latest"
 
       - name: Run pytest
@@ -44,7 +43,6 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
-          cache-downloads: true
           micromamba-version: "latest"
 
       - name: Build Sphinx docs
