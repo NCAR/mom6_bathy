@@ -22,7 +22,7 @@ jobs:
       id: check_version
       run: |
           # Get the previous commit's setup.py
-          PREV_COMMIT=$(git rev-parse HEAD~1)
+          PREV_COMMIT=$(git rev-parse HEAD~2)
           git fetch origin $PREV_COMMIT
           PREV_VERSION=$(grep "version=" setup.py | cut -d'"' -f2)
           echo "Previous version: $PREV_VERSION"
