@@ -355,9 +355,9 @@ class Grid:
         return False
 
     @classmethod
-    def get_rectangular_segment_info(hgrid: xr.Dataset | Grid):
+    def get_rectangular_segment_info(hgrid):
         """
-        This function finds the required segment queries from the hgrid and calls the functions
+        This function finds the required segment queries from the hgrid and calls the functions. Must be either an hgrid or a mom6_bathy Grid instance
         """
         if type(hgrid) == Grid:
             assert hgrid.is_rectangular()
