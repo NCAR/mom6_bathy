@@ -362,9 +362,11 @@ class Grid:
         if type(hgrid) == Grid:
             assert hgrid.is_rectangular()
             hgrid = hgrid.gen_supergrid_ds()
+            assert not Grid.is_cyclic_x(hgrid)
         else:
             grid_check = Grid.from_supergrid_ds(hgrid)
             assert grid_check.is_rectangular()
+            assert not Grid.is_cyclic_x(hgrid)
 
         init_result = {
             "lon_min": float(hgrid.x.min()),
@@ -436,7 +438,6 @@ class Grid:
             xarray Dataset of the supergrid file to be written
         name : str, optional
             Name of the new grid. If provided, it will be used as the name of the grid.
-            If not provided, the name will be derived from the file name.
 
         Returns
         -------
