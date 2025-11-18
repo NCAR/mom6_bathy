@@ -358,13 +358,10 @@ class Grid:
     def get_bounding_boxes_of_rectangular_grid(hgrid):
         """
         Extract lat/lon bounding boxes for each edge of a rectangular regional MOM6 grid.
-        This function is used when subsetting global datasets (e.g., GLORYS, JRA55, HYCOM)
+        This function is used when subsetting global datasets (e.g. GLORYS)
         down to the lat/lon ranges required for efficient regridding:
-            • Eastern boundary forcing
-            • Western boundary forcing
-            • Northern boundary forcing
-            • Southern boundary forcing
-            • Full-domain initial condition files
+            • north, south, east, west boundaries
+            • Entire domain initial condition files
         Parameters
         ----------
         hgrid : Grid or xarray.Dataset in the supergrid format
