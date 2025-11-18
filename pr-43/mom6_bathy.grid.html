@@ -374,15 +374,12 @@ during runtime.</p>
 <dt class="sig sig-object py" id="mom6_bathy.grid.Grid.get_bounding_boxes_of_rectangular_grid">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_bounding_boxes_of_rectangular_grid</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.grid.Grid.get_bounding_boxes_of_rectangular_grid" title="Link to this definition"></a></dt>
 <dd><p>Extract lat/lon bounding boxes for each edge of a rectangular regional MOM6 grid.
-This function is used when subsetting global datasets (e.g., GLORYS, JRA55, HYCOM)
+This function is used when subsetting global datasets (e.g. GLORYS)
 down to the lat/lon ranges required for efficient regridding:</p>
 <blockquote>
 <div><ul class="simple">
-<li><p>Eastern boundary forcing</p></li>
-<li><p>Western boundary forcing</p></li>
-<li><p>Northern boundary forcing</p></li>
-<li><p>Southern boundary forcing</p></li>
-<li><p>Full-domain initial condition files</p></li>
+<li><p>north, south, east, west boundaries</p></li>
+<li><p>Entire domain initial condition files</p></li>
 </ul>
 </div></blockquote>
 <dl class="field-list simple">
