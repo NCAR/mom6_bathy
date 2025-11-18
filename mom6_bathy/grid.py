@@ -355,9 +355,29 @@ class Grid:
         return False
 
     @classmethod
-    def get_rectangular_segment_info(hgrid):
+    def get_bounding_boxes_of_rectangular_grid(hgrid):
         """
-        This function finds the required segment queries from the hgrid and calls the functions. Must be either an hgrid or a mom6_bathy Grid instance
+        Extract lat/lon bounding boxes for each edge of a rectangular regional MOM6 grid.
+        This function is used when subsetting global datasets (e.g., GLORYS, JRA55, HYCOM)
+        down to the lat/lon ranges required for efficient regridding:
+            • Eastern boundary forcing
+            • Western boundary forcing
+            • Northern boundary forcing
+            • Southern boundary forcing
+            • Full-domain initial condition files
+        Parameters
+        ----------
+        hgrid : Grid or xarray.Dataset in the supergrid format
+
+        Returns
+        -------
+        dict
+            A dictionary containing bounding boxes for:
+                • "east"
+                • "west"
+                • "north"
+                • "south"
+                • "ic" (full domain for initial conditions)
         """
         if type(hgrid) == Grid:
             assert hgrid.is_rectangular()
