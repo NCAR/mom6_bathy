@@ -354,6 +354,75 @@ class Grid:
             return True
         return False
 
+    @classmethod
+    def get_bounding_boxes_of_rectangular_grid(hgrid):
+        """
+        Extract lat/lon bounding boxes for each edge of a rectangular regional MOM6 grid.
+        This function is used when subsetting global datasets (e.g. GLORYS)
+        down to the lat/lon ranges required for efficient regridding:
+            • north, south, east, west boundaries
+            • Entire domain initial condition files
+        Parameters
+        ----------
+        hgrid : Grid or xarray.Dataset in the supergrid format
+
+        Returns
+        -------
+        dict
+            A dictionary containing bounding boxes for:
+                • "east"
+                • "west"
+                • "north"
+                • "south"
+                • "ic" (full domain for initial conditions)
+        """
+        if type(hgrid) == Grid:
+            assert hgrid.is_rectangular()
+            hgrid = hgrid.gen_supergrid_ds()
+            assert not Grid.is_cyclic_x(hgrid)
+        else:
+            grid_check = Grid.from_supergrid_ds(hgrid)
+            assert grid_check.is_rectangular()
+            assert not Grid.is_cyclic_x(hgrid)
+
+        init_result = {
+            "lon_min": float(hgrid.x.min()),
+            "lon_max": float(hgrid.x.max()),
+            "lat_min": float(hgrid.y.min()),
+            "lat_max": float(hgrid.y.max()),
+        }
+        east_result = {
+            "lon_min": float(hgrid.x.isel(nxp=-1).min()),
+            "lon_max": float(hgrid.x.isel(nxp=-1).max()),
+            "lat_min": float(hgrid.y.isel(nxp=-1).min()),
+            "lat_max": float(hgrid.y.isel(nxp=-1).max()),
+        }
+        west_result = {
+            "lon_min": float(hgrid.x.isel(nxp=0).min()),
+            "lon_max": float(hgrid.x.isel(nxp=0).max()),
+            "lat_min": float(hgrid.y.isel(nxp=0).min()),
+            "lat_max": float(hgrid.y.isel(nxp=0).max()),
+        }
+        south_result = {
+            "lon_min": float(hgrid.x.isel(nyp=0).min()),
+            "lon_max": float(hgrid.x.isel(nyp=0).max()),
+            "lat_min": float(hgrid.y.isel(nyp=0).min()),
+            "lat_max": float(hgrid.y.isel(nyp=0).max()),
+        }
+        north_result = {
+            "lon_min": float(hgrid.x.isel(nyp=-1).min()),
+            "lon_max": float(hgrid.x.isel(nyp=-1).max()),
+            "lat_min": float(hgrid.y.isel(nyp=-1).min()),
+            "lat_max": float(hgrid.y.isel(nyp=-1).max()),
+        }
+        return {
+            "east": east_result,
+            "west": west_result,
+            "north": north_result,
+            "south": south_result,
+            "ic": init_result,
+        }
+
 
     @classmethod
     def from_supergrid(cls, path: str, name: Optional[str] = None) -> "Grid":
@@ -372,9 +441,28 @@ class Grid:
         Grid
             The Grid instance created from the supergrid file.
         """
+        ds = xr.open_dataset(path)
+        name = name or os.path.basename(path).replace(".nc", "") if os.path.basename(path).endswith(".nc") else os.path.basename(path)
+        return Grid.from_supergrid_ds(ds, name)
+
+    @classmethod
+    def from_supergrid_ds(cls, ds: xr.Dataset, name: Optional[str] = None) -> "Grid":
+        """Create a Grid instance from a supergrid file.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            xarray Dataset of the supergrid file to be written
+        name : str, optional
+            Name of the new grid. If provided, it will be used as the name of the grid.
+
+        Returns
+        -------
+        Grid
+            The Grid instance created from the supergrid file.
+        """
 
         # read supergrid dataset
-        ds = xr.open_dataset(path)
         assert (
             ds.x.units == ds.y.units and "degree" in ds.x.units
         ), "Only degrees units are supported in supergrid files"
@@ -383,8 +471,6 @@ class Grid:
         Grid.check_supergrid(ds)
 
         srefine = 2  # supergrid refinement factor
-
-        name = name or os.path.basename(path).replace(".nc", "") if os.path.basename(path).endswith(".nc") else os.path.basename(path)
 
         # create an initial Grid object:
         obj = cls(
