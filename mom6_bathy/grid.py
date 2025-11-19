@@ -355,7 +355,7 @@ class Grid:
         return False
 
     @classmethod
-    def get_bounding_boxes_of_rectangular_grid(hgrid):
+    def get_bounding_boxes_of_rectangular_grid(cls, hgrid):
         """
         Extract lat/lon bounding boxes for each edge of a rectangular regional MOM6 grid.
         This function is used when subsetting global datasets (e.g. GLORYS)
