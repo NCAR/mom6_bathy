@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from mom6_bathy.grid import Grid
 
 @pytest.fixture
 def get_realistic_vgrid_elements():
@@ -42,3 +43,15 @@ def get_faulty_vgrid_elements():
     cell_interface = np.array([0, 1, 6, 11, 14, 19, 20, 20, 17, 22, 28])
     
     return (layer_thickness, cell_center, cell_interface)
+
+@pytest.fixture
+def get_rect_grid():
+    grid = Grid(
+        resolution=0.1,
+        xstart=278.0,
+        lenx=4.0,
+        ystart=7.0,
+        leny=3.0,
+        name="panama1",
+    )
+    return grid
