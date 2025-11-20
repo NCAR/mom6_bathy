@@ -361,8 +361,7 @@ class Topo:
         south_lat = self._grid.tlat[0, 0]
         nx = self._grid.nx
         ny = self._grid.ny
-        lenx = self._grid.supergrid.x.max() - self._grid.supergrid.x.min()
-        leny = self._grid.supergrid.y.max() - self._grid.supergrid.y.min()
+        leny = self._grid.supergrid.leny
         self._depth = xr.DataArray(
             np.full((ny, nx), max_depth),
             dims=["ny", "nx"],
@@ -375,7 +374,7 @@ class Topo:
         )
 
         self._depth[:, :] = dedge + D0 * (
-            np.sin(np.pi * (self._grid.tlon[:, :] - west_lon) / lenx)
+            np.sin(np.pi * (self._grid.tlon[:, :] - west_lon) / self._grid.supergrid.lenx)
             * (
                 1.0
                 - np.exp(

@@ -19,6 +19,14 @@ from mom6_bathy.utils import quadrilateral_areas, mdist
 class SupergridBase:
     """Abstract base class defining the MOM6-style supergrid interface."""
 
+    @property
+    def lenx(self):
+        return self.x.max() - self.x.min()
+
+    @property
+    def leny(self):
+        return self.y.max() - self.y.min()
+
     def __init__(self, x, y, dx, dy, area, angle_dx, axis_units):
         """
         Initialize a generic supergrid.
