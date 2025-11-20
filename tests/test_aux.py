@@ -25,7 +25,7 @@ def test_longitude_slicer():
 
         dims = ["silly_lat", "silly_lon", "time"]
 
-        dλ = (longitude_extent[1] - longitude_extent[0]) / 2
+        dlambda = (longitude_extent[1] - longitude_extent[0]) / 2
 
         data = xr.DataArray(
             np.random.random((ny, nx, nt)),
@@ -35,8 +35,8 @@ def test_longitude_slicer():
                 "silly_lon": np.array(
                     [
                         longitude_extent[0],
-                        longitude_extent[0] + 1.5 * dλ,
-                        longitude_extent[0] + 2.6 * dλ,
+                        longitude_extent[0] + 1.5 * dlambda,
+                        longitude_extent[0] + 2.6 * dlambda,
                         longitude_extent[1],
                     ]
                 ),

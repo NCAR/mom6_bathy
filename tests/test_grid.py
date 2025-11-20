@@ -3,7 +3,7 @@ import tempfile
 import socket
 import numpy as np
 import xarray as xr
-
+import pytest 
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
 from utils import on_cisl_machine
@@ -204,8 +204,7 @@ if __name__ == "__main__":
     test_global_grid()
     test_from_file()
     test_equatorial_refinement()
-from mom6_bathy.grid import Grid
-import pytest 
+
 
 @pytest.fixture
 def get_rect_grid():

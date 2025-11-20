@@ -893,6 +893,52 @@ class Grid:
 
         self.supergrid = EqualDegreeSupergrid.from_xy(xdat, ydat)
 
+    def gen_supergrid_ds(
+        self, author: Optional[str] = None
+    ) -> xr.Dataset:
+        """
+        Generate supergrid to a xarray Dataset file. The supergrid file is to be read in by MOM6
+        during runtime.
+
+        Parameters
+        ----------
+        author: str, optional
+            Name of the author. If provided, the name will appear in files as metadata.
+        """
+        # initialize the dataset:
+        ds = xr.Dataset()
+
+        # global attrs:
+        ds.attrs["type"] = "MOM6 supergrid"
+        ds.attrs["Created"] = datetime.now().isoformat()
+        if author:
+            ds.attrs["Author"] = author
+
+        # data arrays:
+        ds["y"] = xr.DataArray(
+            self._supergrid.y,
+            dims=["nyp", "nxp"],
+            attrs={"units": self._supergrid.dict["axis_units"]},
+        )
+        ds["x"] = xr.DataArray(
+            self._supergrid.x,
+            dims=["nyp", "nxp"],
+            attrs={"units": self._supergrid.dict["axis_units"]},
+        )
+        ds["dy"] = xr.DataArray(
+            self._supergrid.dy, dims=["ny", "nxp"], attrs={"units": "meters"}
+        )
+        ds["dx"] = xr.DataArray(
+            self._supergrid.dx, dims=["nyp", "nx"], attrs={"units": "meters"}
+        )
+        ds["area"] = xr.DataArray(
+            self._supergrid.area, dims=["ny", "nx"], attrs={"units": "m2"}
+        )
+        ds["angle_dx"] = xr.DataArray(
+            self._supergrid.angle_dx, dims=["nyp", "nxp"], attrs={"units": "meters"}
+        )            
+        return ds
+
     def write_supergrid(
         self, path: Optional[str] = None, author: Optional[str] = None
     ) -> None:
@@ -908,7 +954,6 @@ class Grid:
             Name of the author. If provided, the name will appear in files as metadata.
         """
 
-        ds = self.supergrid.to_ds(author=author)
+        ds = self.gen_supergrid_ds(author=author)
         ds.attrs["filename"] = os.path.basename(path)
-        ds.to_netcdf(path, format="NETCDF3_64BIT")
-        return ds
+        ds.to_netcdf(path, format='NETCDF3_64BIT')
