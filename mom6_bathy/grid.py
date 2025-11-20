@@ -4,7 +4,7 @@ from typing import Optional
 import numpy as np
 import xarray as xr
 from scipy.spatial import cKDTree
-from mom6_bathy._supergrid import EqualDegreeSupergrid, EvenSpacingSupergrid
+from mom6_bathy._supergrid import EqualDegreeSupergrid, EvenSpacingSupergrid, SupergridBase
 from mom6_bathy.utils import normalize_deg
 
 

@@ -1,5 +1,5 @@
 import pytest
-from mom6_bathy.utils import get_avg_resolution, get_avg_resolution_km, longitude_slicer, quadrilateral_area, latlon_to_cartesian
+from mom6_bathy.utils import get_avg_resolution, get_avg_resolution_km, longitude_slicer, quadrilateral_area, latlon_to_cartesian,quadrilateral_areas
 from utils import on_cisl_machine
 import xarray as xr
 import numpy as np  
