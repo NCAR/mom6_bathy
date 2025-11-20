@@ -402,7 +402,7 @@ class Grid:
         """
         if type(hgrid) == Grid:
             assert hgrid.is_rectangular()
-            hgrid = hgrid.gen_supergrid_ds()
+            hgrid = Grid.gen_supergrid_ds(hgrid)
             assert not Grid.is_cyclic_x(hgrid)
         else:
             grid_check = Grid.from_supergrid_ds(hgrid)
