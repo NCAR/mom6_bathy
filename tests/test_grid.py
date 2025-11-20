@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import pytest
 import tempfile
 import socket
@@ -205,7 +204,6 @@ if __name__ == "__main__":
     test_global_grid()
     test_from_file()
     test_equatorial_refinement()
-=======
 from mom6_bathy.grid import Grid
 import pytest 
 
@@ -228,4 +226,3 @@ def test_get_rectangular_segment_info(get_rect_grid):
     assert "north" in res.keys()
     assert "south" in res.keys()
     assert "lat_min" in res["east"].keys()
->>>>>>> main
