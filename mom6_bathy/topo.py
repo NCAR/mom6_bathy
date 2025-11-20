@@ -4,7 +4,7 @@ import xarray as xr
 from datetime import datetime
 from scipy import interpolate
 from scipy.ndimage import label
-from mom6_bathy.aux import cell_area_rad, longitude_slicer
+from mom6_bathy.utils import cell_area_rad, longitude_slicer
 from mom6_bathy.grid import Grid
 from scipy.spatial import cKDTree
 import xesmf as xe

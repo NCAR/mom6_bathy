@@ -206,17 +206,7 @@ if __name__ == "__main__":
     test_equatorial_refinement()
 
 
-@pytest.fixture
-def get_rect_grid():
-    grid = Grid(
-        resolution=0.1,
-        xstart=278.0,
-        lenx=4.0,
-        ystart=7.0,
-        leny=3.0,
-        name="panama1",
-    )
-    return grid
+
 def test_get_rectangular_segment_info(get_rect_grid):
     grid = get_rect_grid
     res = Grid.get_bounding_boxes_of_rectangular_grid(grid)

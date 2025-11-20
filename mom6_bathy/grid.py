@@ -5,7 +5,7 @@ import numpy as np
 import xarray as xr
 from scipy.spatial import cKDTree
 from mom6_bathy._supergrid import *
-from mom6_bathy.aux import normalize_deg
+from mom6_bathy.utils import normalize_deg
 
 
 class Grid:
