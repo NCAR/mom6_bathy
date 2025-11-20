@@ -12,7 +12,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/NCAR/mom6-bathy",
-    packages=['mom6_bathy', 'midas'],
+    packages=['mom6_bathy'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
