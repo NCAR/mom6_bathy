@@ -215,3 +215,9 @@ def test_get_rectangular_segment_info(get_rect_grid):
     assert "north" in res.keys()
     assert "south" in res.keys()
     assert "lat_min" in res["east"].keys()
+
+
+def test_slice_grid(get_rect_grid):
+    grid = get_rect_grid
+    sub = grid [1:,1:]
+    assert sub.tlon[0][0] == grid.tlon[0][1]

@@ -127,7 +127,6 @@ class Grid:
         self.name = name
         self.cyclic_x = cyclic_x
 
-        # TODO: Cyclic x
         if type == "equal_degree":
             self.supergrid = EqualDegreeSupergrid.from_extents(
                 lon_min=xstart,
@@ -246,18 +245,21 @@ class Grid:
         srefine = 2  # supergrid refinement factor
 
         # Periodicity checks:
-        cyclic_y = (
-            self.supergrid.dict["cyclic_y"] and (j_low == 0) and (j_high == self.ny)
-        )
+
         cyclic_x = (
-            self.supergrid.dict["cyclic_x"] and (i_low == 0) and (i_high == self.nx)
+            self.cyclic_x and (i_low == 0) and (i_high == self.nx)
         )
-        tripolar_n = (
-            self.supergrid.dict["tripolar_n"]
-            and (i_low == 0)
-            and (i_high == self.nx)
-            and (j_high == self.ny)
-        )
+
+        # Cyclic Y and tripolar are still TODO (these were not supported previously)
+        # cyclic_y = (
+        #     self.supergrid.dict["cyclic_y"] and (j_low == 0) and (j_high == self.ny)
+        # )
+        # tripolar_n = (
+        #     self.supergrid.dict["tripolar_n"]
+        #     and (i_low == 0)
+        #     and (i_high == self.nx)
+        #     and (j_high == self.ny)
+        # )
 
         # supergrid slicing:
         s_j_low = j_low * srefine
@@ -265,10 +267,6 @@ class Grid:
         s_i_low = i_low * srefine
         s_i_high = (i_high) * srefine + 1
 
-        # Create a sub-supergrid with the sliced data
-        raise ValueError(
-            "Needs to be replaced with base class which is done when xdat ydat are done."
-        )
         sub_supergrid = EqualDegreeSupergrid.from_xy(
             x=self.supergrid.x[s_j_low:s_j_high:j_step, s_i_low:s_i_high:i_step],
             y=self.supergrid.y[s_j_low:s_j_high:j_step, s_i_low:s_i_high:i_step],
@@ -286,8 +284,8 @@ class Grid:
         sub_grid = Grid(
             nx=int((i_high - i_low) / i_step),
             ny=int((j_high - j_low) / j_step),
-            lenx=(sub_supergrid.x.max() - sub_supergrid.x.min()).item(),
-            leny=(sub_supergrid.y.max() - sub_supergrid.y.min()).item(),
+            lenx=sub_supergrid.lenx,
+            leny=sub_supergrid.leny,
             cyclic_x=cyclic_x,
             name=name,
         )
