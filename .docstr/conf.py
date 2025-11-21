@@ -13,8 +13,6 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('../mom6_bathy/'))
 sys.path.insert(0, os.path.abspath('../mom6_bathy/midas/'))
-from mom6_bathy.grid import Grid
-from mom6_bathy.topo import Topo
 
 
 # -- Project information -----------------------------------------------------

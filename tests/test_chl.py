@@ -3,7 +3,7 @@ from mom6_bathy.topo import Topo
 from mom6_bathy.chl import interpolate_and_fill_seawifs
 import pytest
 import os
-from .utils import on_cisl_machine
+from utils import on_cisl_machine
 
 
 def test_chl(tmp_path):
