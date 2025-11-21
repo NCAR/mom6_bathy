@@ -6,7 +6,7 @@ import xarray as xr
 
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
-from utils import on_cisl_machine
+from .utils import on_cisl_machine
 
 
 def test_is_tripolar():
