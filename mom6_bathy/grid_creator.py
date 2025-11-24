@@ -6,20 +6,23 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from mom6_bathy.grid import Grid
+from pathlib import Path
 
 
 class GridCreator(widgets.HBox):
 
     def __init__(self, grid, repo_root=None):
         self.grid = grid
-        self.repo_root = repo_root if repo_root is not None else os.getcwd()
-        self.grids_dir = os.path.join(self.repo_root, "Grids")
+        self.repo_root = Path(repo_root if repo_root is not None else os.getcwd())
+        self.grids_dir = Path(os.path.join(self.repo_root, "GridLibrary"))
+        self.grids_dir.mkdir(exist_ok=True)
         self._initial_params = {
             "lenx": grid.lenx,
             "leny": grid.leny,
-            "resolution": grid.resolution,
-            "xstart": grid.xstart,
-            "ystart": grid.ystart,
+            "nx": grid.nx,
+            "ny": grid.ny,
+            "xstart": grid.supergrid.x[0, 0],
+            "ystart": grid.supergrid.y[0, 0],
             "name": grid.name,
         }
 
@@ -74,7 +77,7 @@ class GridCreator(widgets.HBox):
         )
 
         # Use initial values for slider ranges
-        initial_xstart = float(self.grid.xstart) % 360
+        initial_xstart = float(self.grid.supergrid.x[0, 0]) % 360
 
         # Handle longitude wrap-around and negative values for slider
         slider_window = 30
@@ -103,7 +106,7 @@ class GridCreator(widgets.HBox):
             value=self.grid.lenx, min=0.01, max=50.0, step=0.01, description="lenx"
         )
 
-        initial_ystart = float(self.grid.ystart)
+        initial_ystart = float(self.grid.supergrid.y[0, 0])
 
         self._ystart_slider = widgets.FloatSlider(
             value=initial_ystart,
@@ -117,7 +120,7 @@ class GridCreator(widgets.HBox):
         )
 
         self._resolution_slider = widgets.FloatSlider(
-            value=self.grid.resolution,
+            value=self.grid.lenx / self.grid.nx,
             min=0.01,
             max=1.0,
             step=0.01,
@@ -300,11 +303,10 @@ class GridCreator(widgets.HBox):
 
         if name.lower().endswith(".nc"):
             name = name[:-3]
-        sanitized_name = self.grid.sanitize_name(name)
-        self.grid.name = sanitized_name
+        self.grid.name = name
 
-        nc_path = os.path.join(self.grids_dir, f"grid_{sanitized_name}.nc")
-        self.grid.to_netcdf(nc_path)
+        nc_path = os.path.join(self.grids_dir, f"grid_{name}.nc")
+        self.grid.write_supergrid(nc_path)
         print(f"Saved grid '{os.path.basename(nc_path)}' in '{self.grids_dir}'.")
         self.refresh_commit_dropdown()
         return
@@ -315,7 +317,7 @@ class GridCreator(widgets.HBox):
             return
         nc_path = os.path.join(self.grids_dir, val)
         try:
-            self.grid = self.grid.from_netcdf(nc_path)
+            self.grid = self.grid.from_supergrid(nc_path)
             self.sync_sliders_to_grid()
             self.construct_observances()
             self.plot_grid()
@@ -329,7 +331,7 @@ class GridCreator(widgets.HBox):
     def sync_sliders_to_grid(self):
         try:
             # --- xstart ---
-            initial_xstart = float(self.grid.xstart) % 360
+            initial_xstart = float(self.grid.supergrid.x[0, 0]) % 360
             slider_window = 30
             slider_min = max(initial_xstart - slider_window, -180.0)
             slider_max = min(initial_xstart + slider_window, 360.0)
@@ -342,7 +344,7 @@ class GridCreator(widgets.HBox):
             xstart_val = min(max(initial_xstart, slider_min), slider_max)
 
             # --- ystart ---
-            initial_ystart = float(self.grid.ystart)
+            initial_ystart = float(self.grid.supergrid.y[0, 0])
             y_min = max(initial_ystart - 30, -90)
             y_max = min(initial_ystart + 30, 90)
             if y_min >= y_max:
@@ -355,7 +357,9 @@ class GridCreator(widgets.HBox):
 
             # --- resolution ---
             res_min, res_max = 0.01, 1.0
-            resolution_val = min(max(float(self.grid.resolution), res_min), res_max)
+            resolution_val = min(
+                max(float(self.grid.lenx / self.grid.nx), res_min), res_max
+            )
 
             # --- lenx ---
             lenx_min, lenx_max = 0.01, 50.0
@@ -388,26 +392,23 @@ class GridCreator(widgets.HBox):
             xstart=self._xstart_slider.value,
             ystart=self._ystart_slider.value,
             name=self.grid.name,
-            save_on_create=False,  # Avoid saving on every slider change
         )
         self.plot_grid()
 
     def reset_grid(self, b=None):
         params = self._initial_params
         name = self._snapshot_name.value.strip() or params["name"]
-        sanitized_name = self.grid.sanitize_name(name)
         self.grid = Grid(
             lenx=params["lenx"],
             leny=params["leny"],
             resolution=params["resolution"],
             xstart=params["xstart"],
             ystart=params["ystart"],
-            name=sanitized_name,
-            save_on_create=False,
+            name=name,
         )
         self.sync_sliders_to_grid()
         self.plot_grid()
-        grid_nc_name = f"grid_{sanitized_name}.nc"
+        grid_nc_name = f"grid_{name}.nc"
         option_values = [v for (l, v) in self._commit_dropdown.options]
         if grid_nc_name in option_values:
             self._commit_dropdown.value = grid_nc_name
@@ -458,21 +459,21 @@ class GridCreator(widgets.HBox):
             return
         abs_path = os.path.join(self.grids_dir, val)
         try:
-            ds = xr.open_dataset(abs_path)
+            grid = Grid.from_supergrid(abs_path)
+            ds = grid.supergrid.to_ds()
             name = ds.attrs.get("name", "")
             date = ds.attrs.get("date_created", "")
+            raise ValueError(ds.attrs)
             # Format date: replace 'T' with ' ', trim to seconds
             date_short = date.replace("T", " ")
             date_short = date_short.split(".")[0] if "." in date_short else date_short
-            resolution = ds.attrs.get("resolution", "")
-            nx = ds.attrs.get("nx", "")
-            ny = ds.attrs.get("ny", "")
+            nx = grid.nx
+            ny = grid.ny
             details = (
                 f"<b>Name:</b> {name}<br>"
                 f"<b>Date:</b> {date_short}<br>"
-                f"<b>Resolution:</b> {resolution}<br>"
                 f"<b>nx:</b> {nx} <b>ny:</b> {ny}"
             )
             self._commit_details.value = details
-        except Exception:
-            self._commit_details.value = ""
+        except Exception as e:
+            self._commit_details.value = f"<b>Error:</b> {e}"
