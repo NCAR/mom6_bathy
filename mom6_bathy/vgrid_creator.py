@@ -15,7 +15,7 @@ class VGridCreator(widgets.HBox):
 
     def __init__(self, vgrid=None, repo_root=None, topo=None, grid=None):
         self.repo_root = repo_root if repo_root is not None else os.getcwd()
-        self.vgrids_dir = os.path.join(self.repo_root, "VGrids")
+        self.vgrids_dir = os.path.join(self.repo_root, "VGridLibrary")
         os.makedirs(self.vgrids_dir, exist_ok=True)
 
         self.topo = topo
@@ -220,9 +220,9 @@ class VGridCreator(widgets.HBox):
             plt.ion()
         else:
             self.ax.clear()
-        for depth in self.vgrid.z:
+        for depth in self.vgrid.zl:
             self.ax.axhline(y=depth, color="steelblue")
-        self.ax.set_ylim(max(self.vgrid.z) + 10, min(self.vgrid.z) - 10)
+        self.ax.set_ylim(max(self.vgrid.zl) + 10, min(self.vgrid.zl) - 10)
         self.ax.set_ylabel("Depth (m)")
         self.ax.set_title("Use the sliders to adjust vertical grid parameters.")
         self.fig.canvas.draw_idle()
@@ -256,8 +256,6 @@ class VGridCreator(widgets.HBox):
                 nk=nk,
                 depth=depth,
                 name=name,
-                save_on_create=False,
-                repo_root=self.repo_root,
             )
             self._ratio_slider.disabled = True
         else:
@@ -266,8 +264,6 @@ class VGridCreator(widgets.HBox):
                 depth=depth,
                 ratio=ratio,
                 name=name,
-                save_on_create=False,
-                repo_root=self.repo_root,
             )
             self._ratio_slider.disabled = False
         self.plot_vgrid()
@@ -282,10 +278,9 @@ class VGridCreator(widgets.HBox):
             print("Enter a vgrid message!")
             return
 
-        sanitized_name = VGrid.sanitize_name(name)
-        self.vgrid.name = sanitized_name
+        self.vgrid.name = name
 
-        nc_path = os.path.join(self.vgrids_dir, f"vgrid_{sanitized_name}.nc")
+        nc_path = os.path.join(self.vgrids_dir, f"vgrid_{name}.nc")
         self.vgrid.write(nc_path, message=msg)
         print(f"Saved vgrid '{os.path.basename(nc_path)}' in '{self.vgrids_dir}'.")
         self.refresh_commit_dropdown()
@@ -298,9 +293,7 @@ class VGridCreator(widgets.HBox):
             return
         nc_path = os.path.join(self.vgrids_dir, val)
         try:
-            self.vgrid = VGrid.from_file(
-                nc_path, name=None, save_on_create=False, repo_root=self.repo_root
-            )
+            self.vgrid = VGrid.from_file(nc_path, name=None)
             # Infer ratio and grid type from dz
             ratio_value, grid_type = self.infer_ratio_and_type(self.vgrid.dz)
             # Temporarily remove observers to avoid recursion
@@ -325,9 +318,7 @@ class VGridCreator(widgets.HBox):
             print(f"Failed to load vgrid: {e}")
 
     def reset_vgrid(self, b=None):
-        self.vgrid = VGrid(
-            self._initial_dz.copy(), save_on_create=False, repo_root=self.repo_root
-        )
+        self.vgrid = VGrid(self._initial_dz.copy())
         ratio_value, grid_type = self.infer_ratio_and_type(self.vgrid.dz)
         self._nk_slider.value = self.vgrid.nk
         self._depth_slider.value = float(self.vgrid.depth)

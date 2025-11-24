@@ -22,10 +22,7 @@ class VGrid:
         Array of layer center depths
     """
 
-    def __init__(
-        self,
-        dz: np.ndarray,
-    ):
+    def __init__(self, dz: np.ndarray, name=None):
         """Create a vertical grid.
 
         Parameters
@@ -37,6 +34,7 @@ class VGrid:
         assert np.all(dz > 0), "Layer thickness cannot be zero or negative."
 
         self.dz = dz
+        self.name = name
 
     @property
     def nk(self):
@@ -60,7 +58,7 @@ class VGrid:
         return np.insert(np.cumsum(self.dz), 0, 0)
 
     @classmethod
-    def uniform(cls, nk: int, depth: float):
+    def uniform(cls, nk: int, depth: float, name: str = None):
         """Create a uniform vertical grid instance.
 
         Parameters
@@ -69,6 +67,8 @@ class VGrid:
             Number of vertical levels
         depth: float
             Total depth of the water column (meters)
+        name: str, optional
+            Name of the vertical grid
         """
 
         assert nk > 1, "Number of layers must be greater than 1"
@@ -80,10 +80,10 @@ class VGrid:
         # update the bottom layer thickness to ensure the total depth is correct
         dz[-1] = depth - np.sum(dz[:-1])
 
-        return cls(dz)
+        return cls(dz, name)
 
     @classmethod
-    def hyperbolic(cls, nk: int, depth: float, ratio: float):
+    def hyperbolic(cls, nk: int, depth: float, ratio: float, name: str = None):
         """Create a hyperbolic vertical grid instance. (Adapted from regional-mom6)
 
         Parameters
@@ -94,6 +94,8 @@ class VGrid:
             Target ratio of top to bottom layer thicknesses
         depth: float
             Total depth of the water column (meters)
+        name: str, optional
+            Name of the vertical grid
         """
 
         assert nk > 1, "Number of layers must be greater than 1"
@@ -109,7 +111,7 @@ class VGrid:
         # update the bottom layer thickness to ensure the total depth is correct
         dz[-1] = depth - np.sum(dz[:-1])
 
-        return cls(dz)
+        return cls(dz, name=name)
 
     @classmethod
     def from_file(
@@ -119,6 +121,7 @@ class VGrid:
         variable_type: Literal[
             "layer_thickness", "cell_center", "cell_interface"
         ] = "layer_thickness",
+        name: str = None,
     ):
         """Create a vertical grid from an existing vertical grid file.
 
@@ -159,7 +162,10 @@ class VGrid:
 
         assert np.all(dz > 0), "Layer thickness cannot be zero."
 
-        return cls(dz)
+        if name is None:
+            name = ds.attrs.get("name", None)
+
+        return cls(dz, name)
 
     def write(self, filename: str, message: str = None, author: str = None):
         """Write the vertical grid (in thickness) to a NetCDF file.
@@ -190,6 +196,8 @@ class VGrid:
 
         ds.attrs["title"] = f"Vertical grid for MOM6 simulation"
         ds.attrs["maximum_depth"] = self.depth
+        if self.name is not None:
+            ds.attrs["name"] = self.name
         ds.attrs["top_bottom_ratio"] = float(ratio)
         ds.attrs["history"] = f"Created on {datetime.now()}"
         if message:
