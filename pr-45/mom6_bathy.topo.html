@@ -93,7 +93,7 @@
 <span id="mom6-bathy-topo-module"></span><h1>mom6_bathy.topo module<a class="headerlink" href="#module-mom6_bathy.topo" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mom6_bathy.topo.</span></span><span class="sig-name descname"><span class="pre">Topo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_depth</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mom6_bathy.topo.</span></span><span class="sig-name descname"><span class="pre">Topo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_depth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version_control_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'TopoLibrary'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Bathymetry Generator for MOM6 grids (mom6_bathy.grid.Grid).</p>
 <p>MOM6 Simpler Models bathymetry constructor.</p>
@@ -105,6 +105,11 @@
 </ul>
 </dd>
 </dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.apply_edit">
+<span class="sig-name descname"><span class="pre">apply_edit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.apply_edit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.apply_land_frac">
 <span class="sig-name descname"><span class="pre">apply_land_frac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">landfrac_filepath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">landfrac_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xcoord_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ycoord_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth_fillval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff_frac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'bilinear'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.apply_land_frac" title="Link to this definition"></a></dt>
@@ -198,6 +203,17 @@ The str or Path the write to file should write to. Defaults to the directory the
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.from_version_control">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_version_control</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.from_version_control" title="Link to this definition"></a></dt>
+<dd><p>Create a bathymetry object from an existing version-controlled bathymetry folder.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>folder_path</strong> (<em>str</em><em> | </em><em>Path</em>) – Path to an existing bathymetry folder created by mom6_bathy with version control enabled.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.gen_topo_ds">
 <span class="sig-name descname"><span class="pre">gen_topo_ds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.gen_topo_ds" title="Link to this definition"></a></dt>
 <dd><p>Write the TOPO_FILE (bathymetry file) in xarray Dataset.</p>
@@ -236,6 +252,11 @@ The str or Path the write to file should write to. Defaults to the directory the
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">qmask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.qmask" title="Link to this definition"></a></dt>
 <dd><p>Ocean domain mask on Q grid. 1 if ocean, 0 if land.</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.redo_last_edit">
+<span class="sig-name descname"><span class="pre">redo_last_edit</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.redo_last_edit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.regrid_dataset">
@@ -390,6 +411,11 @@ that was created by <code class="xref py py-func docutils literal notranslate"><
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">umask</span></span><a class="headerlink" href="#mom6_bathy.topo.Topo.umask" title="Link to this definition"></a></dt>
 <dd><p>Ocean domain mask on U grid. 1 if ocean, 0 if land.</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.undo_last_edit">
+<span class="sig-name descname"><span class="pre">undo_last_edit</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.undo_last_edit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.vmask">
