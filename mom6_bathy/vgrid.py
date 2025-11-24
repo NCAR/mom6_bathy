@@ -167,7 +167,7 @@ class VGrid:
 
         return cls(dz)
 
-    def write(self, filename: str):
+    def write(self, filename: str, message: str = None, author: str = None):
         """Write the vertical grid (in thickness) to a NetCDF file.
         
         Parameters
@@ -175,7 +175,9 @@ class VGrid:
         filename: str
             Name of the NetCDF file to write
         """
-        
+        dz0 = float(self.dz[0])
+        dzbot = float(self.dz[-1])
+        ratio = dzbot / dz0 if dz0 != 0 else 1.0
         ds = xr.Dataset(
             data_vars={
                 'dz': (
@@ -193,7 +195,12 @@ class VGrid:
 
         ds.attrs['title'] = f'Vertical grid for MOM6 simulation'
         ds.attrs['maximum_depth'] = self.depth
+        ds.attrs['top_bottom_ratio'] = float(ratio)
         ds.attrs['history'] = f'Created on {datetime.now()}'
+        if message:
+            ds.attrs['message'] = message
+        if author:
+            ds.attrs['author'] = author
         ds.to_netcdf(filename, format='NETCDF3_64BIT',)
         return ds
 
