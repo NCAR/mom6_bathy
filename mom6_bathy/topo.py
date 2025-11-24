@@ -374,7 +374,9 @@ class Topo:
         )
 
         self._depth[:, :] = dedge + D0 * (
-            np.sin(np.pi * (self._grid.tlon[:, :] - west_lon) / self._grid.supergrid.lenx)
+            np.sin(
+                np.pi * (self._grid.tlon[:, :] - west_lon) / self._grid.supergrid.lenx
+            )
             * (
                 1.0
                 - np.exp(

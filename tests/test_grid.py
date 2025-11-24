@@ -3,7 +3,7 @@ import tempfile
 import socket
 import numpy as np
 import xarray as xr
-import pytest 
+import pytest
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
 from utils import on_cisl_machine
@@ -127,14 +127,12 @@ def test_from_file():
     if not on_cisl_machine():
         pytest.skip("This test is only for the derecho and casper machines")
 
-    print ("Running test_from_file")
+    print("Running test_from_file")
     supergrid_path = (
         "/glade/p/cesmdata/cseg/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc"
     )
 
-    topo_path = (
-        "/glade/p/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_topog_230413.nc"
-    )
+    topo_path = "/glade/p/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_topog_230413.nc"
 
     grid = Grid.from_supergrid(supergrid_path)
     topo = Topo.from_topo_file(grid, topo_path)
@@ -158,7 +156,7 @@ def test_from_file():
         ds_orig = xr.open_dataset(topo_path)
         ds_new = xr.open_dataset(tmpdirname + "/ocean_topog_2.nc")
 
-        assert (ds_orig['geolon'].data == ds_new['x'].data).all()
+        assert (ds_orig["geolon"].data == ds_new["x"].data).all()
 
 
 def test_equatorial_refinement():
@@ -204,7 +202,6 @@ if __name__ == "__main__":
     test_global_grid()
     test_from_file()
     test_equatorial_refinement()
-
 
 
 def test_get_rectangular_segment_info(get_rect_grid):
@@ -295,3 +292,5 @@ def test_grid_list_metadata_files(tmp_path, simple_2by2_grid):
         f.write("{}")
     files = Grid.list_metadata_files(tmp_path / "Grids")
     assert any("grid_testgrid.json" in f for f in files)
+    sub = grid[1:, 1:]
+    assert sub.tlon[0][0] == grid.tlon[0][1]
