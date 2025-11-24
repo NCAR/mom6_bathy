@@ -36,6 +36,20 @@ class EditCommand(ABC):
         """
         pass
 
+    @classmethod
+    @abstractmethod
+    def reverse_deserialize(cls, data: dict):
+        """Deserialize a command for undoing purposes.
+
+        This method creates a command instance that can revert the changes made by the original command.
+
+        Parameters: Dictionary containing serialized command data.
+        Returns an instance of the command class configured for undoing the original action.
+        """
+        raise NotImplementedError(
+            "reverse_deserialize is not implemented for this command type. It probably doesn't make sense!"
+        )
+
 
 # Registry for type <-> class mapping
 COMMAND_REGISTRY = {}
@@ -108,6 +122,15 @@ class DepthEditCommand(EditCommand):
             old_values=data["old_values"],
         )
 
+    @classmethod
+    def reverse_deserialize(cls, data):
+        return lambda topo: cls(
+            topo,
+            affected_indices=[tuple(idx) for idx in data["affected_indices"]],
+            new_values=data["old_values"],
+            old_values=data["new_values"],
+        )
+
 
 @register_command
 class MinDepthEditCommand(EditCommand):
@@ -144,66 +167,11 @@ class MinDepthEditCommand(EditCommand):
             old_value=data["old_value"],
         )
 
-
-@register_command
-class GridStateCommand(EditCommand):
-    """
-    Command to set all grid parameters (resolution, xstart, lenx, ystart, leny).
-    """
-
-    def __init__(self, grid, resolution, xstart, lenx, ystart, leny, old_state=None):
-        self.grid = grid
-        self.resolution = resolution
-        self.xstart = xstart
-        self.lenx = lenx
-        self.ystart = ystart
-        self.leny = leny
-        if old_state is None:
-            self.old_state = (
-                grid.resolution,
-                grid.xstart,
-                grid.lenx,
-                grid.ystart,
-                grid.leny,
-            )
-        else:
-            self.old_state = old_state
-
-    def __call__(self):
-        self.grid.resolution = self.resolution
-        self.grid.xstart = self.xstart
-        self.grid.lenx = self.lenx
-        self.grid.ystart = self.ystart
-        self.grid.leny = self.leny
-
-    def undo(self):
-        (
-            self.grid.resolution,
-            self.grid.xstart,
-            self.grid.lenx,
-            self.grid.ystart,
-            self.grid.leny,
-        ) = self.old_state
-
-    def serialize(self):
-        return {
-            "type": self.__class__.__name__,
-            "resolution": self.resolution,
-            "xstart": self.xstart,
-            "lenx": self.lenx,
-            "ystart": self.ystart,
-            "leny": self.leny,
-            "old_state": self.old_state,
-        }
-
     @classmethod
-    def deserialize(cls, data):
-        return lambda grid: cls(
-            grid,
-            resolution=data["resolution"],
-            xstart=data["xstart"],
-            lenx=data["lenx"],
-            ystart=data["ystart"],
-            leny=data["leny"],
-            old_state=tuple(data["old_state"]),
+    def reverse_deserialize(cls, data):
+        return lambda topo: cls(
+            topo,
+            attr=data["attr"],
+            new_value=data["old_value"],
+            old_value=data["new_value"],
         )

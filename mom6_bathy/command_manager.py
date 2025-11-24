@@ -2,100 +2,76 @@ import json
 import os
 import numpy as np
 from abc import ABC, abstractmethod
+from mom6_bathy.git_utils import get_repo
+from pathlib import Path
 
 
 class CommandManager(ABC):
-    def __init__(self, domain_id, snapshot_dir="Topos"):
-        self._undo_history = []
-        self._redo_history = []
-        self.snapshot_dir = snapshot_dir
+    def __init__(self, domain_id, directory, command_registry):
+        self.directory = Path(directory)
         self.domain_id = domain_id
-
-    def get_domain_id(self):
-        """
-        Return a unique identifier for the domain or context.
-
-        This identifier is used to associate command histories and snapshots with a specific
-        domain (such as a dataset, grid, or other context), and to prevent applying histories
-        to incompatible domains.
-
-        Returns
-        -------
-        domain_id : object
-            A value or data structure (commonly a dict or string) that uniquely identifies
-            the domain. If self.domain_id is callable, this method should call it and return
-            the result; otherwise, it should return self.domain_id as-is.
-        """
-        return self.domain_id() if callable(self.domain_id) else self.domain_id
-
-    def get_history_path(self):
-        dom_id = self.get_domain_id()
-        if isinstance(dom_id, dict):
-            id_str = "_".join(f"{k}-{v}" for k, v in dom_id.items())
-        else:
-            id_str = str(dom_id)
-        return os.path.join(self.snapshot_dir, f"history_{id_str}.json")
-
-    def save_histories(self):
-        path = self.get_history_path()
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            json.dump([cmd.serialize() for cmd in self._undo_history], f)
-
-    def load_histories(self, command_registry, *args, **kwargs):
-        path = self.get_history_path()
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                data = json.load(f)
-                self._undo_history = [
-                    command_registry[d["type"]].deserialize(d)(*args, **kwargs)
-                    for d in data
-                ]
-                self._redo_history = []
-
-    def save_commit(self, name):
-        os.makedirs(self.snapshot_dir, exist_ok=True)
-        fname = os.path.join(self.snapshot_dir, f"{name}.json")
-        data = {
-            "domain_id": self.get_domain_id(),
-            "undo_history": [cmd.serialize() for cmd in self._undo_history],
-            "redo_history": [cmd.serialize() for cmd in self._redo_history],
-        }
-        with open(fname, "w") as f:
-            json.dump(data, f)
-
-    def load_commit(self, name, command_registry, topo, reset_to_original=False):
-        fname = os.path.join(self.snapshot_dir, f"{name}.json")
-        if not os.path.exists(fname):
-            raise FileNotFoundError(f"No snapshot named {name}")
-        with open(fname, "r") as f:
-            data = json.load(f)
-        # Restore topo state using Topo's method if possible
-        if hasattr(topo, "update_from_snapshot_dict"):
-            topo.update_from_snapshot_dict(data)
-        elif hasattr(type(topo), "from_snapshot_file"):
-            pass  # Already handled in TopoEditor if needed
-
-        # Restore histories
-        self._undo_history = [
-            command_registry[d["type"]].deserialize(d)(topo)
-            for d in data.get("undo_history", [])
-        ]
-        self._redo_history = [
-            command_registry[d["type"]].deserialize(d)(topo)
-            for d in data.get("redo_history", [])
-        ]
-        self.replay()
+        self.repo = get_repo(directory)
+        self.command_registry = command_registry
 
     @abstractmethod
-    def execute(self, cmd):
+    def execute(self, cmd, message=None):
         """Execute a command, push it onto the undo stack, and clear the redo stack."""
         pass
 
-    @abstractmethod
-    def push(self, command):
+    def push(self, command, message=None):
         """Add a command to the history."""
-        pass
+
+        # The command must be serializable to JSON
+        command_data = command.serialize()
+        history_file_path = add_to_unofficial_history(self, command_data)
+
+        # git add it
+        rel_path = os.path.relpath(history_file, self.repo.working_tree_dir)
+        self.repo.git.add(rel_path)
+        # git commit it
+        if message is not None:
+            self.repo.git.commit("-m", f"{message}: {json.dumps(command_data)}")
+        else:
+            self.repo.git.commit("-m", f"COMMAND: {json.dumps(command_data)}")
+
+    def parse_commit_message(self, commit_msg: str):
+        """
+        Parse a commit message to extract command type and data.
+        Expected format: "<CommandType>: <JSON data>"
+        """
+        try:
+            if ":" not in commit_msg:
+                raise ValueError("Commit message missing ':' separator")
+
+            # Split at the first colon
+            cmd_type, json_str = commit_msg.split(":", 1)
+            cmd_type = cmd_type.strip()
+            json_str = json_str.strip()
+
+            # Parse JSON
+            data = json.loads(json_str)
+            return cmd_type, data
+        except Exception as e:
+            raise ValueError(f"Invalid commit message format: {commit_msg}") from e
+
+    def add_to_unofficial_history(self, json_line: str):
+        """
+        Ensure the command unoffical history file exists (true history is generated from commit messages), append a line to it.
+        """
+        import os
+
+        # Path to history file
+        history_file = self.directory / f"command_history_{self.domain_id}.json"
+
+        # 1. Create file if missing
+        if not history_file.exists():
+            history_file.touch()
+
+        # 2. Append the line
+        with history_file.open("a") as f:
+            f.write(json.dumps(json_obj) + "\n")
+
+        return history_file
 
     @abstractmethod
     def undo(self):
@@ -119,12 +95,11 @@ class CommandManager(ABC):
 
 
 class TopoCommandManager(CommandManager):
-    def __init__(self, domain_id, topo, command_registry, snapshot_dir="Topos"):
-        super().__init__(domain_id, snapshot_dir)
+    def __init__(self, domain_id, topo, command_registry):
+        super().__init__(domain_id, topo.domain_dir, command_registry)
         self._topo = topo
-        self._command_registry = command_registry
 
-    def execute(self, cmd):
+    def execute(self, cmd, message=None):
         """
         Execute a command object. If it's a user edit, push to history and clear redo.
         For system commands (undo, redo, save, load, reset), the command object handles everything.
@@ -135,129 +110,82 @@ class TopoCommandManager(CommandManager):
         )  # Add more as needed
         if cmd.__class__.__name__ in user_edit_types:
             cmd()
-            self.push(cmd)
-            self._redo_history.clear()
-            self.save_histories()
+            self.push(cmd, message=message)
         else:
-            cmd()
-
-    def get_history_path(self):
-        dom_id = self.get_domain_id()
-        if isinstance(dom_id, dict):
-            grid_name = dom_id.get("grid_name", "unknown")
-            shape = dom_id.get("shape", ["?", "?"])
-            shape_str = f"{shape[0]}x{shape[1]}"
-            fname = f"history_{grid_name}_{shape_str}.json"
-        else:
-            fname = f"history_{str(dom_id)}.json"
-        return os.path.join(self.snapshot_dir, fname)
-
-    def push(self, command):
-        self._undo_history.append(command)
-        self._redo_history.clear()
-
-    def load_histories(self):
-        super().load_histories(self._command_registry, self._topo)
-
-    def replay(self):
-        for cmd in self._undo_history:
-            cmd()
+            raise ValueError(
+                "Unsupported command type for execute. {}".format(
+                    cmd.__class__.__name__
+                )
+            )
 
     def undo(self):
-        if not self._undo_history:
-            return False
-        cmd = self._undo_history.pop()
-        cmd.undo()
-        self._redo_history.append(cmd)
-        self.save_histories()
-        return True
+        # Find first commit that isn't an undo
+        for commit in self.repo.iter_commits():
+            message = commit.message.strip()
+            try:
+                cmd_type, cmd_data = self.parse_commit_message(message)
+            except ValueError:
+                continue  # skip malformed messages
+            if "REVERT" not in cmd_type:
+                commit_sha = commit.hexsha  # <- the SHA of this commit
+                break
+        command_class = self.command_registry[cmd_data["type"]]
+        cmd = command_class.reverse_deserialize(cmd_data)(self._topo)
+        self.execute(
+            cmd, message=f"REVERT-{commit_sha}"
+        )  # This is the revert right here, a revert commit
 
     def redo(self):
-        if not self._redo_history:
-            return False
-        cmd = self._redo_history.pop()
-        cmd()
-        self._undo_history.append(cmd)
-        self.save_histories()
-        return True
+        # Redo needs to find the first revert commit and only runs if it doesn't hit a COMMAND cmd_type in the backwards iteration then takes the revert commit and reverse desearlies and has the message "REDO-<original commit sha>"
+        redo_possible = True
+        already_redone = {}
+        for commit in self.repo.iter_commits():
+            message = commit.message.strip()
+            try:
+                cmd_type, cmd_data = self.parse_commit_message(message)
+            except ValueError:
+                continue  # skip malformed messages
 
-    def load_commit(self, name, command_registry, topo, reset_to_original=False):
-        """Original (or original state) refers to the reference, or baseline state of the (topo) data before
-        any user edits or modifications have been applied.
-        """
-        if reset_to_original:
-            topo_id = self.get_domain_id()
-            grid_name = topo_id["grid_name"]
-            shape = topo_id["shape"]
-            shape_str = f"{shape[0]}x{shape[1]}"
-            original_topo_path = os.path.join(
-                self.snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy"
-            )
-            original_min_depth_path = os.path.join(
-                self.snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json"
-            )
+            # You can't redo something if nothing is undone
+            if cmd_type == "COMMAND":
+                redo_possible = False
+                break
 
-            if os.path.exists(original_topo_path):
-                topo.depth.data[:] = np.load(original_topo_path)
-                if os.path.exists(original_min_depth_path):
-                    with open(original_min_depth_path, "r") as f:
-                        d = json.load(f)
-                        topo.min_depth = d.get("min_depth", topo.min_depth)
-            else:
-                print(
-                    "Warning: original topo not found, cannot reset before loading snapshot."
-                )
+            # At least one undo was found and already redone
+            elif "REDO" in cmd_type:
+                # We've already redone a commit
+                original_sha = cmd_type.split("-")[1]
+                already_redone[original_sha] = True
 
-        # Call the base class implementation for the rest
-        super().load_commit(name, command_registry, topo)
+            # We found an undo commit, we check if it's already redone. If not, break, If so, continue searching
+            elif "REVERT" in cmd_type:
+                # Parse commit sha
+                if commit.hexsha in already_redone:
+                    continue
+                else:
+                    commit_sha = commit.hexsha
+                break
 
-    def reset(
-        self,
-        topo,
-        original_depth,
-        original_min_depth,
-        get_topo_id,
-        min_depth_specifier=None,
-        trigger_refresh=None,
-    ):
-        topo_id = get_topo_id()
-        grid_name = topo_id["grid_name"]
-        shape = topo_id["shape"]
-        shape_str = f"{shape[0]}x{shape[1]}"
-        original_topo_path = os.path.join(
-            self.snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy"
-        )
-        original_min_depth_path = os.path.join(
-            self.snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json"
-        )
-
-        if os.path.exists(original_topo_path):
-            topo.depth.data[:] = np.load(original_topo_path)
-            if os.path.exists(original_min_depth_path):
-                with open(original_min_depth_path, "r") as f:
-                    d = json.load(f)
-                    topo.min_depth = d.get("min_depth", topo.min_depth)
+        if not redo_possible:
+            print("No redo available.")
+            return
         else:
-            topo.depth.data[:] = np.copy(original_depth)
-            topo.min_depth = original_min_depth
+            command_class = self.command_registry[cmd_data["type"]]
+            cmd = command_class.reverse_deserialize(cmd_data)(self._topo)
+            self.execute(cmd, message=f"REDO-{commit_sha}")
 
-        original_name = f"original_{grid_name}_{shape_str}"
-        from mom6_bathy.edit_command import COMMAND_REGISTRY
+    def reset(self):
+        """Reset the bathymetry to its original state by replaying commands from the beginning."""
 
-        try:
-            self.load_commit(original_name, COMMAND_REGISTRY, topo)
-        except FileNotFoundError:
-            print("Original command snapshot not found, edit history not reset.")
+        for commit in commits:
+            message = commit.message.strip()
+            try:
+                cmd_type, cmd_data = self.parse_commit_message(message)
+            except ValueError:
+                continue  # skip malformed messages
 
-        if min_depth_specifier is not None:
-            min_depth_specifier.value = topo.min_depth
-        if trigger_refresh is not None:
-            trigger_refresh()
-
-        self._undo_history.clear()
-        self._redo_history.clear()
-        self.save_histories()
-
-    def initialize(self):
-        self.load_histories()
-        self.replay()
+            if cmd_type == "COMMAND":
+                # Reconstruct and execute the command
+                command_class = self.command_registry[cmd_data["type"]]
+                cmd = command_class.reverse_deserialize(cmd_data)(self._topo)
+                self.execute(cmd, message=None)  # no need to commit again

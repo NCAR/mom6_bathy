@@ -9,6 +9,9 @@ from mom6_bathy.grid import Grid
 from scipy.spatial import cKDTree
 import xesmf as xe
 from scipy.ndimage import binary_fill_holes
+from mom6_bathy.git_utils import get_domain_dir, get_repo
+import shutil
+import json
 from pathlib import Path
 
 
@@ -17,7 +20,7 @@ class Topo:
     Bathymetry Generator for MOM6 grids (mom6_bathy.grid.Grid).
     """
 
-    def __init__(self, grid, min_depth):
+    def __init__(self, grid, min_depth, version_control_dir="TopoLibrary"):
         """
         MOM6 Simpler Models bathymetry constructor.
 
@@ -32,6 +35,82 @@ class Topo:
         self._grid = grid
         self._depth = None
         self._min_depth = min_depth
+
+        if version_control_dir != None:
+            self.version_control = True
+
+            # Create a folder to store bathymetry objects in
+            self.topos_root = Path(version_control_dir).mkdir(exist_ok=True)
+
+            # Create the subfolder for this specific bathymetry
+            self.domain_dir = Path(get_domain_dir(grid, base_dir=version_control_dir))
+            self.domain_dir.mkdir(
+                exist_ok=True
+            )  # This folder should not already exist.
+
+            # Save the grid info there (there can only be 1 grid per bathymetry)
+            self.grid_file_path = self.domain_dir / "grid.nc"
+            grid.write_supergrid(self.grid_file_path)
+
+            # Start the json file for tracking bathymetry
+            self.bathy_info_path = self.domain_dir / "bathy_info.json"
+            bathy_info = {
+                "min_depth": min_depth,
+                "grid_path": str(grid_file_path),
+            }
+
+            MinDepthEditCommand(
+                self.topo, attr="min_depth", new_value=min_depth, old_value=None
+            )
+
+            # Initialize the git repo
+            self.repo = get_repo(self.domain_dir)
+
+        else:
+            self.version_control = False  # For backwards compatability
+
+    @classmethod
+    def from_version_control(folder_path: str | Path):
+        """
+        Create a bathymetry object from an existing version-controlled bathymetry folder.
+
+        Parameters
+        ----------
+        folder_path: str | Path
+            Path to an existing bathymetry folder created by mom6_bathy with version control enabled.
+        """
+
+        folder_path = Path(folder_path)
+        assert folder_path.exists(), f"Cannot find bathymetry folder at {folder_path}."
+
+        # Read the bathymetry info json file
+        bathy_info_path = folder_path / "bathy_info.json"
+        assert (
+            bathy_info_path.exists()
+        ), f"Cannot find bathy_info.json file at {bathy_info_path}."
+
+        with open(bathy_info_path, "r") as f:
+            bathy_info = json.load(f)
+
+        min_depth = bathy_info["min_depth"]
+        grid_file_path = folder_path / "grid.nc"
+        assert grid_file_path.exists(), f"Cannot find grid file at {grid_file_path}."
+
+        grid = Grid.from_supergrid(grid_file_path)
+
+        # Create the topo object
+        topo = Topo(grid, min_depth)
+
+        # Read in the depth from the topog file
+        topog_file_path = folder_path / "topog.nc"
+        try:
+            topo.set_depth_via_topog_file(topog_file_path)
+        except Exception as e:
+            print(
+                "No topography file found in the version-controlled folder. Bathymetry depth not set."
+            )
+
+        return topo
 
     @classmethod
     def from_topo_file(cls, grid, topo_file_path, min_depth=0.0):
@@ -52,6 +131,16 @@ class Topo:
         topo.set_depth_via_topog_file(topo_file_path)
         topo.min_depth = min_depth
         return topo
+
+    def apply_edit(self, cmd):
+        self.command_manager.execute(cmd)
+        self.command_manager.save_commit("_autosave_working")
+
+    def undo_last_edit(self):
+        self.command_manager.undo()
+
+    def redo_last_edit(self):
+        self.command_manager.redo()
 
     @property
     def depth(self):
@@ -541,7 +630,6 @@ class Topo:
         write_to_file=True,
         verbose=True,
     ):
-
         if verbose:
             print(
                 f"""
@@ -685,9 +773,9 @@ class Topo:
 
         bathymetry_output.depth.attrs["_FillValue"] = -1e20
         bathymetry_output.depth.attrs["units"] = "meters"
-        bathymetry_output.depth.attrs["standard_name"] = (
-            "height_above_reference_ellipsoid"
-        )
+        bathymetry_output.depth.attrs[
+            "standard_name"
+        ] = "height_above_reference_ellipsoid"
         bathymetry_output.depth.attrs["long_name"] = "Elevation relative to sea level"
         bathymetry_output.depth.attrs["coordinates"] = "lon lat"
         if write_to_file:
@@ -1438,7 +1526,6 @@ class Topo:
         i0 = 1  # start index for node id's
 
         if self._grid.is_tripolar(self._grid._supergrid):
-
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()[: -(nx // 2 - 1)]
             qlat_flat = self._grid.qlat.data[:, :-1].flatten()[: -(nx // 2 - 1)]
@@ -1473,7 +1560,6 @@ class Topo:
                 return [ll, lr, ur, ul]
 
         elif Grid.is_cyclic_x(self._grid.supergrid) == True:
-
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()
             qlat_flat = self._grid.qlat.data[:, :-1].flatten()
@@ -1490,7 +1576,6 @@ class Topo:
             ]
 
         else:  # non-cyclic grid
-
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data.flatten()
             qlat_flat = self._grid.qlat.data.flatten()
