@@ -566,6 +566,16 @@ class Grid:
         nominal resolution (by default) of the actual computational grid."""
         return self._supergrid
 
+    @property
+    def lenx(self) -> float:
+        """Length of the grid in the x-direction."""
+        return self.supergrid.lenx
+    
+    @property
+    def leny(self) -> float:
+        """Length of the grid in the y-direction."""
+        return self.supergrid.leny
+
     @supergrid.setter
     def supergrid(self, new_supergrid: SupergridBase) -> None:
         self._supergrid = new_supergrid
