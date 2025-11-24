@@ -9,6 +9,7 @@ from mom6_bathy.topo import Topo
 from utils import on_cisl_machine
 import os
 
+
 def test_is_tripolar():
     """Check if Grid.is_tripolar() and .is_cyclic_x() methods work correctly for different MOM grids."""
 
@@ -216,8 +217,9 @@ def test_get_rectangular_segment_info(get_rect_grid):
 
 def test_slice_grid(get_rect_grid):
     grid = get_rect_grid
-    sub = grid [1:,1:]
+    sub = grid[1:, 1:]
     assert sub.tlon[0][0] == grid.tlon[0][1]
+
 
 @pytest.fixture
 def simple_2by2_grid():
@@ -233,6 +235,7 @@ def simple_2by2_grid():
     )
     return grid
 
+
 def test_grid_properties(simple_2by2_grid):
     grid = simple_2by2_grid
     assert grid.nx == 2
@@ -241,10 +244,11 @@ def test_grid_properties(simple_2by2_grid):
     assert grid._supergrid.leny == 2.0
     assert grid.name == "testgrid"
 
+
 def test_grid_sanitize_name():
     with pytest.raises(AssertionError):
-        g = Grid(
-            lenx=2.0, leny=2.0, nx=2, ny=2,name="bad name!@#")
+        g = Grid(lenx=2.0, leny=2.0, nx=2, ny=2, name="bad name!@#")
+
 
 def test_grid_get_indices(simple_2by2_grid):
     grid = simple_2by2_grid
@@ -253,8 +257,10 @@ def test_grid_get_indices(simple_2by2_grid):
     assert 0 <= j < grid.ny
     assert 0 <= i < grid.nx
 
+
 def test_grid_is_rectangular(simple_2by2_grid):
     assert simple_2by2_grid.is_rectangular()
+
 
 def test_grid_slice(simple_2by2_grid):
     sub = simple_2by2_grid[0:1, 0:1]
@@ -262,9 +268,11 @@ def test_grid_slice(simple_2by2_grid):
     assert sub.nx == 1
     assert sub.ny == 1
 
+
 def test_grid_supergrid_setter(simple_2by2_grid):
     sg = simple_2by2_grid.supergrid
     simple_2by2_grid.supergrid = sg  # Should not raise
+
 
 def test_grid_to_netcdf_and_from_netcdf(tmp_path, simple_2by2_grid):
     path = tmp_path / "testgrid.nc"
@@ -275,6 +283,7 @@ def test_grid_to_netcdf_and_from_netcdf(tmp_path, simple_2by2_grid):
     assert loaded.ny == simple_2by2_grid.ny
     assert loaded.name == simple_2by2_grid.name
 
+
 def test_grid_save_and_load_metadata(tmp_path, simple_2by2_grid):
     json_path = tmp_path / "meta.json"
     simple_2by2_grid.save_metadata(str(json_path), message="test", ncfile="file.nc")
@@ -282,6 +291,7 @@ def test_grid_save_and_load_metadata(tmp_path, simple_2by2_grid):
     meta = Grid.load_metadata(str(json_path))
     assert meta["message"] == "test"
     assert meta["ncfile"] == "file.nc"
+
 
 def test_grid_list_metadata_files(tmp_path, simple_2by2_grid):
     # Create a fake metadata file

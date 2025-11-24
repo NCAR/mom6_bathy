@@ -3,6 +3,7 @@ import os
 import numpy as np
 from abc import ABC, abstractmethod
 
+
 class CommandManager(ABC):
     def __init__(self, domain_id, snapshot_dir="Topos"):
         self._undo_history = []
@@ -26,7 +27,7 @@ class CommandManager(ABC):
             the result; otherwise, it should return self.domain_id as-is.
         """
         return self.domain_id() if callable(self.domain_id) else self.domain_id
-    
+
     def get_history_path(self):
         dom_id = self.get_domain_id()
         if isinstance(dom_id, dict):
@@ -47,7 +48,8 @@ class CommandManager(ABC):
             with open(path, "r") as f:
                 data = json.load(f)
                 self._undo_history = [
-                    command_registry[d['type']].deserialize(d)(*args, **kwargs) for d in data
+                    command_registry[d["type"]].deserialize(d)(*args, **kwargs)
+                    for d in data
                 ]
                 self._redo_history = []
 
@@ -57,7 +59,7 @@ class CommandManager(ABC):
         data = {
             "domain_id": self.get_domain_id(),
             "undo_history": [cmd.serialize() for cmd in self._undo_history],
-            "redo_history": [cmd.serialize() for cmd in self._redo_history]
+            "redo_history": [cmd.serialize() for cmd in self._redo_history],
         }
         with open(fname, "w") as f:
             json.dump(data, f)
@@ -76,10 +78,12 @@ class CommandManager(ABC):
 
         # Restore histories
         self._undo_history = [
-            command_registry[d['type']].deserialize(d)(topo) for d in data.get("undo_history", [])
+            command_registry[d["type"]].deserialize(d)(topo)
+            for d in data.get("undo_history", [])
         ]
         self._redo_history = [
-            command_registry[d['type']].deserialize(d)(topo) for d in data.get("redo_history", [])
+            command_registry[d["type"]].deserialize(d)(topo)
+            for d in data.get("redo_history", [])
         ]
         self.replay()
 
@@ -113,6 +117,7 @@ class CommandManager(ABC):
         """Replay all commands in the undo history."""
         pass
 
+
 class TopoCommandManager(CommandManager):
     def __init__(self, domain_id, topo, command_registry, snapshot_dir="Topos"):
         super().__init__(domain_id, snapshot_dir)
@@ -124,7 +129,10 @@ class TopoCommandManager(CommandManager):
         Execute a command object. If it's a user edit, push to history and clear redo.
         For system commands (undo, redo, save, load, reset), the command object handles everything.
         """
-        user_edit_types = ('DepthEditCommand', 'MinDepthEditCommand')  # Add more as needed
+        user_edit_types = (
+            "DepthEditCommand",
+            "MinDepthEditCommand",
+        )  # Add more as needed
         if cmd.__class__.__name__ in user_edit_types:
             cmd()
             self.push(cmd)
@@ -143,7 +151,7 @@ class TopoCommandManager(CommandManager):
         else:
             fname = f"history_{str(dom_id)}.json"
         return os.path.join(self.snapshot_dir, fname)
-    
+
     def push(self, command):
         self._undo_history.append(command)
         self._redo_history.clear()
@@ -174,16 +182,20 @@ class TopoCommandManager(CommandManager):
         return True
 
     def load_commit(self, name, command_registry, topo, reset_to_original=False):
-        """ Original (or original state) refers to the reference, or baseline state of the (topo) data before 
+        """Original (or original state) refers to the reference, or baseline state of the (topo) data before
         any user edits or modifications have been applied.
         """
-        if reset_to_original: 
+        if reset_to_original:
             topo_id = self.get_domain_id()
-            grid_name = topo_id['grid_name']
-            shape = topo_id['shape']
+            grid_name = topo_id["grid_name"]
+            shape = topo_id["shape"]
             shape_str = f"{shape[0]}x{shape[1]}"
-            original_topo_path = os.path.join(self.snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy")
-            original_min_depth_path = os.path.join(self.snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json")
+            original_topo_path = os.path.join(
+                self.snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy"
+            )
+            original_min_depth_path = os.path.join(
+                self.snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json"
+            )
 
             if os.path.exists(original_topo_path):
                 topo.depth.data[:] = np.load(original_topo_path)
@@ -192,18 +204,32 @@ class TopoCommandManager(CommandManager):
                         d = json.load(f)
                         topo.min_depth = d.get("min_depth", topo.min_depth)
             else:
-                print("Warning: original topo not found, cannot reset before loading snapshot.")
+                print(
+                    "Warning: original topo not found, cannot reset before loading snapshot."
+                )
 
         # Call the base class implementation for the rest
         super().load_commit(name, command_registry, topo)
 
-    def reset(self, topo, original_depth, original_min_depth, get_topo_id, min_depth_specifier=None, trigger_refresh=None):
+    def reset(
+        self,
+        topo,
+        original_depth,
+        original_min_depth,
+        get_topo_id,
+        min_depth_specifier=None,
+        trigger_refresh=None,
+    ):
         topo_id = get_topo_id()
-        grid_name = topo_id['grid_name']
-        shape = topo_id['shape']
+        grid_name = topo_id["grid_name"]
+        shape = topo_id["shape"]
         shape_str = f"{shape[0]}x{shape[1]}"
-        original_topo_path = os.path.join(self.snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy")
-        original_min_depth_path = os.path.join(self.snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json")
+        original_topo_path = os.path.join(
+            self.snapshot_dir, f"original_topo_{grid_name}_{shape_str}.npy"
+        )
+        original_min_depth_path = os.path.join(
+            self.snapshot_dir, f"original_min_depth_{grid_name}_{shape_str}.json"
+        )
 
         if os.path.exists(original_topo_path):
             topo.depth.data[:] = np.load(original_topo_path)
@@ -217,6 +243,7 @@ class TopoCommandManager(CommandManager):
 
         original_name = f"original_{grid_name}_{shape_str}"
         from mom6_bathy.edit_command import COMMAND_REGISTRY
+
         try:
             self.load_commit(original_name, COMMAND_REGISTRY, topo)
         except FileNotFoundError:
@@ -234,4 +261,3 @@ class TopoCommandManager(CommandManager):
     def initialize(self):
         self.load_histories()
         self.replay()
-        

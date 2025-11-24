@@ -9,20 +9,17 @@ from mom6_bathy.topo import Topo
 from mom6_bathy.edit_command import DepthEditCommand
 from mom6_bathy.topo_editor import TopoEditor
 
+
 @pytest.fixture
 def minimal_grid_and_topo():
     """Test that a minimal 5x5 grid can be set up for the Panama region"""
     grid = Grid(
-        resolution=0.1,
-        xstart=278.0,
-        lenx=0.5,
-        ystart=7.0,
-        leny=0.5,
-        name="testpanama"
+        resolution=0.1, xstart=278.0, lenx=0.5, ystart=7.0, leny=0.5, name="testpanama"
     )
     topo = Topo(grid=grid, min_depth=10.0)
     topo.set_flat(100.0)
     return topo
+
 
 class Dummy:
     disabled = False
@@ -38,28 +35,43 @@ class Dummy:
     def __call__(self, *args, **kwargs):
         return self
 
+
 class PatchedTopoEditor(TopoEditor):
     """
     A test-only subclass of TopoEditor that enforces the use of a provided snapshot_dir
     and disables UI construction by default. This ensures all file operations are
     isolated to the test environment and no interactive widgets are created.
     """
+
     def __init__(self, topo, build_ui=False, snapshot_dir=None):
         assert snapshot_dir is not None, "snapshot_dir must be provided for tests"
         super().__init__(topo, build_ui=build_ui, snapshot_dir=snapshot_dir)
 
+
 def patch_all_widgets(editor):
     dummy_attrs = [
-        '_undo_button', '_redo_button', '_reset_button',
-        '_min_depth_specifier', '_depth_specifier', '_selected_cell_label',
-        '_basin_specifier', '_basin_specifier_toggle',
-        '_basin_specifier_delete_selected', '_snapshot_name',
-        '_save_button', '_load_button', '_display_mode_toggle',
-        'im', 'cbar', 'ax', 'fig'
+        "_undo_button",
+        "_redo_button",
+        "_reset_button",
+        "_min_depth_specifier",
+        "_depth_specifier",
+        "_selected_cell_label",
+        "_basin_specifier",
+        "_basin_specifier_toggle",
+        "_basin_specifier_delete_selected",
+        "_snapshot_name",
+        "_save_button",
+        "_load_button",
+        "_display_mode_toggle",
+        "im",
+        "cbar",
+        "ax",
+        "fig",
     ]
     for attr in dummy_attrs:
-        value = "depth" if attr == '_display_mode_toggle' else None
+        value = "depth" if attr == "_display_mode_toggle" else None
         setattr(editor, attr, Dummy(value=value))
+
 
 def setup_depth(editor, i=2, j=2, new_depth=777.0):
     orig_depth = float(editor.topo.depth.data[j, i])
@@ -73,6 +85,7 @@ def setup_depth(editor, i=2, j=2, new_depth=777.0):
     editor.apply_edit(edit)
     return orig_depth, new_depth, i, j
 
+
 def test_undo(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
     snapshot_dir = str(tmp_path / "Topos")
@@ -81,11 +94,12 @@ def test_undo(minimal_grid_and_topo, tmp_path):
     patch_all_widgets(editor)
 
     orig_depth, new_depth, i, j = setup_depth(editor)
-    assert float(topo.depth.data[j, i]) == new_depth 
+    assert float(topo.depth.data[j, i]) == new_depth
 
     editor.undo_last_edit()
-    assert float(topo.depth.data[j, i]) == orig_depth 
+    assert float(topo.depth.data[j, i]) == orig_depth
     assert not editor.command_manager._undo_history
+
 
 def test_redo(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
@@ -101,6 +115,7 @@ def test_redo(minimal_grid_and_topo, tmp_path):
     editor.redo_last_edit()
     assert float(topo.depth.data[j, i]) == new_depth
     assert not editor.command_manager._redo_history
+
 
 def test_undo_redo_interleaving(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
@@ -135,6 +150,7 @@ def test_undo_redo_interleaving(minimal_grid_and_topo, tmp_path):
     editor.redo_last_edit()
     assert float(editor.topo.depth.data[j, i]) == 999.0
 
+
 def test_redo_cleared_after_new_edit(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
     snapshot_dir = str(tmp_path / "Topos")
@@ -163,6 +179,7 @@ def test_redo_cleared_after_new_edit(minimal_grid_and_topo, tmp_path):
     editor.apply_edit(edit_999)
     assert len(editor.command_manager._redo_history) == 0
 
+
 def test_undo_redo_empty_history_noop(minimal_grid_and_topo, tmp_path):
     topo = minimal_grid_and_topo
     snapshot_dir = str(tmp_path / "Topos")
@@ -178,6 +195,7 @@ def test_undo_redo_empty_history_noop(minimal_grid_and_topo, tmp_path):
     assert float(editor.topo.depth.data[j, i]) == orig
     editor.redo_last_edit()
     assert float(editor.topo.depth.data[j, i]) == orig
+
 
 def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_path):
     snapshot_dir = str(tmp_path / "Topos")
@@ -199,6 +217,7 @@ def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_pat
     patch_all_widgets(editor2)
     editor2.command_manager.snapshot_dir = snapshot_dir
     from mom6_bathy.edit_command import COMMAND_REGISTRY
+
     print("COMMAND_REGISTRY keys:", list(COMMAND_REGISTRY.keys()))
     editor2.command_manager.load_commit("test_snapshot", COMMAND_REGISTRY, editor2.topo)
     editor2.command_manager.replay()
@@ -207,6 +226,7 @@ def test_save_and_load_histories_with_setup_depth(minimal_grid_and_topo, tmp_pat
     # If you undo, you should get back to the original depth
     editor2.undo_last_edit()
     assert float(editor2.topo.depth.data[j, i]) == orig_depth
+
 
 def test_save_and_load_histories_with_git(minimal_grid_and_topo, tmp_path):
     from mom6_bathy.edit_command import COMMAND_REGISTRY
@@ -252,6 +272,7 @@ def test_save_and_load_histories_with_git(minimal_grid_and_topo, tmp_path):
     editor2.undo_last_edit()
     assert float(editor2.topo.depth.data[j, i]) == orig_depth
 
+
 def test_in_memory_replay_does_not_reset_to_original(minimal_grid_and_topo, tmp_path):
     """Replay should apply edits on top of current topo, not reset to original."""
     snapshot_dir = str(tmp_path / "Topos")
@@ -276,6 +297,7 @@ def test_in_memory_replay_does_not_reset_to_original(minimal_grid_and_topo, tmp_
     editor.command_manager.replay()
     assert float(editor.topo.depth.data[j, i]) == 200.0
 
+
 def test_commit_load_resets_to_original(minimal_grid_and_topo, tmp_path):
     """Loading a commit should reset topo to original before replaying history."""
     snapshot_dir = str(tmp_path / "Topos")
@@ -297,9 +319,11 @@ def test_commit_load_resets_to_original(minimal_grid_and_topo, tmp_path):
 
     # Load commit, should reset to original and replay history
     from mom6_bathy.edit_command import COMMAND_REGISTRY
+
     editor.command_manager.load_commit("test_commit", COMMAND_REGISTRY, editor.topo)
     editor.command_manager.replay()
     assert float(editor.topo.depth.data[j, i]) == 100.0
+
 
 def test_switching_between_flows_branches(minimal_grid_and_topo, tmp_path):
     """Switching between two histories should replay the correct one."""
@@ -335,6 +359,7 @@ def test_switching_between_flows_branches(minimal_grid_and_topo, tmp_path):
     editor.command_manager.replay()
     assert float(editor.topo.depth.data[j, i]) == 200.0
 
+
 def test_undo_redo_after_commit_load(minimal_grid_and_topo, tmp_path):
     """Undo/redo should work after loading a commit."""
     snapshot_dir = str(tmp_path / "Topos")
@@ -355,6 +380,7 @@ def test_undo_redo_after_commit_load(minimal_grid_and_topo, tmp_path):
 
     # Load commit
     from mom6_bathy.edit_command import COMMAND_REGISTRY
+
     editor.command_manager.load_commit("test_commit", COMMAND_REGISTRY, editor.topo)
     editor.command_manager.replay()
     assert float(editor.topo.depth.data[j, i]) == 200.0
@@ -364,6 +390,7 @@ def test_undo_redo_after_commit_load(minimal_grid_and_topo, tmp_path):
     assert float(editor.topo.depth.data[j, i]) == 100.0
     editor.redo_last_edit()
     assert float(editor.topo.depth.data[j, i]) == 200.0
+
 
 def test_merge_branch(tmp_path):
     from mom6_bathy.git_utils import merge_branch
@@ -376,14 +403,14 @@ def test_merge_branch(tmp_path):
     repo.index.commit("initial commit")
 
     # Create and switch to a new branch
-    repo.git.checkout('-b', 'feature')
+    repo.git.checkout("-b", "feature")
     feature_file = tmp_path / "feature.txt"
     feature_file.write_text("feature branch")
     repo.index.add([str(feature_file)])
     repo.index.commit("add feature file")
 
     # Switch back to main branch
-    repo.git.checkout('master')
+    repo.git.checkout("master")
 
     # Try to merge master into itself (should fail)
     success, msg = merge_branch(str(tmp_path), "master")
@@ -397,6 +424,7 @@ def test_merge_branch(tmp_path):
 
     # After merge, feature.txt should exist in master
     assert (tmp_path / "feature.txt").exists()
+
 
 def test_new_domain_creates_original_snapshot(tmp_path, minimal_grid_and_topo):
     from mom6_bathy import git_utils
@@ -421,7 +449,9 @@ def test_new_domain_creates_original_snapshot(tmp_path, minimal_grid_and_topo):
     shape = topo.depth.data.shape
     shape_str = f"{shape[0]}x{shape[1]}"
     original_topo_path = snapshot_dir / f"original_topo_{grid_name}_{shape_str}.nc"
-    original_min_depth_path = snapshot_dir / f"original_min_depth_{grid_name}_{shape_str}.json"
+    original_min_depth_path = (
+        snapshot_dir / f"original_min_depth_{grid_name}_{shape_str}.json"
+    )
     original_json_path = snapshot_dir / f"original_{grid_name}_{shape_str}.json"
 
     assert original_topo_path.exists(), "Original topo NetCDF file should exist"
@@ -435,6 +465,7 @@ def test_new_domain_creates_original_snapshot(tmp_path, minimal_grid_and_topo):
     with open(original_json_path) as f:
         snapshot_data = json.load(f)
     assert snapshot_data is not None
+
 
 def test_ui_state_after_domain_switch(tmp_path):
     import os
@@ -450,17 +481,21 @@ def test_ui_state_after_domain_switch(tmp_path):
     dummy_file = tmp_path / "README.md"
     dummy_file.write_text("dummy")
     repo.index.add([str(dummy_file)])
-    repo.git.checkout('-b', 'master')
+    repo.git.checkout("-b", "master")
     repo.index.commit("initial commit")
 
     # -----------------------
     # First domain (resolution 0.1)
     # -----------------------
-    grid1 = Grid(resolution=0.1, xstart=278.0, lenx=0.5, ystart=7.0, leny=0.5, name="testpanama")
+    grid1 = Grid(
+        resolution=0.1, xstart=278.0, lenx=0.5, ystart=7.0, leny=0.5, name="testpanama"
+    )
     topo1 = Topo(grid=grid1, min_depth=10.0)
     topo1.set_flat(100.0)
 
-    domain_dir1 = os.path.join(snapshot_dir, f"domain_{grid1.name}_{grid1.qlon.shape[0]}x{grid1.qlon.shape[1]}")
+    domain_dir1 = os.path.join(
+        snapshot_dir, f"domain_{grid1.name}_{grid1.qlon.shape[0]}x{grid1.qlon.shape[1]}"
+    )
     os.makedirs(domain_dir1, exist_ok=True)
     topo1.SNAPSHOT_DIR = domain_dir1
     topo1.repo_root = str(tmp_path)
@@ -469,7 +504,9 @@ def test_ui_state_after_domain_switch(tmp_path):
     patch_all_widgets(editor)
 
     # Patch GUI plotting & control panel to avoid errors
-    editor.construct_interactive_plot = lambda: setattr(editor, "_interactive_plot", HBox())
+    editor.construct_interactive_plot = lambda: setattr(
+        editor, "_interactive_plot", HBox()
+    )
     editor.construct_control_panel = lambda: setattr(editor, "_control_panel", HBox())
     editor.refresh_commit_dropdown = lambda: None
 
@@ -491,16 +528,28 @@ def test_ui_state_after_domain_switch(tmp_path):
     editor._git_merge_button = Button()
     editor._snapshot_name = FloatText(value=0.0)
     editor._commit_dropdown = Dropdown(options=[])
-    editor.fig = type("DummyFig", (), {"canvas": type("DummyCanvas", (), {"mpl_connect": lambda self, *a, **k: None})()})()
+    editor.fig = type(
+        "DummyFig",
+        (),
+        {
+            "canvas": type(
+                "DummyCanvas", (), {"mpl_connect": lambda self, *a, **k: None}
+            )()
+        },
+    )()
 
     # -----------------------
     # Second domain (resolution 0.2)
     # -----------------------
-    grid2 = Grid(resolution=0.2, xstart=278.0, lenx=0.5, ystart=7.0, leny=0.5, name="testpanama")
+    grid2 = Grid(
+        resolution=0.2, xstart=278.0, lenx=0.5, ystart=7.0, leny=0.5, name="testpanama"
+    )
     topo2 = Topo(grid=grid2, min_depth=10.0)
     topo2.set_flat(50.0)
 
-    domain_dir2 = os.path.join(snapshot_dir, f"domain_{grid2.name}_{grid2.qlon.shape[0]}x{grid2.qlon.shape[1]}")
+    domain_dir2 = os.path.join(
+        snapshot_dir, f"domain_{grid2.name}_{grid2.qlon.shape[0]}x{grid2.qlon.shape[1]}"
+    )
     os.makedirs(domain_dir2, exist_ok=True)
     topo2.SNAPSHOT_DIR = domain_dir2
     topo2.repo_root = str(tmp_path)

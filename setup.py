@@ -34,6 +34,6 @@ setuptools.setup(
         "black>=24.1,<24.2",
         "pytest>=8.0",
         "gitpython>=3.1,<4.0",
-        "cartopy>=0.23,<0.24"
-    ]
+        "cartopy>=0.23,<0.24",
+    ],
 )

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import threading
 from mom6_bathy.vgrid import VGrid
 
+
 class VGridCreator(widgets.HBox):
     """
     Interactive creator for vertical grids (VGrid).
@@ -27,7 +28,9 @@ class VGridCreator(widgets.HBox):
             self.min_depth = float(np.nanmax(grid.depth.data))
 
         if vgrid is None:
-            vgrid = VGrid.uniform(nk=10, depth=100.0, save_on_create=False, repo_root=self.repo_root)
+            vgrid = VGrid.uniform(
+                nk=10, depth=100.0, save_on_create=False, repo_root=self.repo_root
+            )
         self.vgrid = vgrid
         self._initial_dz = np.copy(self.vgrid.dz)
 
@@ -45,7 +48,10 @@ class VGridCreator(widgets.HBox):
         self._type_toggle.value = grid_type
 
         self.plot_vgrid()
-        super().__init__([self._control_panel, self.fig.canvas], layout=widgets.Layout(width="100%", align_items="flex-start"))
+        super().__init__(
+            [self._control_panel, self.fig.canvas],
+            layout=widgets.Layout(width="100%", align_items="flex-start"),
+        )
         self.construct_observances()
         self._observers_attached = True
         self.refresh_commit_dropdown()
@@ -61,11 +67,16 @@ class VGridCreator(widgets.HBox):
             return ratio, "Hyperbolic"
 
     def construct_control_panel(self, ratio_value=1.0, grid_type="Uniform"):
-        label_style = {'description_width': '120px'}
+        label_style = {"description_width": "120px"}
 
         self._nk_slider = widgets.IntSlider(
-            value=self.vgrid.nk, min=2, max=100, step=1, description="Levels",
-            layout={'width': '98%'}, style=label_style
+            value=self.vgrid.nk,
+            min=2,
+            max=100,
+            step=1,
+            description="Levels",
+            layout={"width": "98%"},
+            style=label_style,
         )
         self._depth_slider = widgets.FloatSlider(
             value=max(self.vgrid.depth, self.min_depth),
@@ -73,91 +84,119 @@ class VGridCreator(widgets.HBox):
             max=10000.0,
             step=1.0,
             description="Depth (m)",
-            layout={'width': '98%'}, style=label_style
+            layout={"width": "98%"},
+            style=label_style,
         )
         self._warning_label = widgets.HTML(
             value="",
-            layout={'width': '98%', 'color': 'red', 'display': 'none'}  # Start hidden
+            layout={"width": "98%", "color": "red", "display": "none"},  # Start hidden
         )
         self._ratio_slider = widgets.FloatSlider(
-            value=ratio_value, min=0.1, max=20.0, step=0.01,
+            value=ratio_value,
+            min=0.1,
+            max=20.0,
+            step=0.01,
             description="Top/Bottom Ratio:",
-            layout={'width': '98%'}, style=label_style
+            layout={"width": "98%"},
+            style=label_style,
         )
         self.ratio_help = widgets.HTML(
             value="<span style='font-size: 90%; color: #888;'>Ratio of bottom layer thickness to top layer thickness</span>",
-            layout={'width': '98%', 'display': 'none'}
+            layout={"width": "98%", "display": "none"},
         )
-        
+
         # Timer handle for hiding help
         self._ratio_help_timer = None
 
         def show_help(change=None):
-            self.ratio_help.layout.display = 'block'
+            self.ratio_help.layout.display = "block"
             if self._ratio_help_timer is not None:
                 self._ratio_help_timer.cancel()
             self._ratio_help_timer = threading.Timer(3.0, hide_help)
             self._ratio_help_timer.start()
 
         def hide_help():
-            self.ratio_help.layout.display = 'none'
+            self.ratio_help.layout.display = "none"
 
-        self._ratio_slider.observe(show_help, names='value')
+        self._ratio_slider.observe(show_help, names="value")
 
         self._type_toggle = widgets.ToggleButtons(
             options=["Uniform", "Hyperbolic"],
             value=grid_type,
             description="Type",
-            layout={'width': '98%'}, style=label_style
+            layout={"width": "98%"},
+            style=label_style,
         )
         self._snapshot_name = widgets.Text(
-            value='', placeholder='Enter vgrid name', description='Name:',
-            layout={'width': '98%'}, style=label_style
+            value="",
+            placeholder="Enter vgrid name",
+            description="Name:",
+            layout={"width": "98%"},
+            style=label_style,
         )
         self._commit_msg = widgets.Text(
-            value='', placeholder='Enter vgrid message', description='Message:',
-            layout={'width': '98%'}, style=label_style
+            value="",
+            placeholder="Enter vgrid message",
+            description="Message:",
+            layout={"width": "98%"},
+            style=label_style,
         )
         self._commit_dropdown = widgets.Dropdown(
-            options=[], description='VGrids:', layout={'width': '98%'}, style=label_style
+            options=[],
+            description="VGrids:",
+            layout={"width": "98%"},
+            style=label_style,
         )
         self._commit_details = widgets.HTML(
-            value="", layout={'width': '98%', 'min_height': '2em'}
+            value="", layout={"width": "98%", "min_height": "2em"}
         )
         self._save_button = widgets.Button(
-            description='Save VGrid', layout={'width': '49%'}
+            description="Save VGrid", layout={"width": "49%"}
         )
         self._load_button = widgets.Button(
-            description='Load VGrid', layout={'width': '49%'}
+            description="Load VGrid", layout={"width": "49%"}
         )
         self._reset_button = widgets.Button(
-            description='Reset', layout={'width': '98%'}, button_style='danger'
+            description="Reset", layout={"width": "98%"}, button_style="danger"
         )
 
-        controls = widgets.VBox([
-            widgets.HTML("<h3>Vertical Grid Creator</h3>"),
-            self._type_toggle,
-            self._nk_slider,
-            self._depth_slider,
-            self._warning_label,
-            self._ratio_slider,
-            self.ratio_help,
-            self._reset_button,
-        ], layout=widgets.Layout(width="100%", align_items="stretch", overflow_y="visible"))
-        
-        library_section = widgets.VBox([
-            widgets.HTML("<h3>Library</h3>"),
-            self._snapshot_name,
-            self._commit_msg,
-            self._commit_dropdown,
-            self._commit_details,
-            widgets.HBox([self._save_button, self._load_button], layout={'width': '100%'}),
-        ], layout={'width': '100%'})
+        controls = widgets.VBox(
+            [
+                widgets.HTML("<h3>Vertical Grid Creator</h3>"),
+                self._type_toggle,
+                self._nk_slider,
+                self._depth_slider,
+                self._warning_label,
+                self._ratio_slider,
+                self.ratio_help,
+                self._reset_button,
+            ],
+            layout=widgets.Layout(
+                width="100%", align_items="stretch", overflow_y="visible"
+            ),
+        )
 
-        self._control_panel = widgets.VBox([
-            controls,
-            library_section,
-        ], layout={'width': '35%', 'height': '100%'})
+        library_section = widgets.VBox(
+            [
+                widgets.HTML("<h3>Library</h3>"),
+                self._snapshot_name,
+                self._commit_msg,
+                self._commit_dropdown,
+                self._commit_details,
+                widgets.HBox(
+                    [self._save_button, self._load_button], layout={"width": "100%"}
+                ),
+            ],
+            layout={"width": "100%"},
+        )
+
+        self._control_panel = widgets.VBox(
+            [
+                controls,
+                library_section,
+            ],
+            layout={"width": "35%", "height": "100%"},
+        )
 
     def construct_observances(self):
         if getattr(self, "_observers_attached", False):
@@ -165,8 +204,10 @@ class VGridCreator(widgets.HBox):
         self._save_button.on_click(self.save_vgrid)
         self._load_button.on_click(self.load_vgrid)
         self._reset_button.on_click(self.reset_vgrid)
-        self._snapshot_name.observe(lambda change: self.refresh_commit_dropdown(), names='value')
-        self._commit_dropdown.observe(self.update_commit_details, names='value')
+        self._snapshot_name.observe(
+            lambda change: self.refresh_commit_dropdown(), names="value"
+        )
+        self._commit_dropdown.observe(self.update_commit_details, names="value")
         self._type_toggle.observe(self._on_param_change, names="value")
         self._nk_slider.observe(self._on_param_change, names="value")
         self._depth_slider.observe(self._on_param_change, names="value")
@@ -180,7 +221,7 @@ class VGridCreator(widgets.HBox):
         else:
             self.ax.clear()
         for depth in self.vgrid.z:
-            self.ax.axhline(y=depth, color='steelblue')
+            self.ax.axhline(y=depth, color="steelblue")
         self.ax.set_ylim(max(self.vgrid.z) + 10, min(self.vgrid.z) - 10)
         self.ax.set_ylabel("Depth (m)")
         self.ax.set_title("Use the sliders to adjust vertical grid parameters.")
@@ -196,21 +237,38 @@ class VGridCreator(widgets.HBox):
 
         # Warn if depth < topo max depth
         topo_max = getattr(self, "min_depth", 1.0)
-        if hasattr(self, "topo") and self.topo is not None and hasattr(self.topo, "max_depth"):
+        if (
+            hasattr(self, "topo")
+            and self.topo is not None
+            and hasattr(self.topo, "max_depth")
+        ):
             topo_max = float(self.topo.max_depth)
 
         if depth < topo_max - 0.5:
             self._warning_label.value = f"<span style='color:red'>Warning: Depth is less than topo max depth ({topo_max:.2f} m)!</span>"
-            self._warning_label.layout.display = 'block'
+            self._warning_label.layout.display = "block"
         else:
             self._warning_label.value = ""
-            self._warning_label.layout.display = 'none'
+            self._warning_label.layout.display = "none"
 
         if grid_type == "Uniform":
-            self.vgrid = VGrid.uniform(nk=nk, depth=depth, name=name, save_on_create=False, repo_root=self.repo_root)
+            self.vgrid = VGrid.uniform(
+                nk=nk,
+                depth=depth,
+                name=name,
+                save_on_create=False,
+                repo_root=self.repo_root,
+            )
             self._ratio_slider.disabled = True
         else:
-            self.vgrid = VGrid.hyperbolic(nk=nk, depth=depth, ratio=ratio, name=name, save_on_create=False, repo_root=self.repo_root)
+            self.vgrid = VGrid.hyperbolic(
+                nk=nk,
+                depth=depth,
+                ratio=ratio,
+                name=name,
+                save_on_create=False,
+                repo_root=self.repo_root,
+            )
             self._ratio_slider.disabled = False
         self.plot_vgrid()
 
@@ -240,7 +298,9 @@ class VGridCreator(widgets.HBox):
             return
         nc_path = os.path.join(self.vgrids_dir, val)
         try:
-            self.vgrid = VGrid.from_file(nc_path, name=None, save_on_create=False, repo_root=self.repo_root)
+            self.vgrid = VGrid.from_file(
+                nc_path, name=None, save_on_create=False, repo_root=self.repo_root
+            )
             # Infer ratio and grid type from dz
             ratio_value, grid_type = self.infer_ratio_and_type(self.vgrid.dz)
             # Temporarily remove observers to avoid recursion
@@ -265,7 +325,9 @@ class VGridCreator(widgets.HBox):
             print(f"Failed to load vgrid: {e}")
 
     def reset_vgrid(self, b=None):
-        self.vgrid = VGrid(self._initial_dz.copy(), save_on_create=False, repo_root=self.repo_root)
+        self.vgrid = VGrid(
+            self._initial_dz.copy(), save_on_create=False, repo_root=self.repo_root
+        )
         ratio_value, grid_type = self.infer_ratio_and_type(self.vgrid.dz)
         self._nk_slider.value = self.vgrid.nk
         self._depth_slider.value = float(self.vgrid.depth)
@@ -276,7 +338,8 @@ class VGridCreator(widgets.HBox):
     def refresh_commit_dropdown(self):
         # List all .nc files in the VGrids directory (no subfolders)
         vgrid_nc_files = [
-            fname for fname in os.listdir(self.vgrids_dir)
+            fname
+            for fname in os.listdir(self.vgrids_dir)
             if fname.startswith("vgrid_") and fname.endswith(".nc")
         ]
         options = []
@@ -293,7 +356,7 @@ class VGridCreator(widgets.HBox):
 
         options.sort(
             key=lambda x: os.path.getmtime(os.path.join(self.vgrids_dir, x[1])),
-            reverse=True
+            reverse=True,
         )
         self._commit_dropdown.options = options if options else []
         if options:

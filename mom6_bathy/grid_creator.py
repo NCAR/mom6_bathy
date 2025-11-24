@@ -7,6 +7,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from mom6_bathy.grid import Grid
 
+
 class GridCreator(widgets.HBox):
 
     def __init__(self, grid, repo_root=None):
@@ -19,7 +20,7 @@ class GridCreator(widgets.HBox):
             "resolution": grid.resolution,
             "xstart": grid.xstart,
             "ystart": grid.ystart,
-            "name": grid.name
+            "name": grid.name,
         }
 
         self.construct_control_panel()
@@ -33,22 +34,45 @@ class GridCreator(widgets.HBox):
         self.fig.canvas.layout.width = "100%"
         self.fig.canvas.layout.min_width = "0"
         self.fig.canvas.toolbar_visible = True
-        self.fig.canvas.toolbar_position = 'top'
+        self.fig.canvas.toolbar_position = "top"
 
-        super().__init__([self._control_panel, self.fig.canvas], layout=widgets.Layout(width="100%", align_items="flex-start"))
+        super().__init__(
+            [self._control_panel, self.fig.canvas],
+            layout=widgets.Layout(width="100%", align_items="flex-start"),
+        )
 
         self.refresh_commit_dropdown()
         self.plot_grid()
-    
+
     def construct_control_panel(self):
-        self._snapshot_name = widgets.Text(value='', placeholder='Enter grid name', description='Name:', layout={'width': '90%'})
-        self._commit_msg = widgets.Text(value='', placeholder='Enter grid message', description='Message:', layout={'width': '90%'})
-        self._commit_dropdown = widgets.Dropdown(options=[], description='Grids:', layout={'width': '90%'})
-        self._commit_details = widgets.HTML(value="", layout={'width': '90%', 'min_height': '2em'})
-        self._save_button = widgets.Button(description='Save Grid', layout={'width': '44%'})
-        self._load_button = widgets.Button(description='Load Grid', layout={'width': '44%'})
-        self._reset_button = widgets.Button(description='Reset', layout={'width': '100%'}, button_style='danger')
-        
+        self._snapshot_name = widgets.Text(
+            value="",
+            placeholder="Enter grid name",
+            description="Name:",
+            layout={"width": "90%"},
+        )
+        self._commit_msg = widgets.Text(
+            value="",
+            placeholder="Enter grid message",
+            description="Message:",
+            layout={"width": "90%"},
+        )
+        self._commit_dropdown = widgets.Dropdown(
+            options=[], description="Grids:", layout={"width": "90%"}
+        )
+        self._commit_details = widgets.HTML(
+            value="", layout={"width": "90%", "min_height": "2em"}
+        )
+        self._save_button = widgets.Button(
+            description="Save Grid", layout={"width": "44%"}
+        )
+        self._load_button = widgets.Button(
+            description="Load Grid", layout={"width": "44%"}
+        )
+        self._reset_button = widgets.Button(
+            description="Reset", layout={"width": "100%"}, button_style="danger"
+        )
+
         # Use initial values for slider ranges
         initial_xstart = float(self.grid.xstart) % 360
 
@@ -73,59 +97,82 @@ class GridCreator(widgets.HBox):
             min=slider_min,
             max=slider_max,
             step=0.01,
-            description="xstart"
+            description="xstart",
         )
         self._lenx_slider = widgets.FloatSlider(
             value=self.grid.lenx, min=0.01, max=50.0, step=0.01, description="lenx"
         )
 
-        initial_ystart = float(self.grid.ystart)  
+        initial_ystart = float(self.grid.ystart)
 
         self._ystart_slider = widgets.FloatSlider(
             value=initial_ystart,
             min=max(initial_ystart - 30, -90),
             max=min(initial_ystart + 30, 90),
             step=0.01,
-            description="ystart"
+            description="ystart",
         )
         self._leny_slider = widgets.FloatSlider(
             value=self.grid.leny, min=0.01, max=50.0, step=0.01, description="leny"
         )
 
         self._resolution_slider = widgets.FloatSlider(
-            value=self.grid.resolution, min=0.01, max=1.0, step=0.01, description="Resolution"
+            value=self.grid.resolution,
+            min=0.01,
+            max=1.0,
+            step=0.01,
+            description="Resolution",
         )
 
-        controls = widgets.VBox([
-            widgets.HTML("<h3>Grid Creator</h3>"),
-            self._resolution_slider,
-            self._xstart_slider,
-            self._lenx_slider,
-            self._ystart_slider,
-            self._leny_slider,
-            widgets.HBox([self._reset_button], layout=widgets.Layout(justify_content="flex-end", width="100%")),
-        ], layout=widgets.Layout(width="100%", min_width="200px", max_width="400px", align_items="stretch", overflow_y="auto"))
-        
-        library_section = widgets.VBox([
-            widgets.HTML("<h3>Library</h3>"),
-            self._snapshot_name,
-            self._commit_msg,
-            self._commit_dropdown,
-            self._commit_details,
-            widgets.HBox([self._save_button, self._load_button]),
-        ])
+        controls = widgets.VBox(
+            [
+                widgets.HTML("<h3>Grid Creator</h3>"),
+                self._resolution_slider,
+                self._xstart_slider,
+                self._lenx_slider,
+                self._ystart_slider,
+                self._leny_slider,
+                widgets.HBox(
+                    [self._reset_button],
+                    layout=widgets.Layout(justify_content="flex-end", width="100%"),
+                ),
+            ],
+            layout=widgets.Layout(
+                width="100%",
+                min_width="200px",
+                max_width="400px",
+                align_items="stretch",
+                overflow_y="auto",
+            ),
+        )
 
-        self._control_panel = widgets.VBox([
-            controls,
-            library_section,
-        ], layout={'width': '45%', 'height': '100%'})
+        library_section = widgets.VBox(
+            [
+                widgets.HTML("<h3>Library</h3>"),
+                self._snapshot_name,
+                self._commit_msg,
+                self._commit_dropdown,
+                self._commit_details,
+                widgets.HBox([self._save_button, self._load_button]),
+            ]
+        )
+
+        self._control_panel = widgets.VBox(
+            [
+                controls,
+                library_section,
+            ],
+            layout={"width": "45%", "height": "100%"},
+        )
 
     def construct_observances(self):
         self._save_button.on_click(self.save_grid)
         self._load_button.on_click(self.load_grid)
         self._reset_button.on_click(self.reset_grid)
-        self._snapshot_name.observe(lambda change: self.refresh_commit_dropdown(), names='value')
-        self._commit_dropdown.observe(self.update_commit_details, names='value')
+        self._snapshot_name.observe(
+            lambda change: self.refresh_commit_dropdown(), names="value"
+        )
+        self._commit_dropdown.observe(self.update_commit_details, names="value")
 
         for slider in [
             self._resolution_slider,
@@ -138,41 +185,54 @@ class GridCreator(widgets.HBox):
 
     def plot_grid(self):
         self.ax.clear()
-        self.ax.coastlines(resolution='10m', linewidth=1)
-        self.ax.add_feature(cfeature.LAND, facecolor='0.9')
+        self.ax.coastlines(resolution="10m", linewidth=1)
+        self.ax.add_feature(cfeature.LAND, facecolor="0.9")
         self.ax.add_feature(cfeature.BORDERS, linewidth=0.5)
 
         n_jq, n_iq = self.grid.qlon.shape
         for i in range(n_iq):
-            self.ax.plot(self.grid.qlon[:, i], self.grid.qlat[:, i], color='k', linewidth=0.1, transform=ccrs.PlateCarree())
+            self.ax.plot(
+                self.grid.qlon[:, i],
+                self.grid.qlat[:, i],
+                color="k",
+                linewidth=0.1,
+                transform=ccrs.PlateCarree(),
+            )
         for j in range(n_jq):
-            self.ax.plot(self.grid.qlon[j, :], self.grid.qlat[j, :], color='k', linewidth=0.1, transform=ccrs.PlateCarree())
+            self.ax.plot(
+                self.grid.qlon[j, :],
+                self.grid.qlat[j, :],
+                color="k",
+                linewidth=0.1,
+                transform=ccrs.PlateCarree(),
+            )
         self.ax.set_title("Use the sliders to adjust grid parameters.")
 
         lon_min, lon_max = float(self.grid.qlon.min()), float(self.grid.qlon.max())
         lat_min, lat_max = float(self.grid.qlat.min()), float(self.grid.qlat.max())
         self.ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
 
-        gl = self.ax.gridlines(draw_labels=True, linewidth=0, color='none')
+        gl = self.ax.gridlines(draw_labels=True, linewidth=0, color="none")
         gl.top_labels = False
         gl.right_labels = False
-        gl.xlabel_style = {'size': 10}
-        gl.ylabel_style = {'size': 10}
+        gl.xlabel_style = {"size": 10}
+        gl.ylabel_style = {"size": 10}
 
         self._draw_scale_bar(lon_min, lon_max, lat_min, lat_max)
 
         self.fig.canvas.draw_idle()
-    
+
     def _nice_scale_length(self, length_m):
         """
         Given a length in meters, return a 'nice' rounded value (1, 2, 5, 10, 20, 50, 100, etc.)
         in meters or kilometers.
         """
         import math
+
         if length_m == 0:
             return 0
         exp = math.floor(math.log10(length_m))
-        base = length_m / (10 ** exp)
+        base = length_m / (10**exp)
         if base < 1.5:
             nice = 1
         elif base < 3.5:
@@ -181,7 +241,7 @@ class GridCreator(widgets.HBox):
             nice = 5
         else:
             nice = 10
-        return nice * (10 ** exp)
+        return nice * (10**exp)
 
     def _draw_scale_bar(self, lon_min, lon_max, lat_min, lat_max):
         """Draw a fixed-length scale bar with dynamic label using geometric calculation."""
@@ -209,9 +269,22 @@ class GridCreator(widgets.HBox):
             else:
                 label = f"{int(nice_length_m)} m"
 
-            self.ax.plot([bar_lon_start, bar_lon_end], [bar_lat, bar_lat], color='k', linewidth=3, transform=ccrs.PlateCarree())
-            self.ax.text((bar_lon_start + bar_lon_end) / 2, bar_lat + 0.01 * (lat_max - lat_min),
-                        label, ha='center', va='bottom', fontsize=10, transform=ccrs.PlateCarree())
+            self.ax.plot(
+                [bar_lon_start, bar_lon_end],
+                [bar_lat, bar_lat],
+                color="k",
+                linewidth=3,
+                transform=ccrs.PlateCarree(),
+            )
+            self.ax.text(
+                (bar_lon_start + bar_lon_end) / 2,
+                bar_lat + 0.01 * (lat_max - lat_min),
+                label,
+                ha="center",
+                va="bottom",
+                fontsize=10,
+                transform=ccrs.PlateCarree(),
+            )
         except Exception as e:
             print(f"Failed to draw scale bar: {e}")
 
@@ -225,7 +298,7 @@ class GridCreator(widgets.HBox):
             print("Enter a grid message!")
             return
 
-        if name.lower().endswith('.nc'):
+        if name.lower().endswith(".nc"):
             name = name[:-3]
         sanitized_name = self.grid.sanitize_name(name)
         self.grid.name = sanitized_name
@@ -250,6 +323,7 @@ class GridCreator(widgets.HBox):
         except Exception as e:
             print(f"Failed to load grid: {e}")
             import traceback
+
             traceback.print_exc()
 
     def sync_sliders_to_grid(self):
@@ -292,14 +366,21 @@ class GridCreator(widgets.HBox):
             leny_val = min(max(float(self.grid.leny), leny_min), leny_max)
 
             # Remove old observers
-            for slider in [self._resolution_slider, self._xstart_slider, self._lenx_slider, self._ystart_slider, self._leny_slider]:
+            for slider in [
+                self._resolution_slider,
+                self._xstart_slider,
+                self._lenx_slider,
+                self._ystart_slider,
+                self._leny_slider,
+            ]:
                 slider.unobserve(self._on_slider_change, names="value")
 
         except Exception as e:
             print(f"Error in sync_sliders_to_grid: {e}")
-                        
+
     def _on_slider_change(self, change):
         from mom6_bathy.grid import Grid
+
         self.grid = Grid(
             lenx=self._lenx_slider.value,
             leny=self._leny_slider.value,
@@ -307,7 +388,7 @@ class GridCreator(widgets.HBox):
             xstart=self._xstart_slider.value,
             ystart=self._ystart_slider.value,
             name=self.grid.name,
-            save_on_create=False  # Avoid saving on every slider change
+            save_on_create=False,  # Avoid saving on every slider change
         )
         self.plot_grid()
 
@@ -322,7 +403,7 @@ class GridCreator(widgets.HBox):
             xstart=params["xstart"],
             ystart=params["ystart"],
             name=sanitized_name,
-            save_on_create=False
+            save_on_create=False,
         )
         self.sync_sliders_to_grid()
         self.plot_grid()
@@ -335,7 +416,8 @@ class GridCreator(widgets.HBox):
     def refresh_commit_dropdown(self):
         # List all .nc files in the Grids directory (no subfolders)
         grid_nc_files = [
-            fname for fname in os.listdir(self.grids_dir)
+            fname
+            for fname in os.listdir(self.grids_dir)
             if fname.startswith("grid_") and fname.endswith(".nc")
         ]
         options = []
@@ -355,7 +437,7 @@ class GridCreator(widgets.HBox):
 
         options.sort(
             key=lambda x: os.path.getmtime(os.path.join(self.grids_dir, x[1])),
-            reverse=True
+            reverse=True,
         )
 
         self._commit_dropdown.options = options if options else []

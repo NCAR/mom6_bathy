@@ -188,15 +188,18 @@ class VGrid:
             },
         )
 
-        ds.attrs['title'] = f'Vertical grid for MOM6 simulation'
-        ds.attrs['maximum_depth'] = self.depth
-        ds.attrs['top_bottom_ratio'] = float(ratio)
-        ds.attrs['history'] = f'Created on {datetime.now()}'
+        ds.attrs["title"] = f"Vertical grid for MOM6 simulation"
+        ds.attrs["maximum_depth"] = self.depth
+        ds.attrs["top_bottom_ratio"] = float(ratio)
+        ds.attrs["history"] = f"Created on {datetime.now()}"
         if message:
-            ds.attrs['message'] = message
+            ds.attrs["message"] = message
         if author:
-            ds.attrs['author'] = author
-        ds.to_netcdf(filename, format='NETCDF3_64BIT',)
+            ds.attrs["author"] = author
+        ds.to_netcdf(
+            filename,
+            format="NETCDF3_64BIT",
+        )
         ds.attrs["title"] = f"Vertical grid for MOM6 simulation"
         ds.attrs["maximum_depth"] = self.depth
         ds.attrs["history"] = f"Created on {datetime.now()}"
