@@ -460,10 +460,9 @@ class GridCreator(widgets.HBox):
         abs_path = os.path.join(self.grids_dir, val)
         try:
             grid = Grid.from_supergrid(abs_path)
-            ds = grid.supergrid.to_ds()
+            ds = xr.open_dataset(abs_path)
             name = ds.attrs.get("name", "")
-            date = ds.attrs.get("date_created", "")
-            raise ValueError(ds.attrs)
+            date = ds.attrs.get("Created", "")
             # Format date: replace 'T' with ' ', trim to seconds
             date_short = date.replace("T", " ")
             date_short = date_short.split(".")[0] if "." in date_short else date_short
@@ -471,7 +470,7 @@ class GridCreator(widgets.HBox):
             ny = grid.ny
             details = (
                 f"<b>Name:</b> {name}<br>"
-                f"<b>Date:</b> {date_short}<br>"
+                f"<b>Created:</b> {date_short}<br>"
                 f"<b>nx:</b> {nx} <b>ny:</b> {ny}"
             )
             self._commit_details.value = details
