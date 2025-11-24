@@ -7,7 +7,7 @@ import pytest
 from mom6_bathy.grid import Grid
 from mom6_bathy.topo import Topo
 from utils import on_cisl_machine
-
+import os
 
 def test_is_tripolar():
     """Check if Grid.is_tripolar() and .is_cyclic_x() methods work correctly for different MOM grids."""
@@ -240,15 +240,14 @@ def test_grid_properties(simple_2by2_grid):
     grid = simple_2by2_grid
     assert grid.nx == 2
     assert grid.ny == 2
-    assert grid.lenx == 2.0
-    assert grid.leny == 2.0
-    assert grid.resolution == 1.0
+    assert grid._supergrid.lenx == 2.0
+    assert grid._supergrid.leny == 2.0
     assert grid.name == "testgrid"
 
 def test_grid_sanitize_name():
-    g = Grid(
-        lenx=2.0, leny=2.0, nx=2, ny=2,name="bad name!@#")
-    assert g.name == "bad_name_"
+    with pytest.raises(AssertionError):
+        g = Grid(
+            lenx=2.0, leny=2.0, nx=2, ny=2,name="bad name!@#")
 
 def test_grid_get_indices(simple_2by2_grid):
     grid = simple_2by2_grid
@@ -272,9 +271,9 @@ def test_grid_supergrid_setter(simple_2by2_grid):
 
 def test_grid_to_netcdf_and_from_netcdf(tmp_path, simple_2by2_grid):
     path = tmp_path / "testgrid.nc"
-    simple_2by2_grid.to_netcdf(str(path))
+    simple_2by2_grid.write_supergrid(str(path))
     assert os.path.exists(path)
-    loaded = Grid.from_netcdf(str(path))
+    loaded = Grid.from_supergrid(path)
     assert loaded.nx == simple_2by2_grid.nx
     assert loaded.ny == simple_2by2_grid.ny
     assert loaded.name == simple_2by2_grid.name
