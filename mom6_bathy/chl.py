@@ -6,7 +6,7 @@ import xesmf as xe
 from datetime import datetime
 from pathlib import Path
 from os.path import isfile
-from mom6_bathy.aux import fill_missing_data
+from mom6_bathy.utils import fill_missing_data
 
 
 def interpolate_and_fill_seawifs(
@@ -132,7 +132,7 @@ def interpolate_and_fill_seawifs(
                 "_FillValue": fill_value,
             }
         },
-        format='NETCDF3_64BIT',
+        format="NETCDF3_64BIT",
     )
     print(f"Wrote interpolated and filled SeaWiFS data to:\n{output_path}")
 
