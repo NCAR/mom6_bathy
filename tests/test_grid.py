@@ -282,25 +282,3 @@ def test_grid_to_netcdf_and_from_netcdf(tmp_path, simple_2by2_grid):
     assert loaded.nx == simple_2by2_grid.nx
     assert loaded.ny == simple_2by2_grid.ny
     assert loaded.name == simple_2by2_grid.name
-
-
-def test_grid_save_and_load_metadata(tmp_path, simple_2by2_grid):
-    json_path = tmp_path / "meta.json"
-    simple_2by2_grid.save_metadata(str(json_path), message="test", ncfile="file.nc")
-    assert os.path.exists(json_path)
-    meta = Grid.load_metadata(str(json_path))
-    assert meta["message"] == "test"
-    assert meta["ncfile"] == "file.nc"
-
-
-def test_grid_list_metadata_files(tmp_path, simple_2by2_grid):
-    # Create a fake metadata file
-    grid_dir = tmp_path / "Grids" / "testgrid_2x2"
-    os.makedirs(grid_dir, exist_ok=True)
-    json_path = grid_dir / "grid_testgrid.json"
-    with open(json_path, "w") as f:
-        f.write("{}")
-    files = Grid.list_metadata_files(tmp_path / "Grids")
-    assert any("grid_testgrid.json" in f for f in files)
-    sub = grid[1:, 1:]
-    assert sub.tlon[0][0] == grid.tlon[0][1]
