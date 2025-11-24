@@ -56,7 +56,7 @@ class Topo:
             self.bathy_info_path = self.domain_dir / "bathy_info.json"
             bathy_info = {
                 "min_depth": min_depth,
-                "grid_path": str(grid_file_path),
+                "grid_path": str(self.grid_file_path),
             }
 
             MinDepthEditCommand(
