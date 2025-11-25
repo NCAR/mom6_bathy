@@ -202,4 +202,4 @@ class TopoCommandManager(CommandManager):
     def __del__(self):
         # This runs when the object is garbage collected
         print("TopoCommandManagers is being destroyed! Writing out topo!")
-        self._topo.save_topo(self.directory / "topog.nc")
+        self._topo.write_topo(self.directory / "topog.nc")
