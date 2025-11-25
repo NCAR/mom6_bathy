@@ -3,6 +3,7 @@ import git
 import hashlib
 from pathlib import Path
 
+
 def get_domain_dir(grid, base_dir="TopoLibrary"):
     """
     Returns a unique directory path for a given grid object.
@@ -14,19 +15,7 @@ def get_domain_dir(grid, base_dir="TopoLibrary"):
 
     # Generate SHA256
     sha = hashlib.sha256(data_bytes).hexdigest()
-    return Path(base_dir)/sha
-
-def list_domain_dirs(base_dir="TopoLibrary"):
-    """
-    List all domain directories in the base_dir.
-    """
-    if not os.path.exists(base_dir):
-        return []
-    return [
-        d
-        for d in os.listdir(base_dir)
-        if os.path.isdir(os.path.join(base_dir, d)) and d.startswith("domain_")
-    ]
+    return Path(base_dir) / sha
 
 
 def get_repo(path):
@@ -36,6 +25,12 @@ def get_repo(path):
     """
     if not os.path.exists(os.path.join(path, ".git")):
         repo = git.Repo.init(path)
+        # Path to .gitignore
+        gitignore_path = os.path.join(path, ".gitignore")
+        lines = ["*.nc"]
+        with open(gitignore_path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+
     else:
         repo = git.Repo(path)
     return repo

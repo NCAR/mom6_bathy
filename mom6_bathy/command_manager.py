@@ -8,9 +8,8 @@ import tempfile
 
 
 class CommandManager(ABC):
-    def __init__(self, domain_id, directory, command_registry):
+    def __init__(self, directory, command_registry):
         self.directory = Path(directory)
-        self.domain_id = domain_id
         self.repo = get_repo(directory)
         self.command_registry = command_registry
         self.history_file_path = self.directory / f"command_history.json"
@@ -29,6 +28,7 @@ class CommandManager(ABC):
         # The command must be serializable to JSON
         command_data = command.serialize()
 
+        self.add_to_history("head", json.dumps(command_data))
         # git add it
         rel_path = os.path.relpath(self.history_file_path, self.repo.working_tree_dir)
 
@@ -39,14 +39,16 @@ class CommandManager(ABC):
         else:
             self.repo.git.commit("-m", f"COMMAND")
 
-        self.add_to_history(self.repo.head.commit.hexsha, json.dumps(command_data))
-
-    def parse_commit_message(self, sha, commit_msg: str):
+    def parse_commit_message(self, sha):
         """
         Parse a commit message to extract command type and data.
         Expected format: "<CommandType>"
         """
         try:
+            commit = self.repo.commit(sha)
+
+            # Access the commit message
+            commit_msg = commit.message
             # Split at the first colon
             cmd_type, affected_sha = commit_msg.split("-", 1)
             cmd_type = cmd_type.strip()
@@ -75,6 +77,10 @@ class CommandManager(ABC):
         else:
             history = {}
 
+        # Move previous head entry to sha entry of current head
+        if "head" in history:
+            history[self.repo.head.commit.hexsha] = history["head"]
+
         # 2. Add/overwrite the SHA entry
         history[sha] = command_data
 
@@ -99,13 +105,14 @@ class TopoCommandManager(CommandManager):
     """
     The unique part here is we need to handle the topo object seperately!
     """
-    def __init__(self, domain_id, topo, command_registry):
-        super().__init__(domain_id, topo.domain_dir, command_registry)
+
+    def __init__(self, topo, command_registry):
+        super().__init__(topo.domain_dir, command_registry)
         self._topo = topo
         self._original_topo_path = self.directory / "original_topog.nc"
-        if not self._original_topo_path.exists(): # I.E. first time init
+        if not self._original_topo_path.exists():  # I.E. first time init
             self._topo.write_topo(self._original_topo_path)
-        # Override history path
+        # Override history path to temporary because topo editing should exist across session
         self.history_file_path = self.directory / f"temp_command_history.json"
 
         # Initialize temp history file if it doesn't exist
@@ -116,23 +123,69 @@ class TopoCommandManager(CommandManager):
         # If permanent history is not synced with temporary, raise an error, and copy the permanent into temp
         permanent_history_path = self.directory / f"command_history.json"
         if permanent_history_path.exists():
-            with permanent_history_path.open("r") as f_perm, self.history_file_path.open("r") as f_temp:
+            with permanent_history_path.open(
+                "r"
+            ) as f_perm, self.history_file_path.open("r") as f_temp:
                 perm_history = json.load(f_perm)
                 temp_history = json.load(f_temp)
                 if perm_history != temp_history:
-                    print("Warning: Permanent history and temporary history are out of sync. Syncing temporary history with permanent.")
+                    print(
+                        "Warning: Permanent history and temporary history are out of sync. Syncing temporary history with permanent."
+                    )
                     with self.history_file_path.open("w") as f_temp_write:
                         json.dump(perm_history, f_temp_write)
 
-    def save(self):
+    def save(self, file_name="topog.nc"):
         """Save the current topo state, and make history permanent as a git tag with the given name."""
         # First, copy over the temp history into real
         # Copy temp history to permanent history
         permanent_history_path = self.directory / f"command_history.json"
-        with self.history_file_path.open("r") as src, permanent_history_path.open("w") as dst:
+        with self.history_file_path.open("r") as src, permanent_history_path.open(
+            "w"
+        ) as dst:
             dst.write(src.read())
         # Now write out topo
-        self._topo.write_topo(self.directory / "topog.nc")
+        self._topo.write_topo(self.directory / file_name)
+
+    def tag(self, tag_name):
+        """Tag the current state of the topo."""
+        self.repo.git.tag(tag_name)
+        self.save(file_name=f"{tag_name}_topog.nc")
+
+    def retrieve_tag(self, tag_name):
+        """Retrieve a tagged topo state."""
+        # Checkout the tag
+        self.repo.git.checkout(tag_name)
+        # Load the topo file
+        tagged_topo_path = self.directory / f"{tag_name}_topog.nc"
+        if not tagged_topo_path.exists():
+            raise FileNotFoundError(
+                f"Tagged topo file {tagged_topo_path} does not exist."
+            )
+        self._topo.set_depth_via_topog_file(tagged_topo_path)
+
+    def checkout(self, branch_name):
+        """Switch to a branch, loading the topo state from that branch."""
+        self.repo.git.checkout(branch_name)
+
+        # Replay New History
+        self.reapply_changes()
+
+    def reapply_changes(self):
+        """Reapply all changes from history to the topo."""
+        # Load the original topo file
+        branch_topo_path = self.directory / "original_topog.nc"
+        self._topo.set_depth_via_topog_file(branch_topo_path)
+        for commit in self.repo.iter_commits():
+            commit_sha = commit.hexsha
+            try:
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha)
+            except ValueError:
+                continue  # skip malformed messages
+            # Reconstruct and execute the command
+            command_class = self.command_registry[cmd_data["type"]]
+            cmd = command_class.deserialize(cmd_data)(self._topo)
+            cmd()  # Execute the command without pushing
 
     def execute(self, cmd, message=None):
         """
@@ -156,12 +209,9 @@ class TopoCommandManager(CommandManager):
     def undo(self):
         # Find first commit that isn't an undo
         for commit in self.repo.iter_commits():
-            message = commit.message.strip()
             commit_sha = commit.hexsha
             try:
-                cmd_type, affected_sha, cmd_data = self.parse_commit_message(
-                    commit_sha, message
-                )
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha)
             except ValueError:
                 continue  # skip malformed messages
             if "REVERT" not in cmd_type:
@@ -178,12 +228,9 @@ class TopoCommandManager(CommandManager):
         redo_possible = True
         already_redone = {}
         for commit in self.repo.iter_commits():
-            message = commit.message.strip()
             commit_sha = commit.hexsha
             try:
-                cmd_type, affected_sha, cmd_data = self.parse_commit_message(
-                    commit_sha, message
-                )
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha)
             except ValueError:
                 continue  # skip malformed messages
 
@@ -218,12 +265,9 @@ class TopoCommandManager(CommandManager):
         """Reset the bathymetry to its original state by replaying commands from the beginning."""
 
         for commit in self.repo.iter_commits():
-            message = commit.message.strip()
             commit_sha = commit.hexsha
             try:
-                cmd_type, affected_sha, cmd_data = self.parse_commit_message(
-                    commit_sha, message
-                )
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha)
             except ValueError:
                 continue  # skip malformed messages
 

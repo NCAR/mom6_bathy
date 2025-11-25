@@ -66,16 +66,14 @@ class Topo:
             }
 
             initial_command = MinDepthEditCommand(
-                self, attr="min_depth", new_value=min_depth, old_value=None
+                self, attr="min_depth", new_value=min_depth
             )
 
             # Initialize the git repo
             self.repo = get_repo(self.domain_dir)
 
             # Set up TCM
-            self.tcm = TopoCommandManager(
-                "dummy", self, command_registry=COMMAND_REGISTRY
-            )
+            self.tcm = TopoCommandManager(self, command_registry=COMMAND_REGISTRY)
             self.tcm.execute(initial_command, message="INITIAL")
 
         else:
@@ -111,7 +109,9 @@ class Topo:
         grid = Grid.from_supergrid(grid_file_path)
 
         # Create the topo object
-        topo = Topo(grid, min_depth) # Because we hash the grid, the correct domain will be selected
+        topo = Topo(
+            grid, min_depth
+        )  # Because we hash the grid, the correct domain will be selected
 
         # Read in the depth from the topog file
         topog_file_path = folder_path / "topog.nc"
@@ -143,7 +143,7 @@ class Topo:
         topo.set_depth_via_topog_file(topo_file_path)
         topo.min_depth = min_depth
         return topo
-    
+
     @classmethod
     def from_topo_version_control(cls, directory):
         """
@@ -156,7 +156,7 @@ class Topo:
 
         """
         directory = Path(directory)
-        grid = Grid.from_supergrid(directory/"grid.nc")
+        grid = Grid.from_supergrid(directory / "grid.nc")
         topo_file_path = directory / "topog.nc"
         topo_ds = xr.open_dataset(topo_file_path)
 
@@ -1392,6 +1392,13 @@ class Topo:
         )
 
         return ds
+
+    def save(self):
+        """
+        Save the TOPO_FILE (bathymetry file) in netcdf format to version control
+        """
+
+        self.tcm.save()
 
     def write_topo(self, file_path, title=None):
         """

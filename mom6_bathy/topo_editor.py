@@ -77,13 +77,11 @@ class TopoEditor(widgets.HBox):
         """Enable or disable the undo/redo buttons based on command history."""
         if hasattr(self, "_undo_button"):
             self._undo_button.disabled = not (
-                hasattr(self.tcm, "_undo_history")
-                and bool(self.tcm._undo_history)
+                hasattr(self.tcm, "_undo_history") and bool(self.tcm._undo_history)
             )
         if hasattr(self, "_redo_button"):
             self._redo_button.disabled = not (
-                hasattr(self.tcm, "_redo_history")
-                and bool(self.tcm._redo_history)
+                hasattr(self.tcm, "_redo_history") and bool(self.tcm._redo_history)
             )
 
     def refresh_tag_dropdown(self):
