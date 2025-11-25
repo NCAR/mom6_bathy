@@ -96,9 +96,43 @@ class CommandManager(ABC):
 
 
 class TopoCommandManager(CommandManager):
+    """
+    The unique part here is we need to handle the topo object seperately!
+    """
     def __init__(self, domain_id, topo, command_registry):
         super().__init__(domain_id, topo.domain_dir, command_registry)
         self._topo = topo
+        self._original_topo_path = self.directory / "original_topog.nc"
+        if not self._original_topo_path.exists(): # I.E. first time init
+            self._topo.write_topo(self._original_topo_path)
+        # Override history path
+        self.history_file_path = self.directory / f"temp_command_history.json"
+
+        # Initialize temp history file if it doesn't exist
+        if not self.history_file_path.exists():
+            with self.history_file_path.open("w") as f:
+                json.dump({"Description": "Command historys"}, f)
+
+        # If permanent history is not synced with temporary, raise an error, and copy the permanent into temp
+        permanent_history_path = self.directory / f"command_history.json"
+        if permanent_history_path.exists():
+            with permanent_history_path.open("r") as f_perm, self.history_file_path.open("r") as f_temp:
+                perm_history = json.load(f_perm)
+                temp_history = json.load(f_temp)
+                if perm_history != temp_history:
+                    print("Warning: Permanent history and temporary history are out of sync. Syncing temporary history with permanent.")
+                    with self.history_file_path.open("w") as f_temp_write:
+                        json.dump(perm_history, f_temp_write)
+
+    def save(self):
+        """Save the current topo state, and make history permanent as a git tag with the given name."""
+        # First, copy over the temp history into real
+        # Copy temp history to permanent history
+        permanent_history_path = self.directory / f"command_history.json"
+        with self.history_file_path.open("r") as src, permanent_history_path.open("w") as dst:
+            dst.write(src.read())
+        # Now write out topo
+        self._topo.write_topo(self.directory / "topog.nc")
 
     def execute(self, cmd, message=None):
         """

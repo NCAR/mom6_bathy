@@ -111,7 +111,7 @@ class Topo:
         grid = Grid.from_supergrid(grid_file_path)
 
         # Create the topo object
-        topo = Topo(grid, min_depth)
+        topo = Topo(grid, min_depth) # Because we hash the grid, the correct domain will be selected
 
         # Read in the depth from the topog file
         topog_file_path = folder_path / "topog.nc"
@@ -142,6 +142,26 @@ class Topo:
         topo = cls(grid, 0.0)
         topo.set_depth_via_topog_file(topo_file_path)
         topo.min_depth = min_depth
+        return topo
+    
+    @classmethod
+    def from_topo_version_control(cls, directory):
+        """
+        Create a bathymetry object from an existing topog file.
+
+        Parameters
+        ----------
+        directory: str
+            Path to an existing MOM6 topog file.
+
+        """
+        directory = Path(directory)
+        grid = Grid.from_supergrid(directory/"grid.nc")
+        topo_file_path = directory / "topog.nc"
+        topo_ds = xr.open_dataset(topo_file_path)
+
+        topo = cls(grid, topo_ds.attrs["min_depth"])
+        topo.set_depth_via_topog_file(topo_file_path)
         return topo
 
     def apply_edit(self, cmd):

@@ -42,27 +42,27 @@ class TopoEditor(widgets.HBox):
 
     def apply_edit(self, cmd):
         """Apply an edit command, update the UI, and autosave the working state."""
-        self.command_manager.execute(cmd)
+        self.tcm.execute(cmd)
         self.update_undo_redo_buttons()
         self.trigger_refresh()
 
     def undo_last_edit(self, b=None):
         """Undo the last edit command and update the UI."""
-        self.command_manager.undo()
+        self.tcm.undo()
         self.update_undo_redo_buttons()
         self._min_depth_specifier.value = self.topo.min_depth
         self.trigger_refresh()
 
     def redo_last_edit(self, b=None):
         """Redo the last undone edit command and update the UI."""
-        self.command_manager.redo()
+        self.tcm.redo()
         self.update_undo_redo_buttons()
         self._min_depth_specifier.value = self.topo.min_depth
         self.trigger_refresh()
 
     def reset(self, b=None):
         """Reset the topo to its original state and update the UI."""
-        self.command_manager.reset(
+        self.tcm.reset(
             self.topo,
             self._original_depth,
             self._original_min_depth,
@@ -77,13 +77,13 @@ class TopoEditor(widgets.HBox):
         """Enable or disable the undo/redo buttons based on command history."""
         if hasattr(self, "_undo_button"):
             self._undo_button.disabled = not (
-                hasattr(self.command_manager, "_undo_history")
-                and bool(self.command_manager._undo_history)
+                hasattr(self.tcm, "_undo_history")
+                and bool(self.tcm._undo_history)
             )
         if hasattr(self, "_redo_button"):
             self._redo_button.disabled = not (
-                hasattr(self.command_manager, "_redo_history")
-                and bool(self.command_manager._redo_history)
+                hasattr(self.tcm, "_redo_history")
+                and bool(self.tcm._redo_history)
             )
 
     def refresh_tag_dropdown(self):
@@ -490,7 +490,7 @@ class TopoEditor(widgets.HBox):
         self._reset_button.on_click(self.reset)
 
         # Snapshot controls
-        self._save_button.on_click(self.on_save_and_commit)
+        self._save_button.on_click(self.on_save_and_tag)
         self._load_button.on_click(self.on_load_button_clicked)
         self._tag_name.observe(
             lambda change: self.refresh_tag_dropdown(), names="value"
@@ -507,7 +507,7 @@ class TopoEditor(widgets.HBox):
 
     # --- UI Callback Methods ---
 
-    def on_save_and_commit(self, _btn=None):
+    def on_save_and_tag(self, _btn=None):
         """Save the current state as a snapshot and commit it to the repository."""
         name = self._tag_name.value.strip()
         msg = self._tag_msg.value.strip()
@@ -518,7 +518,7 @@ class TopoEditor(widgets.HBox):
             print("Enter a snapshot message!")
             return
 
-        self.command_manager.save_commit(name)  # TODO: Save a tag!
+        self.tcm.save_tag(name)  # TODO: Save a tag!
         print(f"Saved tag '{name}'.")
         self.refresh_tag_dropdown()
         return

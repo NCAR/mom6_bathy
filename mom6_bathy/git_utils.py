@@ -1,23 +1,22 @@
 import os
 import git
+import hashlib
+from pathlib import Path
 
-
-def get_domain_dir(grid, base_dir="Topos"):
+def get_domain_dir(grid, base_dir="TopoLibrary"):
     """
     Returns a unique directory path for a given grid object.
     Works for both rectilinear and curvilinear grids.
     """
-    name = getattr(grid, "name", "unknown")
-    ny = getattr(grid, "ny", None)
-    nx = getattr(grid, "nx", None)
-    if ny is not None and nx is not None:
-        shape = f"{ny}x{nx}"
-    else:
-        shape = "unknownshape"
-    return os.path.join(base_dir, f"domain_{name}_{shape}")
 
+    # Flatten and convert to bytes (deterministic)
+    data_bytes = grid.tlon.values.tobytes()
 
-def list_domain_dirs(base_dir="Topos"):
+    # Generate SHA256
+    sha = hashlib.sha256(data_bytes).hexdigest()
+    return Path(base_dir)/sha
+
+def list_domain_dirs(base_dir="TopoLibrary"):
     """
     List all domain directories in the base_dir.
     """
