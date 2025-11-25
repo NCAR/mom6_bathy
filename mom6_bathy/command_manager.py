@@ -4,6 +4,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from mom6_bathy.git_utils import get_repo
 from pathlib import Path
+import tempfile
 
 
 class CommandManager(ABC):
@@ -12,6 +13,10 @@ class CommandManager(ABC):
         self.domain_id = domain_id
         self.repo = get_repo(directory)
         self.command_registry = command_registry
+        self.history_file_path = self.directory / f"command_history.json"
+        if not self.history_file_path.exists():
+            with self.history_file_path.open("w") as f:
+                json.dump({"Description": "Command historys"}, f)
 
     @abstractmethod
     def execute(self, cmd, message=None):
@@ -23,55 +28,61 @@ class CommandManager(ABC):
 
         # The command must be serializable to JSON
         command_data = command.serialize()
-        history_file_path = add_to_unofficial_history(self, command_data)
 
         # git add it
-        rel_path = os.path.relpath(history_file, self.repo.working_tree_dir)
+        rel_path = os.path.relpath(self.history_file_path, self.repo.working_tree_dir)
+
         self.repo.git.add(rel_path)
         # git commit it
         if message is not None:
-            self.repo.git.commit("-m", f"{message}: {json.dumps(command_data)}")
+            self.repo.git.commit("-m", f"{message}")
         else:
-            self.repo.git.commit("-m", f"COMMAND: {json.dumps(command_data)}")
+            self.repo.git.commit("-m", f"COMMAND")
+            
+        self.add_to_history(self.repo.head.commit.hexsha, json.dumps(command_data))
 
-    def parse_commit_message(self, commit_msg: str):
+    def parse_commit_message(self, sha, commit_msg: str):
         """
         Parse a commit message to extract command type and data.
-        Expected format: "<CommandType>: <JSON data>"
+        Expected format: "<CommandType>"
         """
         try:
-            if ":" not in commit_msg:
-                raise ValueError("Commit message missing ':' separator")
-
             # Split at the first colon
-            cmd_type, json_str = commit_msg.split(":", 1)
+            cmd_type, affected_sha = commit_msg.split("-", 1)
             cmd_type = cmd_type.strip()
-            json_str = json_str.strip()
+            affected_sha = affected_sha.strip()
+            # Open history, use the shaw to get command data
+            with self.history_file_path.open("r") as f:
+                history = json.load(f)
+            cmd_data = history[affected_sha]
 
-            # Parse JSON
-            data = json.loads(json_str)
-            return cmd_type, data
+            return cmd_type, affected_sha, cmd_data
         except Exception as e:
             raise ValueError(f"Invalid commit message format: {commit_msg}") from e
 
-    def add_to_unofficial_history(self, json_line: str):
+    def add_to_history(self,sha, command_data: str):
         """
         Ensure the command unoffical history file exists (true history is generated from commit messages), append a line to it.
         """
-        import os
-
         # Path to history file
-        history_file = self.directory / f"command_history_{self.domain_id}.json"
+        # 1. Load existing history (if file exists)
+        if self.history_file_path.exists():
+            with self.history_file_path.open("r") as f:
+                try:
+                    history = json.load(f)
+                except json.JSONDecodeError:
+                    history = {}
+        else:
+            history = {}
 
-        # 1. Create file if missing
-        if not history_file.exists():
-            history_file.touch()
+        # 2. Add/overwrite the SHA entry
+        history[sha] = command_data
 
-        # 2. Append the line
-        with history_file.open("a") as f:
-            f.write(json.dumps(json_obj) + "\n")
+        # 3. Write back to the file
+        with self.history_file_path.open("w") as f:
+            json.dump(history, f, indent=2)
 
-        return history_file
+        return self.history_file_path
 
     @abstractmethod
     def undo(self):
@@ -81,16 +92,6 @@ class CommandManager(ABC):
     @abstractmethod
     def redo(self):
         """Redo the last undone command."""
-        pass
-
-    @abstractmethod
-    def initialize(self, command_registry, *args, **kwargs):
-        """Initialize with a given registry and context."""
-        pass
-
-    @abstractmethod
-    def replay(self):
-        """Replay all commands in the undo history."""
         pass
 
 
@@ -122,13 +123,14 @@ class TopoCommandManager(CommandManager):
         # Find first commit that isn't an undo
         for commit in self.repo.iter_commits():
             message = commit.message.strip()
+            commit_sha = commit.hexsha
             try:
-                cmd_type, cmd_data = self.parse_commit_message(message)
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha, message)
             except ValueError:
                 continue  # skip malformed messages
             if "REVERT" not in cmd_type:
-                commit_sha = commit.hexsha  # <- the SHA of this commit
                 break
+
         command_class = self.command_registry[cmd_data["type"]]
         cmd = command_class.reverse_deserialize(cmd_data)(self._topo)
         self.execute(
@@ -141,8 +143,9 @@ class TopoCommandManager(CommandManager):
         already_redone = {}
         for commit in self.repo.iter_commits():
             message = commit.message.strip()
+            commit_sha = commit.hexsha
             try:
-                cmd_type, cmd_data = self.parse_commit_message(message)
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha, message)
             except ValueError:
                 continue  # skip malformed messages
 
@@ -154,8 +157,7 @@ class TopoCommandManager(CommandManager):
             # At least one undo was found and already redone
             elif "REDO" in cmd_type:
                 # We've already redone a commit
-                original_sha = cmd_type.split("-")[1]
-                already_redone[original_sha] = True
+                already_redone[affected_sha] = True
 
             # We found an undo commit, we check if it's already redone. If not, break, If so, continue searching
             elif "REVERT" in cmd_type:
@@ -177,10 +179,11 @@ class TopoCommandManager(CommandManager):
     def reset(self):
         """Reset the bathymetry to its original state by replaying commands from the beginning."""
 
-        for commit in commits:
+        for commit in self.repo.iter_commits():
             message = commit.message.strip()
+            commit_sha = commit.hexsha
             try:
-                cmd_type, cmd_data = self.parse_commit_message(message)
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha, message)
             except ValueError:
                 continue  # skip malformed messages
 
@@ -189,3 +192,8 @@ class TopoCommandManager(CommandManager):
                 command_class = self.command_registry[cmd_data["type"]]
                 cmd = command_class.reverse_deserialize(cmd_data)(self._topo)
                 self.execute(cmd, message=None)  # no need to commit again
+
+    def __del__(self):
+        # This runs when the object is garbage collected
+        print("TopoCommandManagers is being destroyed! Writing out topo!")
+        self._topo.save_topo(self.directory/"topog.nc")

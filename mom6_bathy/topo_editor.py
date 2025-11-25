@@ -12,123 +12,41 @@ from mom6_bathy.git_utils import *
 
 
 class TopoEditor(widgets.HBox):
-    def __init__(self, topo, build_ui=True, snapshot_dir="Topos", restore_last=True):
+    def __init__(self, topo, build_ui=True):
         self.topo = topo
         self.ny = self.topo.depth.data.shape[0]
         self.nx = self.topo.depth.data.shape[1]
 
-        # --- Per-Grid Repo Logic ---
-        self.SNAPSHOT_DIR = self.topo.SNAPSHOT_DIR
-        self.repo = self.topo.repo
-        self.repo_root = self.topo.repo_root
+        # Load TCM Logic
+        self.tcm = TopoCommandManager("dummy",topo,COMMAND_REGISTRY)
+
 
         # --- Command Manager ---
         self.current_branch = get_current_branch(self.repo_root)
-        self.command_manager = TopoCommandManager(
-            domain_id=self.topo.get_domain_id,
-            topo=self.topo,
-            command_registry=COMMAND_REGISTRY,
-            snapshot_dir=self.SNAPSHOT_DIR,
-        )
         self._selected_cell = None
         self._original_depth = np.array(self.topo.depth.data)
         self._original_min_depth = self.topo.min_depth
 
-        # --- Restore last session if requested ---
-        restored_topo, restored_snapshot = self.topo.check_restore_last_domain(
-            self.SNAPSHOT_DIR, self.topo.get_domain_id, restore_last=restore_last
-        )
-        if restored_topo is not None:
-            self.topo = restored_topo
+        # --- Build UI controls, plot, and observers ---
+        self.construct_control_panel()
+        self.construct_interactive_plot()
+        self.construct_observances()
+        self.initialize_history()
+        self.refresh_tag_dropdown()
 
-        # --- Ensure original state is saved for this domain ---
-        self.topo.ensure_original_state(
-            snapshot_dir=self.SNAPSHOT_DIR,
-            command_manager=self.command_manager,
-            repo=self.repo,
-            repo_root=self.repo_root,
-        )
+        # --- Initialize the widget layout ---
+        super().__init__([self._control_panel, self._interactive_plot])
 
-        # --- Domain options for switching between grids/domains ---
-        self._domain_options = self.topo.get_domain_options(self.SNAPSHOT_DIR)
-        self._current_domain = self.topo.get_current_domain(
-            self._domain_options, self.SNAPSHOT_DIR
-        )
-
-        if build_ui:
-            # --- Build UI controls, plot, and observers ---
-            self.construct_control_panel()
-            self.construct_interactive_plot()
-            self.construct_observances()
-            self.initialize_history()
-            self.refresh_commit_dropdown()
-            self._domain_dropdown.options = self._domain_options
-
-            # Always set the dropdown to the current domain if possible
-            if self._current_domain:
-                self._domain_dropdown.value = self._current_domain
-            else:
-                if self._domain_options:
-                    self._domain_dropdown.value = self._domain_options[0][1]
-
-            # --- Initialize the widget layout ---
-            super().__init__([self._control_panel, self._interactive_plot])
-
-            # --- Load restored snapshot if available ---
-            if restored_snapshot:
-                self.load_commit(name=restored_snapshot)
-
-            # --- Load autosave if it exists and is newer than the restored snapshot ---
-            autosave_path = os.path.join(self.SNAPSHOT_DIR, "_autosave_working.json")
-            restored_path = (
-                os.path.join(self.SNAPSHOT_DIR, f"{restored_snapshot}.json")
-                if restored_snapshot
-                else None
-            )
-            if os.path.exists(autosave_path):
-                if (not restored_path) or (
-                    os.path.exists(restored_path)
-                    and os.path.getmtime(autosave_path)
-                    > os.path.getmtime(restored_path)
-                ):
-                    self.load_commit(name="_autosave_working")
-        else:
-            # If not building UI, just initialize as an empty HBox [TESTING PURPOSES]
-            super().__init__([])
 
     def initialize_history(self):
         """Initialize the command manager's history and update button states."""
-        self.command_manager.initialize()
         self.update_undo_redo_buttons()
-
-    def load_commit(self, name=None, reset_to_original=False):
-        """Load snapshot/commit by name and update the editor state."""
-        if name is None:
-            name = self._snapshot_name.value
-        if not name:
-            print("No snapshot name specified.")
-            return
-        snapshot_path = os.path.join(self.SNAPSHOT_DIR, f"{name}.json")
-        try:
-            self.command_manager.load_commit(
-                name, COMMAND_REGISTRY, self.topo, reset_to_original=reset_to_original
-            )
-            self.trigger_refresh()
-            self.update_undo_redo_buttons()
-            if hasattr(self, "_min_depth_specifier"):
-                self._min_depth_specifier.value = self.topo.min_depth
-            self.topo.persist_last_domain(
-                self.SNAPSHOT_DIR, self.topo.get_domain_id(), name
-            )
-        except FileNotFoundError:
-            print(f"Snapshot '{name}' not found.")
 
     def apply_edit(self, cmd):
         """Apply an edit command, update the UI, and autosave the working state."""
         self.command_manager.execute(cmd)
         self.update_undo_redo_buttons()
         self.trigger_refresh()
-        self.command_manager.save_commit("_autosave_working")
 
     def undo_last_edit(self, b=None):
         """Undo the last edit command and update the UI."""
@@ -170,63 +88,11 @@ class TopoEditor(widgets.HBox):
                 and bool(self.command_manager._redo_history)
             )
 
-    def refresh_commit_dropdown(self):
+    def refresh_tag_dropdown(self):
         """Refresh the list of available commits/snapshots in the dropdown menu."""
         current_branch = get_current_branch(self.repo_root)
-        options = commit_info(
-            self.repo_root,
-            file_pattern="*.json",
-            root_only=True,
-            change_types=("D"),
-            mode="list",
-            branch=current_branch,
-        )
-
-        def get_grid_info(file_path):
-            abs_path = os.path.join(self.repo_root, file_path)
-            if not os.path.exists(abs_path):
-                return "unknown", "unknown"
-            try:
-                with open(abs_path, "r") as f:
-                    data = json.load(f)
-                domain_id = data.get("domain_id", {})
-                return domain_id.get("grid_name", "unknown"), str(
-                    domain_id.get("shape", "unknown")
-                )
-            except Exception:
-                return "unknown", "unknown"
-
-        filtered_options = []
-        for label, value in options:
-            abs_path = os.path.join(self.repo_root, value[1])
-            filename = os.path.basename(value[1])
-            # Exclude files starting with 'grid_'
-            if filename.startswith("grid_"):
-                continue
-            if filename.endswith(".json") and os.path.exists(abs_path):
-                # Only show the snapshot name (without .json)
-                snapshot_name = os.path.splitext(filename)[0]
-                filtered_options.append((snapshot_name, value))
-
-        self._commit_dropdown.options = filtered_options if filtered_options else []
-        if filtered_options:
-            option_values = [v for (l, v) in filtered_options]
-            if self._commit_dropdown.value not in option_values:
-                self._commit_dropdown.value = filtered_options[0][1]
-        else:
-            self._commit_dropdown.value = None
         self.update_commit_details()
 
-    def update_commit_details(self, change=None):
-        """Update the commit details based on the selected commit in the dropdown."""
-        val = self._commit_dropdown.value
-        if not val:
-            self._commit_details.value = ""
-            return
-        commit_sha, file_path = val
-        self._commit_details.value = commit_info(
-            self.repo_root, commit_sha=commit_sha, file_path=file_path, mode="details"
-        )
 
     def construct_interactive_plot(self):
         """
@@ -373,40 +239,31 @@ class TopoEditor(widgets.HBox):
         )
 
         # --- Snapshot controls ---
-        self._snapshot_name = widgets.Text(
+        self._tag_name = widgets.Text(
             value="",
-            placeholder="Enter snapshot name",
+            placeholder="Enter tag name",
             description="Name:",
             layout={"width": "90%"},
         )
-        self._commit_msg = widgets.Text(
+        self._tag_msg = widgets.Text(
             value="",
-            placeholder="Enter snapshot message",
+            placeholder="Enter tag message",
             description="Message:",
             layout={"width": "90%"},
         )
-        self._commit_dropdown = widgets.Dropdown(
-            options=[], description="Snapshot:", layout={"width": "90%"}
+        self._tag_dropdown = widgets.Dropdown(
+            options=[], description="Tags:", layout={"width": "90%"}
         )
-        self._commit_details = widgets.HTML(
+        self._tag_details = widgets.HTML(
             value="", layout={"width": "90%", "min_height": "2em"}
         )
         self._save_button = widgets.Button(
-            description="Save State", layout={"width": "44%"}
+            description="Save Tag", layout={"width": "44%"}
         )
         self._load_button = widgets.Button(
-            description="Load State", layout={"width": "44%"}
+            description="Load Tag", layout={"width": "44%"}
         )
 
-        # --- Domain and git controls ---
-        self._domain_dropdown = widgets.Dropdown(
-            options=self.topo.get_domain_options(self.SNAPSHOT_DIR),
-            description="Domain:",
-            layout={"width": "90%"},
-        )
-        self._switch_domain_button = widgets.Button(
-            description="Switch Domain", layout={"width": "44%"}
-        )
         self._git_branch_name = widgets.Text(
             value="",
             placeholder="New branch name",
@@ -427,13 +284,6 @@ class TopoEditor(widgets.HBox):
         self._git_checkout_button = widgets.Button(
             description="Checkout", layout={"width": "44%"}
         )
-        # self._git_merge_source_dropdown = widgets.Dropdown(
-        #     options=list_branches(self.repo_root),
-        #     description='Merge from:',
-        #     layout={'width': '90%'}
-        # )
-        # self._git_merge_button = widgets.Button(description='Merge Branch', layout={'width': '44%'})
-
         # --- Group controls into logical sections ---
         display_section = widgets.VBox(
             [
@@ -477,10 +327,10 @@ class TopoEditor(widgets.HBox):
                 self._switch_domain_button,
                 widgets.HTML("<hr>"),
                 # Snapshot controls
-                self._snapshot_name,
-                self._commit_msg,
-                self._commit_dropdown,
-                self._commit_details,
+                self._tag_name,
+                self._tag_msg,
+                self._tag_dropdown,
+                self._tag_details,
                 widgets.HBox([self._save_button, self._load_button]),
                 widgets.HTML("<hr>"),
                 # Git controls
@@ -490,8 +340,6 @@ class TopoEditor(widgets.HBox):
                 ),
                 self._git_branch_dropdown,
                 self._git_checkout_button,
-                self._git_merge_source_dropdown,
-                self._git_merge_button,
             ]
         )
 
@@ -647,18 +495,15 @@ class TopoEditor(widgets.HBox):
         # Snapshot controls
         self._save_button.on_click(self.on_save_and_commit)
         self._load_button.on_click(self.on_load_button_clicked)
-        self._snapshot_name.observe(
-            lambda change: self.refresh_commit_dropdown(), names="value"
+        self._tag_name.observe(
+            lambda change: self.refresh_tag_dropdown(), names="value"
         )
-        self._commit_dropdown.observe(self.update_commit_details, names="value")
+        self._tag_dropdown.observe(self.update_commit_details, names="value")
 
         # Git/domain controls
-        self._switch_domain_button.on_click(self.on_switch_domain)
         self._git_create_branch_button.on_click(self.on_git_create_branch)
         self._git_delete_branch_button.on_click(self.on_git_delete_branch)
         self._git_checkout_button.on_click(self.on_git_checkout)
-        self._git_merge_button.on_click(self.on_git_merge)
-
         self._display_mode_toggle.observe(
             self.refresh_display_mode, names="value", type="change"
         )
@@ -667,8 +512,8 @@ class TopoEditor(widgets.HBox):
 
     def on_save_and_commit(self, _btn=None):
         """Save the current state as a snapshot and commit it to the repository."""
-        name = self._snapshot_name.value.strip()
-        msg = self._commit_msg.value.strip()
+        name = self._tag_name.value.strip()
+        msg = self._tag_msg.value.strip()
         if not name:
             print("Enter a snapshot name!")
             return
@@ -676,14 +521,9 @@ class TopoEditor(widgets.HBox):
             print("Enter a snapshot message!")
             return
 
-        self.command_manager.save_commit(name)
-        print(f"Saved snapshot '{name}'.")
-        snapshot_path = os.path.join(self.SNAPSHOT_DIR, f"{name}.json")
-        result = snapshot_action(
-            "commit", self.repo_root, file_path=snapshot_path, commit_msg=msg
-        )
-        print(result)
-        self.refresh_commit_dropdown()
+        self.command_manager.save_commit(name) # TODO: Save a tag!
+        print(f"Saved tag '{name}'.")
+        self.refresh_tag_dropdown()
         return
 
     def on_double_click(self, event):
@@ -750,37 +590,9 @@ class TopoEditor(widgets.HBox):
         self.apply_edit(cmd)
         self.update_undo_redo_buttons()
 
-    def load_new_topo(self, new_topo):
-        """Load a new topography object and update the editor state."""
-        self.topo = new_topo
-        self.ny = self.topo.depth.data.shape[0]
-        self.nx = self.topo.depth.data.shape[1]
-        self.SNAPSHOT_DIR = get_domain_dir(self.topo._grid)
-        os.makedirs(self.SNAPSHOT_DIR, exist_ok=True)
-        self.repo = get_repo(self.SNAPSHOT_DIR)
-        self.repo_root = self.SNAPSHOT_DIR
-        self._original_depth = np.array(self.topo.depth.data)
-        self._original_min_depth = self.topo.min_depth
-        self._selected_cell = None
-        self.command_manager = TopoCommandManager(
-            domain_id=self.topo.get_domain_id,
-            topo=self.topo,
-            command_registry=COMMAND_REGISTRY,
-            snapshot_dir=self.SNAPSHOT_DIR,
-        )
-        self.construct_control_panel()
-        self.construct_interactive_plot()
-        self.construct_observances()
-        self.initialize_history()
-        self.refresh_commit_dropdown()
-        self.children = [self._control_panel, self._interactive_plot]
-        self.topo.persist_last_domain(
-            self.SNAPSHOT_DIR, self.topo.get_domain_id(), None
-        )
-
     def on_load_button_clicked(self, b):
-        """Load a snapshot from the dropdown and update the editor state."""
-        val = self._commit_dropdown.value
+        """Load a tag from the dropdown and update the editor state."""
+        val = self._tag_dropdown.value
         if not val:
             print("No commit selected.")
             return
@@ -788,94 +600,13 @@ class TopoEditor(widgets.HBox):
         snapshot_name = os.path.splitext(os.path.basename(file_path))[0]
         self.reset()
         self.load_commit(name=snapshot_name)
-        self.refresh_commit_dropdown()
+        self.refresh_tag_dropdown()
         # Set dropdown to the just-loaded commit if present
-        for label, value in self._commit_dropdown.options:
+        for label, value in self._tag_dropdown.options:
             if os.path.splitext(os.path.basename(value[1]))[0] == snapshot_name:
-                self._commit_dropdown.value = value
+                self._tag_dropdown.value = value
                 break
-        print(f"Loaded snapshot '{snapshot_name}' for current grid.")
-
-    # --- Git Callbacks ---
-
-    def on_switch_domain(self, b):
-        """Switch to a different domain based on the selected dropdown value."""
-        selected = self._domain_dropdown.value
-        if not selected:
-            return
-        base_dir = os.path.dirname(self.SNAPSHOT_DIR)
-        domain_dir = os.path.join(base_dir, selected)
-        try:
-            new_topo = self.topo.from_domain_dir(domain_dir)
-            self.load_new_topo(new_topo)
-            snapshot_dir = self.SNAPSHOT_DIR
-            self._domain_dropdown.options = self.topo.get_domain_options(snapshot_dir)
-            self._domain_dropdown.value = selected
-            self.refresh_commit_dropdown()
-
-            # Use commit_info to get all available snapshots for this branch
-            current_branch = get_current_branch(self.repo_root)
-            options = commit_info(
-                self.repo_root,
-                file_pattern="*.json",
-                root_only=True,
-                change_types=("D"),
-                mode="list",
-                branch=current_branch,
-            )
-
-            # Get grid info for the new topo
-            grid_name = new_topo._grid.name
-            shape_tuple = tuple([d - 1 for d in new_topo._grid.qlon.shape])
-
-            # Find the latest snapshot for this grid/shape
-            latest_snapshot = None
-            latest_mtime = -1
-            for label, value in options:
-                abs_path = os.path.join(self.repo_root, value[1])
-                if not abs_path.endswith(".json") or not os.path.exists(abs_path):
-                    continue
-                try:
-                    with open(abs_path, "r") as f:
-                        data = json.load(f)
-                    domain_id = data.get("domain_id", {})
-                    if (
-                        domain_id.get("grid_name") == grid_name
-                        and tuple(domain_id.get("shape", [])) == shape_tuple
-                    ):
-                        mtime = os.path.getmtime(abs_path)
-                        if mtime > latest_mtime:
-                            latest_snapshot = os.path.splitext(
-                                os.path.basename(abs_path)
-                            )[0]
-                            latest_mtime = mtime
-                except Exception:
-                    continue
-
-            if latest_snapshot:
-                self.load_commit(latest_snapshot)
-                print(
-                    f"Switched to domain '{selected}' and loaded latest snapshot '{latest_snapshot}'."
-                )
-            else:
-                # Fallback: try to load original or reset
-                shape_str = f"{shape_tuple[0]}x{shape_tuple[1]}"
-                original_name = f"original_{grid_name}_{shape_str}"
-                original_snapshot_path = os.path.join(
-                    snapshot_dir, f"{original_name}.json"
-                )
-                if os.path.exists(original_snapshot_path):
-                    self.load_commit(original_name)
-                    print(
-                        f"Switched to domain '{selected}' and loaded original snapshot '{original_name}'."
-                    )
-                else:
-                    self.reset()
-                    print(
-                        f"Switched to domain '{selected}' but no snapshot found, reset to original state."
-                    )
-        except Exception as e:
-            print(f"Failed to switch domain: {e}")
+        print(f"Loaded tag '{snapshot_name}' for current grid.")
 
     def on_git_create_branch(self, b):
         """Create a new git branch and switch to it."""
@@ -950,10 +681,10 @@ class TopoEditor(widgets.HBox):
             self.on_switch_domain(None)
 
             # --- Now load the latest user snapshot (if any) on top of the original topo ---
-            self.refresh_commit_dropdown()
+            self.refresh_tag_dropdown()
             user_snapshots = [
                 os.path.basename(opt[1][1])
-                for opt in self._commit_dropdown.options
+                for opt in self._tag_dropdown.options
                 if opt[1][1].endswith(".json")
                 and not os.path.basename(opt[1][1]).startswith("original_")
             ]
