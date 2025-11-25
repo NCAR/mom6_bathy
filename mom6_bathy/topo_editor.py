@@ -18,8 +18,7 @@ class TopoEditor(widgets.HBox):
         self.nx = self.topo.depth.data.shape[1]
 
         # Load TCM Logic
-        self.tcm = TopoCommandManager("dummy",topo,COMMAND_REGISTRY)
-
+        self.tcm = TopoCommandManager("dummy", topo, COMMAND_REGISTRY)
 
         # --- Command Manager ---
         self.current_branch = get_current_branch(self.repo_root)
@@ -36,7 +35,6 @@ class TopoEditor(widgets.HBox):
 
         # --- Initialize the widget layout ---
         super().__init__([self._control_panel, self._interactive_plot])
-
 
     def initialize_history(self):
         """Initialize the command manager's history and update button states."""
@@ -92,7 +90,6 @@ class TopoEditor(widgets.HBox):
         """Refresh the list of available commits/snapshots in the dropdown menu."""
         current_branch = get_current_branch(self.repo_root)
         self.update_commit_details()
-
 
     def construct_interactive_plot(self):
         """
@@ -521,7 +518,7 @@ class TopoEditor(widgets.HBox):
             print("Enter a snapshot message!")
             return
 
-        self.command_manager.save_commit(name) # TODO: Save a tag!
+        self.command_manager.save_commit(name)  # TODO: Save a tag!
         print(f"Saved tag '{name}'.")
         self.refresh_tag_dropdown()
         return

@@ -39,7 +39,7 @@ class Topo:
             np.full((grid.ny, grid.nx), np.nan, dtype=float),
             dims=["ny", "nx"],
             attrs={"units": "m"},
-        ) # Initialize depth with NaNs
+        )  # Initialize depth with NaNs
         self._min_depth = min_depth
 
         if version_control_dir != None:
@@ -73,7 +73,9 @@ class Topo:
             self.repo = get_repo(self.domain_dir)
 
             # Set up TCM
-            self.tcm = TopoCommandManager("dummy",self, command_registry=COMMAND_REGISTRY)
+            self.tcm = TopoCommandManager(
+                "dummy", self, command_registry=COMMAND_REGISTRY
+            )
             self.tcm.execute(initial_command, message="INITIAL")
 
         else:
@@ -357,14 +359,17 @@ class Topo:
         new_values = depth.values.ravel().tolist()
 
         # 4. Flatten old values if depth exists
-        old_values = self.depth.values.ravel().tolist() if self.depth is not None else None
+        old_values = (
+            self.depth.values.ravel().tolist() if self.depth is not None else None
+        )
 
         # 5. Build command
         message = "INITIAL" if self.depth is None else None
-        depth_edit_command = DepthEditCommand(self, all_indices, new_values, old_values=old_values)
+        depth_edit_command = DepthEditCommand(
+            self, all_indices, new_values, old_values=old_values
+        )
 
         self.tcm.execute(depth_edit_command, message=message)
-        
 
     def set_depth_via_topog_file(self, topog_file_path):
         """
@@ -458,10 +463,14 @@ class Topo:
         all_indices = list(np.ndindex(self.depth.data.shape))
         message = ""
         if self.depth is not None:
-            depth_edit_command = DepthEditCommand(self, all_indices, depth, old_values=self.depth.values)
+            depth_edit_command = DepthEditCommand(
+                self, all_indices, depth, old_values=self.depth.values
+            )
         else:
-            depth_edit_command = DepthEditCommand(self, all_indices, depth, old_values=None)
-            message +="INITIAL"
+            depth_edit_command = DepthEditCommand(
+                self, all_indices, depth, old_values=None
+            )
+            message += "INITIAL"
         self.tcm.execute(depth_edit_command, message=message)
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
@@ -511,10 +520,14 @@ class Topo:
         all_indices = list(np.ndindex(self.depth.data.shape))
         message = ""
         if self.depth is not None:
-            depth_edit_command = DepthEditCommand(self, all_indices, new_values, old_values=self.depth.values)
+            depth_edit_command = DepthEditCommand(
+                self, all_indices, new_values, old_values=self.depth.values
+            )
         else:
-            depth_edit_command = DepthEditCommand(self, all_indices, new_values, old_values=None)
-            message +="INITIAL"
+            depth_edit_command = DepthEditCommand(
+                self, all_indices, new_values, old_values=None
+            )
+            message += "INITIAL"
         self.tcm.execute(depth_edit_command, message=message)
 
     def set_bowl(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
@@ -571,10 +584,14 @@ class Topo:
         all_indices = list(np.ndindex(self.depth.data.shape))
         message = ""
         if self.depth is not None:
-            depth_edit_command = DepthEditCommand(self, all_indices, new_values, old_values=self.depth.values)
+            depth_edit_command = DepthEditCommand(
+                self, all_indices, new_values, old_values=self.depth.values
+            )
         else:
-            depth_edit_command = DepthEditCommand(self, all_indices, new_values, old_values=None)
-            message +="INITIAL"
+            depth_edit_command = DepthEditCommand(
+                self, all_indices, new_values, old_values=None
+            )
+            message += "INITIAL"
         self.tcm.execute(depth_edit_command, message=message)
 
     def set_from_dataset(
@@ -818,9 +835,9 @@ class Topo:
 
         bathymetry_output.depth.attrs["_FillValue"] = -1e20
         bathymetry_output.depth.attrs["units"] = "meters"
-        bathymetry_output.depth.attrs[
-            "standard_name"
-        ] = "height_above_reference_ellipsoid"
+        bathymetry_output.depth.attrs["standard_name"] = (
+            "height_above_reference_ellipsoid"
+        )
         bathymetry_output.depth.attrs["long_name"] = "Elevation relative to sea level"
         bathymetry_output.depth.attrs["coordinates"] = "lon lat"
         if write_to_file:
@@ -1121,10 +1138,14 @@ class Topo:
         all_indices = list(np.ndindex(self.depth.data.shape))
         message = ""
         if self.depth is not None:
-            depth_edit_command = DepthEditCommand(self, all_indices, new_values, old_values=self.depth.values)
+            depth_edit_command = DepthEditCommand(
+                self, all_indices, new_values, old_values=self.depth.values
+            )
         else:
-            depth_edit_command = DepthEditCommand(self, all_indices, new_values, old_values=None)
-            message +="INITIAL"
+            depth_edit_command = DepthEditCommand(
+                self, all_indices, new_values, old_values=None
+            )
+            message += "INITIAL"
         self.tcm.execute(depth_edit_command, message=message)
 
     def apply_ridge(self, height, width, lon, ilat):
@@ -1254,7 +1275,7 @@ class Topo:
         mask_mapped = regridder(ds.landfrac)
 
         # Build TCM Object
-        mask = mask_mapped > cutoff_frac   # boolean mask
+        mask = mask_mapped > cutoff_frac  # boolean mask
         ny, nx = self._depth.shape
 
         affected_indices = []
@@ -1271,7 +1292,7 @@ class Topo:
 
                     old_vals.append(old_val)
                     new_vals.append(new_val)
-        
+
         depth_edit_command = DepthEditCommand(
             self, affected_indices, new_vals, old_values=old_vals
         )

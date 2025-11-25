@@ -38,7 +38,7 @@ class CommandManager(ABC):
             self.repo.git.commit("-m", f"{message}")
         else:
             self.repo.git.commit("-m", f"COMMAND")
-            
+
         self.add_to_history(self.repo.head.commit.hexsha, json.dumps(command_data))
 
     def parse_commit_message(self, sha, commit_msg: str):
@@ -60,7 +60,7 @@ class CommandManager(ABC):
         except Exception as e:
             raise ValueError(f"Invalid commit message format: {commit_msg}") from e
 
-    def add_to_history(self,sha, command_data: str):
+    def add_to_history(self, sha, command_data: str):
         """
         Ensure the command unoffical history file exists (true history is generated from commit messages), append a line to it.
         """
@@ -125,7 +125,9 @@ class TopoCommandManager(CommandManager):
             message = commit.message.strip()
             commit_sha = commit.hexsha
             try:
-                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha, message)
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(
+                    commit_sha, message
+                )
             except ValueError:
                 continue  # skip malformed messages
             if "REVERT" not in cmd_type:
@@ -145,7 +147,9 @@ class TopoCommandManager(CommandManager):
             message = commit.message.strip()
             commit_sha = commit.hexsha
             try:
-                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha, message)
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(
+                    commit_sha, message
+                )
             except ValueError:
                 continue  # skip malformed messages
 
@@ -183,7 +187,9 @@ class TopoCommandManager(CommandManager):
             message = commit.message.strip()
             commit_sha = commit.hexsha
             try:
-                cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha, message)
+                cmd_type, affected_sha, cmd_data = self.parse_commit_message(
+                    commit_sha, message
+                )
             except ValueError:
                 continue  # skip malformed messages
 
@@ -196,4 +202,4 @@ class TopoCommandManager(CommandManager):
     def __del__(self):
         # This runs when the object is garbage collected
         print("TopoCommandManagers is being destroyed! Writing out topo!")
-        self._topo.save_topo(self.directory/"topog.nc")
+        self._topo.save_topo(self.directory / "topog.nc")
