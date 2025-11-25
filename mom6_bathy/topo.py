@@ -545,7 +545,7 @@ class Topo:
         all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
 
         # 3. Flatten the new values to match the indices
-        new_values = new_values.ravel().tolist()
+        new_values = new_values.values.ravel().tolist()
 
         # 4. Flatten old values if depth exists
         old_values = (
@@ -614,7 +614,7 @@ class Topo:
         all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
 
         # 3. Flatten the new values to match the indices
-        new_values = new_values.ravel().tolist()
+        new_values = new_values.values.ravel().tolist()
 
         # 4. Flatten old values if depth exists
         old_values = (
@@ -1173,7 +1173,7 @@ class Topo:
         all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
 
         # 3. Flatten the new values to match the indices
-        new_values = new_values.ravel().tolist()
+        new_values = new_values.values.ravel().tolist()
 
         # 4. Flatten old values if depth exists
         old_values = (

@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.patches as patches
 import ipywidgets as widgets
 import os
-import json
 import cartopy.crs as ccrs
 from matplotlib.ticker import MaxNLocator
 from mom6_bathy.command_manager import TopoCommandManager
@@ -18,10 +17,10 @@ class TopoEditor(widgets.HBox):
         self.nx = self.topo.depth.data.shape[1]
 
         # Load TCM Logic
-        self.tcm = TopoCommandManager("dummy", topo, COMMAND_REGISTRY)
+        self.tcm = TopoCommandManager(topo, COMMAND_REGISTRY)
 
         # --- Command Manager ---
-        self.current_branch = get_current_branch(self.repo_root)
+        self.current_branch = self.tcm.get_current_branch()
         self._selected_cell = None
         self._original_depth = np.array(self.topo.depth.data)
         self._original_min_depth = self.topo.min_depth
@@ -30,15 +29,11 @@ class TopoEditor(widgets.HBox):
         self.construct_control_panel()
         self.construct_interactive_plot()
         self.construct_observances()
-        self.initialize_history()
+        self.update_undo_redo_buttons()
         self.refresh_tag_dropdown()
 
         # --- Initialize the widget layout ---
         super().__init__([self._control_panel, self._interactive_plot])
-
-    def initialize_history(self):
-        """Initialize the command manager's history and update button states."""
-        self.update_undo_redo_buttons()
 
     def apply_edit(self, cmd):
         """Apply an edit command, update the UI, and autosave the working state."""
@@ -48,46 +43,34 @@ class TopoEditor(widgets.HBox):
 
     def undo_last_edit(self, b=None):
         """Undo the last edit command and update the UI."""
-        self.tcm.undo()
+        assert self.tcm.undo()
         self.update_undo_redo_buttons()
         self._min_depth_specifier.value = self.topo.min_depth
         self.trigger_refresh()
 
     def redo_last_edit(self, b=None):
         """Redo the last undone edit command and update the UI."""
-        self.tcm.redo()
+        assert self.tcm.redo()
         self.update_undo_redo_buttons()
         self._min_depth_specifier.value = self.topo.min_depth
         self.trigger_refresh()
 
-    def reset(self, b=None):
+    def reset(self, change):
         """Reset the topo to its original state and update the UI."""
-        self.tcm.reset(
-            self.topo,
-            self._original_depth,
-            self._original_min_depth,
-            self.topo.get_domain_id,
-            min_depth_specifier=self._min_depth_specifier,
-            trigger_refresh=self.trigger_refresh,
-        )
+        self.tcm.reset()
         self.update_undo_redo_buttons()
         print("Topo reset to original state.")
 
     def update_undo_redo_buttons(self):
         """Enable or disable the undo/redo buttons based on command history."""
         if hasattr(self, "_undo_button"):
-            self._undo_button.disabled = not (
-                hasattr(self.tcm, "_undo_history") and bool(self.tcm._undo_history)
-            )
+            self._undo_button.disabled = not self.tcm.undo(check_only=True)
         if hasattr(self, "_redo_button"):
-            self._redo_button.disabled = not (
-                hasattr(self.tcm, "_redo_history") and bool(self.tcm._redo_history)
-            )
+            self._redo_button.disabled = not self.tcm.redo(check_only=True)
 
     def refresh_tag_dropdown(self):
         """Refresh the list of available commits/snapshots in the dropdown menu."""
-        current_branch = get_current_branch(self.repo_root)
-        self.update_commit_details()
+        tag_names = self.tcm.get_tag_names()
 
     def construct_interactive_plot(self):
         """
@@ -240,17 +223,8 @@ class TopoEditor(widgets.HBox):
             description="Name:",
             layout={"width": "90%"},
         )
-        self._tag_msg = widgets.Text(
-            value="",
-            placeholder="Enter tag message",
-            description="Message:",
-            layout={"width": "90%"},
-        )
         self._tag_dropdown = widgets.Dropdown(
             options=[], description="Tags:", layout={"width": "90%"}
-        )
-        self._tag_details = widgets.HTML(
-            value="", layout={"width": "90%", "min_height": "2em"}
         )
         self._save_button = widgets.Button(
             description="Save Tag", layout={"width": "44%"}
@@ -268,11 +242,8 @@ class TopoEditor(widgets.HBox):
         self._git_create_branch_button = widgets.Button(
             description="Create Branch", layout={"width": "44%"}
         )
-        self._git_delete_branch_button = widgets.Button(
-            description="Delete Branch", layout={"width": "44%"}, button_style="danger"
-        )
         self._git_branch_dropdown = widgets.Dropdown(
-            options=list_branches(self.repo_root),
+            options=self.tcm.list_branches(),
             description="Checkout:",
             layout={"width": "90%"},
         )
@@ -318,21 +289,15 @@ class TopoEditor(widgets.HBox):
         git_section = widgets.VBox(
             [
                 # Domain controls
-                self._domain_dropdown,
-                self._switch_domain_button,
                 widgets.HTML("<hr>"),
                 # Snapshot controls
                 self._tag_name,
-                self._tag_msg,
                 self._tag_dropdown,
-                self._tag_details,
                 widgets.HBox([self._save_button, self._load_button]),
                 widgets.HTML("<hr>"),
                 # Git controls
                 self._git_branch_name,
-                widgets.HBox(
-                    [self._git_create_branch_button, self._git_delete_branch_button]
-                ),
+                widgets.HBox([self._git_create_branch_button]),
                 self._git_branch_dropdown,
                 self._git_checkout_button,
             ]
@@ -363,7 +328,7 @@ class TopoEditor(widgets.HBox):
         )
 
         # Set the current branch in the dropdown if available
-        current_branch = get_current_branch(self.repo_root)
+        current_branch = self.tcm.get_current_branch()
         if current_branch in self._git_branch_dropdown.options:
             self._git_branch_dropdown.value
 
@@ -488,16 +453,15 @@ class TopoEditor(widgets.HBox):
         self._reset_button.on_click(self.reset)
 
         # Snapshot controls
-        self._save_button.on_click(self.on_save_and_tag)
+        self._save_button.on_click(self.on_tag)
         self._load_button.on_click(self.on_load_button_clicked)
         self._tag_name.observe(
             lambda change: self.refresh_tag_dropdown(), names="value"
         )
-        self._tag_dropdown.observe(self.update_commit_details, names="value")
+        self._tag_dropdown.observe(self.refresh_tag_dropdown(), names="value")
 
         # Git/domain controls
         self._git_create_branch_button.on_click(self.on_git_create_branch)
-        self._git_delete_branch_button.on_click(self.on_git_delete_branch)
         self._git_checkout_button.on_click(self.on_git_checkout)
         self._display_mode_toggle.observe(
             self.refresh_display_mode, names="value", type="change"
@@ -505,18 +469,14 @@ class TopoEditor(widgets.HBox):
 
     # --- UI Callback Methods ---
 
-    def on_save_and_tag(self, _btn=None):
+    def on_tag(self, _btn=None):
         """Save the current state as a snapshot and commit it to the repository."""
         name = self._tag_name.value.strip()
-        msg = self._tag_msg.value.strip()
         if not name:
             print("Enter a snapshot name!")
             return
-        if not msg:
-            print("Enter a snapshot message!")
-            return
 
-        self.tcm.save_tag(name)  # TODO: Save a tag!
+        self.tcm.tag(name)  # TODO: Save a tag!
         print(f"Saved tag '{name}'.")
         self.refresh_tag_dropdown()
         return
@@ -591,17 +551,12 @@ class TopoEditor(widgets.HBox):
         if not val:
             print("No commit selected.")
             return
-        commit_sha, file_path = val
-        snapshot_name = os.path.splitext(os.path.basename(file_path))[0]
-        self.reset()
-        self.load_commit(name=snapshot_name)
+        self.tcm.retrieve_tag(val)
         self.refresh_tag_dropdown()
-        # Set dropdown to the just-loaded commit if present
-        for label, value in self._tag_dropdown.options:
-            if os.path.splitext(os.path.basename(value[1]))[0] == snapshot_name:
-                self._tag_dropdown.value = value
-                break
-        print(f"Loaded tag '{snapshot_name}' for current grid.")
+
+        self._tag_dropdown.value = val
+
+        print(f"Loaded tag '{val}' for current grid.")
 
     def on_git_create_branch(self, b):
         """Create a new git branch and switch to it."""
@@ -610,32 +565,11 @@ class TopoEditor(widgets.HBox):
             print("Please enter a branch name.")
             return
         try:
-            branch = create_branch_and_switch(name, self.repo_root)
-            print(f"Created and switched to branch '{branch}'.")
-            self._git_branch_dropdown.options = list_branches(self.repo_root)
-            self._git_branch_dropdown.value = get_current_branch(self.repo_root)
-            self._git_merge_source_dropdown.options = list_branches(self.repo_root)
+            branch = self.tcm.create_branch(name)
+            self._git_branch_dropdown.options = self.tcm.list_branches()
+            self._git_branch_dropdown.value = self.tcm.get_current_branch()
         except Exception as e:
             print(f"Error creating branch: {str(e)}")
-
-    def on_git_delete_branch(self, b):
-        """Delete the specified git branch."""
-        name = self._git_branch_name.value.strip()
-        if not name:
-            print("Please enter the branch name to delete.")
-            return
-        try:
-            current = get_current_branch(self.repo_root)
-            if current == name:
-                print(f"Cannot delete the currently checked-out branch '{name}'.")
-                return
-            delete_branch_and_switch(name, self.repo_root)
-            print(f"Deleted branch '{name}'.")
-            self._git_branch_dropdown.options = list_branches(self.repo_root)
-            self._git_branch_dropdown.value = get_current_branch(self.repo_root)
-            self._git_merge_source_dropdown.options = list_branches(self.repo_root)
-        except Exception as e:
-            print(f"Error deleting branch: {str(e)}")
 
     def on_git_checkout(self, b):
         """Checkout the specified git branch."""
@@ -644,57 +578,14 @@ class TopoEditor(widgets.HBox):
             print("Please select a branch to checkout.")
             return
         try:
-            rel_snapshot_dir = os.path.relpath(
-                os.path.abspath(self.SNAPSHOT_DIR), self.repo_root
-            )
-            success, _, _, _ = safe_checkout_branch(
-                self.repo_root, target, rel_snapshot_dir
-            )
-            if not success:
-                return
+            self.tcm.checkout(target)
             print(f"Checked out to branch '{target}'.")
 
             # Update branch dropdowns
-            self._git_branch_dropdown.options = list_branches(self.repo_root)
-            self._git_branch_dropdown.value = get_current_branch(self.repo_root)
-            self._git_merge_source_dropdown.options = list_branches(self.repo_root)
-
-            # --- Reset domain dropdown/options to reflect new branch ---
-            self._domain_dropdown.options = self._domain_options
-
-            # Try to keep the same domain selected, or fallback to the first available
-            selected = self._domain_dropdown.value
-            if selected not in [v for l, v in self._domain_options]:
-                if self._domain_options:
-                    self._domain_dropdown.value = self._domain_options[0][1]
-                    selected = self._domain_dropdown.value
-                else:
-                    print("No domains found in this branch.")
-                    return
-
-            # --- Always reload from original topo for the selected domain ---
-            self.on_switch_domain(None)
+            self._git_branch_dropdown.options = self.tcm.list_branches()
+            self._git_branch_dropdown.value = self.tcm.get_current_branch()
 
             # --- Now load the latest user snapshot (if any) on top of the original topo ---
             self.refresh_tag_dropdown()
-            user_snapshots = [
-                os.path.basename(opt[1][1])
-                for opt in self._tag_dropdown.options
-                if opt[1][1].endswith(".json")
-                and not os.path.basename(opt[1][1]).startswith("original_")
-            ]
-            if user_snapshots:
-                # Find the most recent user snapshot (not original, not autosave/history)
-                user_snapshots.sort(
-                    key=lambda f: os.path.getmtime(os.path.join(self.SNAPSHOT_DIR, f)),
-                    reverse=True,
-                )
-                latest_snapshot = user_snapshots[0]
-                latest_name = latest_snapshot.replace(".json", "")
-                self.load_commit(latest_name)
-                print(f"Loaded latest snapshot '{latest_name}' from new branch.")
-            else:
-                print("No user snapshots found, using original topo.")
-
         except Exception as e:
-            print(f"Error checking out branch: {str(e)}")
+            print(f"Error checking out branch '{target}' with error {e}.")

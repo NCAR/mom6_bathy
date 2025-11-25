@@ -50,13 +50,18 @@ class CommandManager(ABC):
             # Access the commit message
             commit_msg = commit.message
             # Split at the first colon
-            cmd_type, affected_sha = commit_msg.split("-", 1)
+            if "-" in commit_msg:
+                cmd_type, affected_sha = commit_msg.split("-", 1)
+                affected_sha = affected_sha.strip()
+            else:
+                cmd_type = commit_msg.strip()
+                affected_sha = None
             cmd_type = cmd_type.strip()
-            affected_sha = affected_sha.strip()
-            # Open history, use the shaw to get command data
+
+            # Open history, use the sha to get command data
             with self.history_file_path.open("r") as f:
                 history = json.load(f)
-            cmd_data = history[affected_sha]
+            cmd_data = json.loads(history[sha])
 
             return cmd_type, affected_sha, cmd_data
         except Exception as e:
@@ -109,6 +114,9 @@ class CommandManager(ABC):
     def create_branch(self, branch):
         self.repo.create_head(branch)
 
+    def get_tag_names(self):
+        return [tag.name for tag in self.repo.tags]
+
 
 class TopoCommandManager(CommandManager):
     """
@@ -129,7 +137,7 @@ class TopoCommandManager(CommandManager):
             with self.history_file_path.open("w") as f:
                 json.dump({"Description": "Command historys"}, f)
 
-        # If permanent history is not synced with temporary, raise an error, and copy the permanent into temp
+        # If permanent history is not synced with temporary, raise an warning, and copy the permanent into temp
         permanent_history_path = self.directory / f"command_history.json"
         if permanent_history_path.exists():
             with permanent_history_path.open(
@@ -215,24 +223,32 @@ class TopoCommandManager(CommandManager):
                 )
             )
 
-    def undo(self):
+    def undo(self, check_only=False):
         # Find first commit that isn't an undo
+        can_undo = False
         for commit in self.repo.iter_commits():
             commit_sha = commit.hexsha
             try:
                 cmd_type, affected_sha, cmd_data = self.parse_commit_message(commit_sha)
             except ValueError:
                 continue  # skip malformed messages
-            if "REVERT" not in cmd_type:
-                break
 
+            if "REVERT" not in cmd_type:
+                can_undo = True
+                break
+        if not can_undo:
+            return False
+        else:
+            if check_only:
+                return True
         command_class = self.command_registry[cmd_data["type"]]
         cmd = command_class.reverse_deserialize(cmd_data)(self._topo)
         self.execute(
             cmd, message=f"REVERT-{commit_sha}"
         )  # This is the revert right here, a revert commit
+        return True
 
-    def redo(self):
+    def redo(self, check_only=False):
         # Redo needs to find the first revert commit and only runs if it doesn't hit a COMMAND cmd_type in the backwards iteration then takes the revert commit and reverse desearlies and has the message "REDO-<original commit sha>"
         redo_possible = True
         already_redone = {}
@@ -263,12 +279,14 @@ class TopoCommandManager(CommandManager):
                 break
 
         if not redo_possible:
-            print("No redo available.")
-            return
+            return False
         else:
+            if check_only:
+                return True
             command_class = self.command_registry[cmd_data["type"]]
             cmd = command_class.reverse_deserialize(cmd_data)(self._topo)
             self.execute(cmd, message=f"REDO-{commit_sha}")
+            return True
 
     def reset(self):
         """Reset the bathymetry to its original state by replaying commands from the beginning."""
@@ -285,8 +303,3 @@ class TopoCommandManager(CommandManager):
                 command_class = self.command_registry[cmd_data["type"]]
                 cmd = command_class.reverse_deserialize(cmd_data)(self._topo)
                 self.execute(cmd, message=None)  # no need to commit again
-
-    def __del__(self):
-        # This runs when the object is garbage collected
-        print("TopoCommandManagers is being destroyed! Writing out topo!")
-        self._topo.write_topo(self.directory / "topog.nc")
