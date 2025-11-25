@@ -16,11 +16,8 @@ class TopoEditor(widgets.HBox):
         self.ny = self.topo.depth.data.shape[0]
         self.nx = self.topo.depth.data.shape[1]
 
-        # Load TCM Logic
-        self.tcm = TopoCommandManager(topo, COMMAND_REGISTRY)
-
         # --- Command Manager ---
-        self.current_branch = self.tcm.get_current_branch()
+        self.current_branch = self.topo.tcm.get_current_branch()
         self._selected_cell = None
         self._original_depth = np.array(self.topo.depth.data)
         self._original_min_depth = self.topo.min_depth
@@ -37,40 +34,34 @@ class TopoEditor(widgets.HBox):
 
     def apply_edit(self, cmd):
         """Apply an edit command, update the UI, and autosave the working state."""
-        self.tcm.execute(cmd)
-        self.update_undo_redo_buttons()
+        self.topo.tcm.execute(cmd)
         self.trigger_refresh()
 
     def undo_last_edit(self, b=None):
         """Undo the last edit command and update the UI."""
-        assert self.tcm.undo()
-        self.update_undo_redo_buttons()
-        self._min_depth_specifier.value = self.topo.min_depth
+        assert self.topo.tcm.undo()
         self.trigger_refresh()
 
     def redo_last_edit(self, b=None):
         """Redo the last undone edit command and update the UI."""
-        assert self.tcm.redo()
-        self.update_undo_redo_buttons()
-        self._min_depth_specifier.value = self.topo.min_depth
+        assert self.topo.tcm.redo()
         self.trigger_refresh()
 
     def reset(self, change):
         """Reset the topo to its original state and update the UI."""
-        self.tcm.reset()
-        self.update_undo_redo_buttons()
-        print("Topo reset to original state.")
+        self.topo.tcm.reset()
+        self.trigger_refresh()
 
     def update_undo_redo_buttons(self):
         """Enable or disable the undo/redo buttons based on command history."""
         if hasattr(self, "_undo_button"):
-            self._undo_button.disabled = not self.tcm.undo(check_only=True)
+            self._undo_button.disabled = not self.topo.tcm.undo(check_only=True)
         if hasattr(self, "_redo_button"):
-            self._redo_button.disabled = not self.tcm.redo(check_only=True)
+            self._redo_button.disabled = not self.topo.tcm.redo(check_only=True)
 
     def refresh_tag_dropdown(self):
         """Refresh the list of available commits/snapshots in the dropdown menu."""
-        tag_names = self.tcm.get_tag_names()
+        tag_names = self.topo.tcm.get_tag_names()
 
     def construct_interactive_plot(self):
         """
@@ -243,7 +234,7 @@ class TopoEditor(widgets.HBox):
             description="Create Branch", layout={"width": "44%"}
         )
         self._git_branch_dropdown = widgets.Dropdown(
-            options=self.tcm.list_branches(),
+            options=self.topo.tcm.list_branches(),
             description="Checkout:",
             layout={"width": "90%"},
         )
@@ -328,7 +319,7 @@ class TopoEditor(widgets.HBox):
         )
 
         # Set the current branch in the dropdown if available
-        current_branch = self.tcm.get_current_branch()
+        current_branch = self.topo.tcm.get_current_branch()
         if current_branch in self._git_branch_dropdown.options:
             self._git_branch_dropdown.value
 
@@ -357,8 +348,10 @@ class TopoEditor(widgets.HBox):
         self.fig.canvas.draw_idle()
 
     def trigger_refresh(self):
-        """Trigger a refresh of the interactive plot."""
+        """Trigger a refresh of the interactive plot and min depth specifier."""
         self.refresh_display_mode({"new": self._display_mode_toggle.value})
+        self._min_depth_specifier.value = self.topo.min_depth
+        self.update_undo_redo_buttons()
 
     def _select_cell(self, i, j):
         """Select a cell in the topography grid and update the UI accordingly."""
@@ -476,7 +469,7 @@ class TopoEditor(widgets.HBox):
             print("Enter a snapshot name!")
             return
 
-        self.tcm.tag(name)  # TODO: Save a tag!
+        self.topo.tcm.tag(name)  # TODO: Save a tag!
         print(f"Saved tag '{name}'.")
         self.refresh_tag_dropdown()
         return
@@ -551,7 +544,7 @@ class TopoEditor(widgets.HBox):
         if not val:
             print("No commit selected.")
             return
-        self.tcm.retrieve_tag(val)
+        self.topo.tcm.retrieve_tag(val)
         self.refresh_tag_dropdown()
 
         self._tag_dropdown.value = val
@@ -565,9 +558,9 @@ class TopoEditor(widgets.HBox):
             print("Please enter a branch name.")
             return
         try:
-            branch = self.tcm.create_branch(name)
-            self._git_branch_dropdown.options = self.tcm.list_branches()
-            self._git_branch_dropdown.value = self.tcm.get_current_branch()
+            branch = self.topo.tcm.create_branch(name)
+            self._git_branch_dropdown.options = self.topo.tcm.list_branches()
+            self._git_branch_dropdown.value = self.topo.tcm.get_current_branch()
         except Exception as e:
             print(f"Error creating branch: {str(e)}")
 
@@ -578,12 +571,12 @@ class TopoEditor(widgets.HBox):
             print("Please select a branch to checkout.")
             return
         try:
-            self.tcm.checkout(target)
+            self.topo.tcm.checkout(target)
             print(f"Checked out to branch '{target}'.")
 
             # Update branch dropdowns
-            self._git_branch_dropdown.options = self.tcm.list_branches()
-            self._git_branch_dropdown.value = self.tcm.get_current_branch()
+            self._git_branch_dropdown.options = self.topo.tcm.list_branches()
+            self._git_branch_dropdown.value = self.topo.tcm.get_current_branch()
 
             # --- Now load the latest user snapshot (if any) on top of the original topo ---
             self.refresh_tag_dropdown()

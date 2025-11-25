@@ -12,10 +12,25 @@ class CommandManager(ABC):
         self.directory = Path(directory)
         self.repo = get_repo(directory)
         self.command_registry = command_registry
+
         self.history_file_path = self.directory / f"command_history.json"
         if not self.history_file_path.exists():
-            with self.history_file_path.open("w") as f:
-                json.dump({"Description": "Command historys"}, f)
+            self.history_dict = {"Description": "Command history"}
+            self.write_history()
+        else:
+            with self.history_file_path.open("r") as f:
+                self.history_dict = json.load(f)
+
+    def write_history(self):
+        """Write the current history dictionary to the history file."""
+        with self.history_file_path.open("w") as f:
+            json.dump(self.history_dict, f, indent=2)
+
+    def load_history(self):
+        """Load the history dictionary from the history file."""
+        with self.history_file_path.open("r") as f:
+            history_dict = json.load(f)
+        return history_dict
 
     @abstractmethod
     def execute(self, cmd, message=None):
@@ -58,10 +73,10 @@ class CommandManager(ABC):
                 affected_sha = None
             cmd_type = cmd_type.strip()
 
-            # Open history, use the sha to get command data
-            with self.history_file_path.open("r") as f:
-                history = json.load(f)
-            cmd_data = json.loads(history[sha])
+            # write  acheck that if the shaw it's head instead we use key head
+            if sha == self.repo.head.commit.hexsha:
+                sha = "head"
+            cmd_data = json.loads(self.history_dict[sha])
 
             return cmd_type, affected_sha, cmd_data
         except Exception as e:
@@ -71,28 +86,18 @@ class CommandManager(ABC):
         """
         Ensure the command unoffical history file exists (true history is generated from commit messages), append a line to it.
         """
-        # Path to history file
-        # 1. Load existing history (if file exists)
-        if self.history_file_path.exists():
-            with self.history_file_path.open("r") as f:
-                try:
-                    history = json.load(f)
-                except json.JSONDecodeError:
-                    history = {}
-        else:
-            history = {}
 
         # Move previous head entry to sha entry of current head
-        if "head" in history:
-            history[self.repo.head.commit.hexsha] = history["head"]
+        if "head" in self.history_dict:
+            self.history_dict[self.repo.head.commit.hexsha] = self.history_dict["head"]
 
         # 2. Add/overwrite the SHA entry
-        history[sha] = command_data
+        self.history_dict[sha] = command_data
 
-        # 3. Write back to the file
-        with self.history_file_path.open("w") as f:
-            json.dump(history, f, indent=2)
+        # 3. Write back to file
+        self.write_history()
 
+        # Return path to history file
         return self.history_file_path
 
     @abstractmethod
@@ -134,23 +139,9 @@ class TopoCommandManager(CommandManager):
 
         # Initialize temp history file if it doesn't exist
         if not self.history_file_path.exists():
-            with self.history_file_path.open("w") as f:
-                json.dump({"Description": "Command historys"}, f)
-
-        # If permanent history is not synced with temporary, raise an warning, and copy the permanent into temp
-        permanent_history_path = self.directory / f"command_history.json"
-        if permanent_history_path.exists():
-            with permanent_history_path.open(
-                "r"
-            ) as f_perm, self.history_file_path.open("r") as f_temp:
-                perm_history = json.load(f_perm)
-                temp_history = json.load(f_temp)
-                if perm_history != temp_history:
-                    print(
-                        "Warning: Permanent history and temporary history are out of sync. Syncing temporary history with permanent."
-                    )
-                    with self.history_file_path.open("w") as f_temp_write:
-                        json.dump(perm_history, f_temp_write)
+            self.history_dict = {"Description": "Temporary Command History"}
+            self.write_history()
+        self.history_dict = self.load_history()
 
     def save(self, file_name="topog.nc"):
         """Save the current topo state, and make history permanent as a git tag with the given name."""

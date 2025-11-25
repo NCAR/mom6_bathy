@@ -384,7 +384,7 @@ class Topo:
         )
 
         # 5. Build command
-        message = "INITIAL" if self.depth is None else None
+        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
@@ -491,7 +491,7 @@ class Topo:
         )
 
         # 5. Build command
-        message = "INITIAL" if self.depth is None else None
+        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
@@ -547,13 +547,11 @@ class Topo:
         # 3. Flatten the new values to match the indices
         new_values = new_values.values.ravel().tolist()
 
-        # 4. Flatten old values if depth exists
-        old_values = (
-            self.depth.values.ravel().tolist() if self.depth is not None else None
-        )
+        # 4. Flatten old values
+        old_values = self.depth.values.ravel().tolist()
 
         # 5. Build command
-        message = "INITIAL" if self.depth is None else None
+        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
@@ -622,7 +620,7 @@ class Topo:
         )
 
         # 5. Build command
-        message = "INITIAL" if self.depth is None else None
+        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
@@ -1181,7 +1179,7 @@ class Topo:
         )
 
         # 5. Build command
-        message = "INITIAL" if self.depth is None else None
+        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
