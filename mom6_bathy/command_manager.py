@@ -100,6 +100,15 @@ class CommandManager(ABC):
         """Redo the last undone command."""
         pass
 
+    def get_current_branch(self):
+        return self.repo.active_branch.name
+
+    def list_branches(self):
+        return [head.name for head in self.repo.heads]
+
+    def create_branch(self, branch):
+        self.repo.create_head(branch)
+
 
 class TopoCommandManager(CommandManager):
     """
