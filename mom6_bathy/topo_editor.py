@@ -27,7 +27,6 @@ class TopoEditor(widgets.HBox):
         self.construct_interactive_plot()
         self.construct_observances()
         self.update_undo_redo_buttons()
-        self.refresh_tag_dropdown()
 
         # --- Initialize the widget layout ---
         super().__init__([self._control_panel, self._interactive_plot])
@@ -58,10 +57,6 @@ class TopoEditor(widgets.HBox):
             self._undo_button.disabled = not self.topo.tcm.undo(check_only=True)
         if hasattr(self, "_redo_button"):
             self._redo_button.disabled = not self.topo.tcm.redo(check_only=True)
-
-    def refresh_tag_dropdown(self):
-        """Refresh the list of available commits/snapshots in the dropdown menu."""
-        tag_names = self.topo.tcm.get_tag_names()
 
     def construct_interactive_plot(self):
         """
@@ -214,14 +209,8 @@ class TopoEditor(widgets.HBox):
             description="Name:",
             layout={"width": "90%"},
         )
-        self._tag_dropdown = widgets.Dropdown(
-            options=[], description="Tags:", layout={"width": "90%"}
-        )
         self._save_button = widgets.Button(
             description="Save Tag", layout={"width": "44%"}
-        )
-        self._load_button = widgets.Button(
-            description="Load Tag", layout={"width": "44%"}
         )
 
         self._git_branch_name = widgets.Text(
@@ -283,8 +272,7 @@ class TopoEditor(widgets.HBox):
                 widgets.HTML("<hr>"),
                 # Snapshot controls
                 self._tag_name,
-                self._tag_dropdown,
-                widgets.HBox([self._save_button, self._load_button]),
+                widgets.HBox([self._save_button]),
                 widgets.HTML("<hr>"),
                 # Git controls
                 self._git_branch_name,
@@ -352,7 +340,6 @@ class TopoEditor(widgets.HBox):
         self.refresh_display_mode({"new": self._display_mode_toggle.value})
         self._min_depth_specifier.value = self.topo.min_depth
         self.update_undo_redo_buttons()
-        self.refresh_tag_dropdown()
 
     def _select_cell(self, i, j):
         """Select a cell in the topography grid and update the UI accordingly."""
@@ -448,11 +435,6 @@ class TopoEditor(widgets.HBox):
 
         # Snapshot controls
         self._save_button.on_click(self.on_tag)
-        self._load_button.on_click(self.on_load_button_clicked)
-        self._tag_name.observe(
-            lambda change: self.refresh_tag_dropdown(), names="value"
-        )
-        self._tag_dropdown.observe(self.refresh_tag_dropdown(), names="value")
 
         # Git/domain controls
         self._git_create_branch_button.on_click(self.on_git_create_branch)
@@ -472,7 +454,6 @@ class TopoEditor(widgets.HBox):
 
         self.topo.tcm.tag(name)  # TODO: Save a tag!
         print(f"Saved tag '{name}'.")
-        self.refresh_tag_dropdown()
         return
 
     def on_double_click(self, event):
@@ -538,19 +519,6 @@ class TopoEditor(widgets.HBox):
         cmd = DepthEditCommand(self.topo, [(j, i)], [new_val], old_values=[old_val])
         self.apply_edit(cmd)
         self.update_undo_redo_buttons()
-
-    def on_load_button_clicked(self, b):
-        """Load a tag from the dropdown and update the editor state."""
-        val = self._tag_dropdown.value
-        if not val:
-            print("No commit selected.")
-            return
-        self.topo.tcm.retrieve_tag(val)
-        self.refresh_tag_dropdown()
-
-        self._tag_dropdown.value = val
-
-        print(f"Loaded tag '{val}' for current grid.")
 
     def on_git_create_branch(self, b):
         """Create a new git branch and switch to it."""
