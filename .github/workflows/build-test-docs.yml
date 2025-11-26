@@ -27,8 +27,8 @@ jobs:
           micromamba-version: "latest"
       - name: Set git identity for testing
         run: |
-          git config user.email "runner@example.com"
-          git config user.name "CI Runner"
+          git config --global user.email "runner@example.com"
+          git config --global user.name "CI Runner"
       - name: Run pytest
         shell: bash -l {0}
         run: |
