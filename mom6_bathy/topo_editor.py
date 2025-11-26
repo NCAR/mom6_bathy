@@ -480,15 +480,7 @@ class TopoEditor(widgets.HBox):
         if self._selected_cell is None:
             return
         i, j, _ = self._selected_cell
-        label = self.topo.basintmask.data[j, i]
-        affected = np.where(self.topo.basintmask.data != label)
-        indices = list(zip(affected[0], affected[1]))
-        if not indices:
-            return
-        old_values = [self.topo.depth.data[jj, ii] for jj, ii in indices]
-        new_values = [0] * len(indices)
-        cmd = DepthEditCommand(self.topo, indices, new_values, old_values=old_values)
-        self.apply_edit(cmd)
+        self.topo.erase_disconnected_basins(i, j)
         self.update_undo_redo_buttons()
 
     def erase_selected_basin(self, b):
@@ -496,15 +488,7 @@ class TopoEditor(widgets.HBox):
         if self._selected_cell is None:
             return
         i, j, _ = self._selected_cell
-        label = self.topo.basintmask.data[j, i]
-        affected = np.where(self.topo.basintmask.data == label)
-        indices = list(zip(affected[0], affected[1]))
-        if not indices:
-            return
-        old_values = [self.topo.depth.data[jj, ii] for jj, ii in indices]
-        new_values = [0] * len(indices)
-        cmd = DepthEditCommand(self.topo, indices, new_values, old_values=old_values)
-        self.apply_edit(cmd)
+        self.topo.erase_selected_basin(i, j)
         self.update_undo_redo_buttons()
 
     def on_depth_change(self, change):

@@ -1199,6 +1199,28 @@ class Topo:
 
         self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
 
+    def erase_selected_basin(self, i, j):
+        label = self.basintmask.data[j, i]
+        affected = np.where(self.basintmask.data == label)
+        indices = list(zip(affected[0], affected[1]))
+        if not indices:
+            return
+        old_values = [self.depth.data[jj, ii] for jj, ii in indices]
+        new_values = [0] * len(indices)
+        cmd = DepthEditCommand(self, indices, new_values, old_values=old_values)
+        self.tcm.execute(cmd)
+
+    def erase_disconnected_basin(self, i, j):
+        label = self.basintmask.data[j, i]
+        affected = np.where(self.basintmask.data != label)
+        indices = list(zip(affected[0], affected[1]))
+        if not indices:
+            return
+        old_values = [self.depth.data[jj, ii] for jj, ii in indices]
+        new_values = [0] * len(indices)
+        cmd = DepthEditCommand(self, indices, new_values, old_values=old_values)
+        self.tcm.execute(cmd)
+
     def apply_ridge(self, height, width, lon, ilat):
         """
         Apply a ridge to the bathymetry.

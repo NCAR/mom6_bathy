@@ -17,6 +17,5 @@ def minimal_grid_and_topo():
         resolution=0.1, xstart=278.0, lenx=0.5, ystart=7.0, leny=0.5, name="testpanama"
     )
     topo = Topo(grid=grid, min_depth=10.0)
-    topo.set_spoon(2000.0,200)
+    topo.set_spoon(2000.0, 200)
     return topo
-
