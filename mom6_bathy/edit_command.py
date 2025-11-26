@@ -74,7 +74,9 @@ def to_native_tuple(t):
 class DepthEditCommand(EditCommand):
     """Define any edit that affects one or more elements of an array"""
 
-    def __init__(self, topo, affected_indices, new_values, old_values=None):
+    def __init__(
+        self, topo, affected_indices, new_values, old_values=None, message="Depth Edit"
+    ):
         self._topo = topo
         # Convert indices and values to native types for consistency and serialization
         self.affected_indices = [to_native_tuple(idx) for idx in affected_indices]
@@ -82,6 +84,7 @@ class DepthEditCommand(EditCommand):
         self.old_values = (
             [to_native(v) for v in old_values] if old_values is not None else None
         )
+        self.message = message
 
     def _get_value(self, j, i):
         return self._topo.depth.data[j, i]
@@ -136,11 +139,12 @@ class DepthEditCommand(EditCommand):
 class MinDepthEditCommand(EditCommand):
     """Define any edit that affects a single scalar attribute of an object"""
 
-    def __init__(self, topo, attr, new_value, old_value=None):
+    def __init__(self, topo, attr, new_value, old_value=None, message="Min Depth Edit"):
         self._topo = topo
         self.attr = attr
         self.new_value = to_native(new_value)
         self.old_value = to_native(old_value) if old_value is not None else None
+        self.message = message
 
     def __call__(self):
         if self.old_value is None:

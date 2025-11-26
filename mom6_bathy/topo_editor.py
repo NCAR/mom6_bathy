@@ -352,6 +352,7 @@ class TopoEditor(widgets.HBox):
         self.refresh_display_mode({"new": self._display_mode_toggle.value})
         self._min_depth_specifier.value = self.topo.min_depth
         self.update_undo_redo_buttons()
+        self.refresh_tag_dropdown()
 
     def _select_cell(self, i, j):
         """Select a cell in the topography grid and update the UI accordingly."""
@@ -578,7 +579,6 @@ class TopoEditor(widgets.HBox):
             self._git_branch_dropdown.options = self.topo.tcm.list_branches()
             self._git_branch_dropdown.value = self.topo.tcm.get_current_branch()
 
-            # --- Now load the latest user snapshot (if any) on top of the original topo ---
-            self.refresh_tag_dropdown()
+            self.trigger_refresh()
         except Exception as e:
             print(f"Error checking out branch '{target}' with error {e}.")

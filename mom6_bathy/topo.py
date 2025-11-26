@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from mom6_bathy.edit_command import *
 from mom6_bathy.command_manager import TopoCommandManager
+from mom6_bathy.command_manager import CommandType
 
 
 class Topo:
@@ -74,7 +75,7 @@ class Topo:
 
             # Set up TCM
             self.tcm = TopoCommandManager(self, command_registry=COMMAND_REGISTRY)
-            self.tcm.execute(initial_command, message="INITIAL")
+            self.tcm.execute(initial_command, cmd_type=CommandType.COMMAND)
 
         else:
             self.version_control = False  # For backwards compatability
@@ -384,14 +385,16 @@ class Topo:
         )
 
         # 5. Build command
-        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
+        type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
 
-        self.tcm.execute(depth_edit_command, message=message)
+        self.tcm.execute(depth_edit_command, cmd_type=type)
 
-    def set_depth_via_topog_file(self, topog_file_path):
+    def set_depth_via_topog_file(self, topog_file_path, quietly=False):
         """
         Apply a bathymetry read from an existing topog file
 
@@ -491,12 +494,16 @@ class Topo:
         )
 
         # 5. Build command
-        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
+        cmd_type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
-
-        self.tcm.execute(depth_edit_command, message=message)
+        if not quietly:
+            self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
+        else:
+            depth_edit_command()
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
@@ -551,12 +558,14 @@ class Topo:
         old_values = self.depth.values.ravel().tolist()
 
         # 5. Build command
-        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
+        cmd_type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
 
-        self.tcm.execute(depth_edit_command, message=message)
+        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
 
     def set_bowl(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
@@ -620,12 +629,14 @@ class Topo:
         )
 
         # 5. Build command
-        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
+        cmd_type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
 
-        self.tcm.execute(depth_edit_command, message=message)
+        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
 
     def set_from_dataset(
         self,
@@ -1179,12 +1190,14 @@ class Topo:
         )
 
         # 5. Build command
-        message = "INITIAL" if np.all(np.isnan(self.depth)) else None
+        cmd_type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
         depth_edit_command = DepthEditCommand(
             self, all_indices, new_values, old_values=old_values
         )
 
-        self.tcm.execute(depth_edit_command, message=message)
+        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
 
     def apply_ridge(self, height, width, lon, ilat):
         """
