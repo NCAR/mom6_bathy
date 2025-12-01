@@ -1,0 +1,160 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Topo &amp; The Widgets! &mdash; mom6_bathy 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=2709fde1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            mom6_bathy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">mom6_bathy</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">mom6_bathy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Topo &amp; The Widgets!</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/widgets.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="topo-the-widgets">
+<h1>Topo &amp; The Widgets!<a class="headerlink" href="#topo-the-widgets" title="Link to this heading"></a></h1>
+<p>This document function to explain the widget modules in mom_bathy.</p>
+<p>mom6_bathy comes with three UI modules/classes that wrap each of the main classes (vgrid, Grid, Topo) to help with the creation of vertical (VGridCreator) and horizontal (GridCreator) grids and the editing of Topography (TopoEditor).</p>
+<p>The creators’ function as a visual wrapper around the contructors of their respective classes with helpful sliders and visualizations. They create folders called “VgridLibrary” and “GridLibrary” to store the created grids and the current grid can be directly accessed as an object in each creator.</p>
+<section id="topo-topo-editor">
+<h2>Topo &amp; Topo Editor<a class="headerlink" href="#topo-topo-editor" title="Link to this heading"></a></h2>
+<p>The Topo &amp; TopoEditor is a bit more nuanced and will be explained further down here.</p>
+<p>The grids are simple classes that are only touched once (creation time). Topo is built on top of the horizontal grid and is majorly edited during the development cycle (filling bays, deepening ridges, etc…).
+As such, topo has a lot of edit functions. The TopoEditor is a visual tool to see the topo and wrap the edit functions in a “point-and-click” way.</p>
+<p>The editing functions are an ever expanding list, but as of writing, here is the list, with the ones in the Topo Editor starred:
+1. * Edit depth at a specific point
+2. * Edit the minimum depth
+3. * Erase a basin at a selected point
+4. * Erase every basin but the basin with the selected point
+5. Given a dataset containing land fraction, generate and apply ocean mask.
+6. Apply a ridge to the bathymetry.</p>
+<p>You can also just apply an initializer again, which is technically an edit (None of these are supported in the TopoEditor):
+1. Set flat bathy
+2. Set spoon bathy
+3. Set bowl bathy
+4. Set from dataset
+5. Set from previous topo object</p>
+<p>To support the iterative process, we provide undo &amp; redo functionality (across sessions!) in the topography. To do this, there is a lot of overhead! Here’s how it’s setup.</p>
+<p>We use a folder to support the topo object, and it contains all the history of edits you make with the topo object or the TopoEditor. It has four items:
+1. The grid underlying the topo
+2. The original topo (which is blank)
+3. A temporary command history for the <em>in session</em> changes
+4. A permanent command history that applies across sessions. Temporary &amp; Permanent only get synced when the topo is saved!</p>
+<p>How it works!
+1. You create your topo, which creates our folder of four files from above.
+2. You make changes using the topo object or through the topo editor.
+3. The change gets added to the temporary command history, and whenever the object is saved, to the permanent command history.
+4. The change then gets <em>commited</em>! That’s right!</p>
+</section>
+<section id="git-and-how-to-use-it">
+<h2>Git and how to use it!<a class="headerlink" href="#git-and-how-to-use-it" title="Link to this heading"></a></h2>
+<p>We’re using Git to implement undo/redo functionality in the topo object! You can see the log of changes by doing git log in your topo folder!
+The temporary command history is a json file corresponding to git commit sha’s. So you can look up the details of the change from your git log in the command history file.</p>
+<p>We also implement a git create branch and checkout, which can be triggered with topo.tcm.create_branch(“branchname”) and topo.tcm.checkout(“branchname”).
+You can also do a “tag” with topo.tcm.tag(“tagname”), which will show up in your git history and save a topo file named like tagname_topog.nc. You cannot checkout the tag because that creates some undefined behavior we don’t want!</p>
+<p>To undo or redo, you can use topo.tcm.undo() or topo.tcm.redo(). It’ll show up in your git log as REDO-sha or UNDO-sha of the sha that was undone or redone. Be careful not to undo your initial set function!</p>
+<p>WARNING! Don’t do git commands in your folder! Use the topo.tcm functions! Only use git log –oneline! We manage the topo independently (for now), and using something like a git checkout would break the functionality (probably).</p>
+</section>
+<section id="naunces-initialization-naming-etc">
+<h2>Naunces (Initialization, naming, etc…)<a class="headerlink" href="#naunces-initialization-naming-etc" title="Link to this heading"></a></h2>
+<p>Folders are named after the hash of the grid tlon variable. This means that any initialization with the <em>same</em> grid will exist in the same folder.</p>
+<p>You can initilalize Topo in three ways:
+1. In __init__, which is like Topo(). That will create an empty topo with whatever minimum depth you have (So if you have a preexiting topo with the same grid, it will add two edits, a minimum depth edit that you specify, and it will set your depth to NaN)
+2. In class method from_topo</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, NCAR.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
