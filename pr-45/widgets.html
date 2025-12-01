@@ -49,7 +49,8 @@
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Topo &amp; The Widgets!</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#topo-topoeditor">Topo &amp; TopoEditor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#topo-topoeditor-edits">Topo &amp; TopoEditor Edits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#undo-redo">Undo &amp; Redo</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#how-it-works">How It Works</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#topo-git-functionality-and-how-to-use-it">Topo Git Functionality and How to Use It</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#nuances-initialization-naming-etc">Nuances (Initialization, Naming, etc.)</a></li>
@@ -91,14 +92,14 @@
 <p><code class="docutils literal notranslate"><span class="pre">mom6_bathy</span></code> comes with three UI modules/classes that wrap the three main
 classes—<code class="docutils literal notranslate"><span class="pre">VGrid</span></code>, <code class="docutils literal notranslate"><span class="pre">Grid</span></code>, and <code class="docutils literal notranslate"><span class="pre">Topo</span></code>—to help with creating vertical grids
 (<code class="docutils literal notranslate"><span class="pre">VGridCreator</span></code>), horizontal grids (<code class="docutils literal notranslate"><span class="pre">GridCreator</span></code>), and editing topography
-(<code class="docutils literal notranslate"><span class="pre">`TopoEditor</span></code>).</p>
+(<code class="docutils literal notranslate"><span class="pre">TopoEditor</span></code>).</p>
 <p>The creators act as visual wrappers around the constructors of their respective
 classes, providing sliders and visualizations. They automatically generate
 folders called <code class="docutils literal notranslate"><span class="pre">VgridLibrary</span></code> and <code class="docutils literal notranslate"><span class="pre">GridLibrary</span></code> to store created grids.
 The currently selected grid is directly accessible as an object inside each
 creator.</p>
-<section id="topo-topoeditor">
-<h2>Topo &amp; TopoEditor<a class="headerlink" href="#topo-topoeditor" title="Link to this heading"></a></h2>
+<section id="topo-topoeditor-edits">
+<h2>Topo &amp; TopoEditor Edits<a class="headerlink" href="#topo-topoeditor-edits" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">Topo</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">TopoEditor</span></code> workflow is a bit more nuanced.</p>
 <p>Grids are simple: they are created once and rarely modified. <code class="docutils literal notranslate"><span class="pre">Topo</span></code> objects,
 however, are built on top of the horizontal grid and are heavily edited during
@@ -107,26 +108,14 @@ the development cycle (filling bays, deepening ridges, etc.).</p>
 visual, point-and-click interface on top of these functions.</p>
 <p>Current editing functions (<code class="docutils literal notranslate"><span class="pre">*</span></code> = available in <code class="docutils literal notranslate"><span class="pre">TopoEditor</span></code>):</p>
 <ol class="arabic simple">
-<li><ul class="simple">
-<li><p>Edit depth at a specific point</p></li>
-</ul>
-</li>
-<li><ul class="simple">
-<li><p>Edit the minimum depth</p></li>
-</ul>
-</li>
-<li><ul class="simple">
-<li><p>Erase a basin at a selected point</p></li>
-</ul>
-</li>
-<li><ul class="simple">
-<li><p>Erase every basin except the one containing the selected point</p></li>
-</ul>
-</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">*</span></code> Edit depth at a specific point</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">*</span></code> Edit the minimum depth</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">*</span></code> Erase a basin at a selected point</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">*</span></code> Erase every basin except the one containing the selected point</p></li>
 <li><p>Generate and apply an ocean mask from a land-fraction dataset</p></li>
 <li><p>Apply a ridge to the bathymetry</p></li>
 </ol>
-<p>You can also reapply an initializer (technical edits not supported in the GUI):</p>
+<p>You can also reapply an initializer (none supported in the TopoEditor):</p>
 <ol class="arabic simple">
 <li><p>Set flat bathy</p></li>
 <li><p>Set spoon bathy</p></li>
@@ -134,6 +123,9 @@ visual, point-and-click interface on top of these functions.</p>
 <li><p>Set from dataset</p></li>
 <li><p>Set from previous topo object</p></li>
 </ol>
+</section>
+<section id="undo-redo">
+<h2>Undo &amp; Redo<a class="headerlink" href="#undo-redo" title="Link to this heading"></a></h2>
 <p>To support the iterative editing process, we provide <strong>undo and redo</strong>
 functionality across sessions. This requires maintaining a structured history,
 stored inside a directory associated with your <code class="docutils literal notranslate"><span class="pre">Topo</span></code> object.</p>
@@ -196,7 +188,7 @@ details of each edit.</p>
 <p>Be careful not to undo your initial set-function!</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Do <strong>not</strong> run Git commands inside this folder except for <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span> <span class="pre">--oneline</span></code>.
+<p>Do <strong>not</strong> run Git commands inside this folder except for harmless commands like <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span></code>.
 We manage the folder internally. External Git commands (like <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">checkout</span></code>)
 may break state management.</p>
 </div>
