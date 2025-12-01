@@ -133,8 +133,7 @@ stored inside a directory associated with your <code class="docutils literal not
 <ol class="arabic simple">
 <li><p>The grid underlying the topo</p></li>
 <li><p>The original blank topo</p></li>
-<li><p>A temporary command history (session-only)</p></li>
-<li><p>A permanent command history (saved on disk; synced only when saving)</p></li>
+<li><p>A permanent command history</p></li>
 </ol>
 <figure class="align-center" id="id1">
 <a class="reference internal image-reference" href="_images/TopoLibrarySample.png"><img alt="_images/TopoLibrarySample.png" src="_images/TopoLibrarySample.png" style="width: 500px;" />
@@ -147,7 +146,7 @@ stored inside a directory associated with your <code class="docutils literal not
 <a class="reference internal image-reference" href="_images/TopoTempCommandHistory.png"><img alt="_images/TopoTempCommandHistory.png" src="_images/TopoTempCommandHistory.png" style="width: 500px;" />
 </a>
 <figcaption>
-<p><span class="caption-text">Structure of the temporary command history JSON file.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+<p><span class="caption-text">Structure of the command history JSON file.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 </section>
@@ -156,7 +155,7 @@ stored inside a directory associated with your <code class="docutils literal not
 <ol class="arabic simple">
 <li><p>You create your <code class="docutils literal notranslate"><span class="pre">Topo</span></code> object, which initializes the four files above.</p></li>
 <li><p>You make changes using <code class="docutils literal notranslate"><span class="pre">Topo</span></code> or <code class="docutils literal notranslate"><span class="pre">TopoEditor</span></code>.</p></li>
-<li><p>Each change is added to the temporary history and, when saved, to the permanent history.</p></li>
+<li><p>Each change is added to history.</p></li>
 <li><p>Each change is then <strong>committed via Git</strong>—this powers undo/redo.</p></li>
 </ol>
 </section>
@@ -165,7 +164,7 @@ stored inside a directory associated with your <code class="docutils literal not
 <p>We use Git to implement undo/redo functionality inside the topo directory.</p>
 <p>You can view the history with:</p>
 <p><code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span></code></p>
-<p>The temporary command history is a JSON file mapping commit SHAs to change
+<p>The command history is a JSON file mapping commit SHAs to change
 metadata. You can cross-reference the Git log with this JSON file to inspect
 details of each edit.</p>
 <p>We also support simple version-control actions:</p>
@@ -210,6 +209,8 @@ This means that <strong>any topo using the same grid</strong> will share the sam
 <li><p><code class="docutils literal notranslate"><span class="pre">Topo.from_version_control(path)</span></code> — loads a folder, applies saved history, and returns the reconstructed topo</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">Topo.from_topo_file(file)</span></code> — loads a topo file and applies it on top of any existing changes in the folder</p></li>
 </ol>
+<p>All of the git versioning (undo, redo, reset, checkout, tag, create branch) is handled by the TopoCommandManager, which can be accessed as the class variable “tcm”. The code for this manager resides in the command_manager class.
+We would use straight git functions, but the topo file itself is handled independently of the commits. (In the future, expect this to use icechunk)</p>
 <p>See also the demonstration notebook:</p>
 <p><a class="reference external" href="https://github.com/NCAR/mom6_bathy/blob/master/notebooks/6_demo_editors.ipynb">6_demo_editors.ipynb</a></p>
 </section>
