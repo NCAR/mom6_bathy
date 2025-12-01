@@ -18,7 +18,9 @@
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="mom6_bathy" href="modules.html" />
+    <link rel="prev" title="Glossary" href="glossary.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -41,11 +43,18 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Topo &amp; The Widgets!</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#topo-topoeditor">Topo &amp; TopoEditor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-it-works">How It Works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#topo-git-functionality-and-how-to-use-it">Topo Git Functionality and How to Use It</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#nuances-initialization-naming-etc">Nuances (Initialization, Naming, etc.)</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API:</span></p>
 <ul>
@@ -78,61 +87,149 @@
              
   <section id="topo-the-widgets">
 <h1>Topo &amp; The Widgets!<a class="headerlink" href="#topo-the-widgets" title="Link to this heading"></a></h1>
-<p>This document function to explain the widget modules in mom_bathy.</p>
-<p>mom6_bathy comes with three UI modules/classes that wrap each of the main classes (vgrid, Grid, Topo) to help with the creation of vertical (VGridCreator) and horizontal (GridCreator) grids and the editing of Topography (TopoEditor).</p>
-<p>The creators’ function as a visual wrapper around the contructors of their respective classes with helpful sliders and visualizations. They create folders called “VgridLibrary” and “GridLibrary” to store the created grids and the current grid can be directly accessed as an object in each creator.</p>
-<section id="topo-topo-editor">
-<h2>Topo &amp; Topo Editor<a class="headerlink" href="#topo-topo-editor" title="Link to this heading"></a></h2>
-<p>The Topo &amp; TopoEditor is a bit more nuanced and will be explained further down here.</p>
-<p>The grids are simple classes that are only touched once (creation time). Topo is built on top of the horizontal grid and is majorly edited during the development cycle (filling bays, deepening ridges, etc…).
-As such, topo has a lot of edit functions. The TopoEditor is a visual tool to see the topo and wrap the edit functions in a “point-and-click” way.</p>
-<p>The editing functions are an ever expanding list, but as of writing, here is the list, with the ones in the Topo Editor starred:
-1. * Edit depth at a specific point
-2. * Edit the minimum depth
-3. * Erase a basin at a selected point
-4. * Erase every basin but the basin with the selected point
-5. Given a dataset containing land fraction, generate and apply ocean mask.
-6. Apply a ridge to the bathymetry.</p>
-<p>You can also just apply an initializer again, which is technically an edit (None of these are supported in the TopoEditor):
-1. Set flat bathy
-2. Set spoon bathy
-3. Set bowl bathy
-4. Set from dataset
-5. Set from previous topo object</p>
-<p>To support the iterative process, we provide undo &amp; redo functionality (across sessions!) in the topography. To do this, there is a lot of overhead! Here’s how it’s setup.</p>
-<p>We use a folder to support the topo object, and it contains all the history of edits you make with the topo object or the TopoEditor. It has four items:
-1. The grid underlying the topo
-2. The original topo (which is blank)
-3. A temporary command history for the <em>in session</em> changes
-4. A permanent command history that applies across sessions. Temporary &amp; Permanent only get synced when the topo is saved!</p>
-<p>How it works!
-1. You create your topo, which creates our folder of four files from above.
-2. You make changes using the topo object or through the topo editor.
-3. The change gets added to the temporary command history, and whenever the object is saved, to the permanent command history.
-4. The change then gets <em>commited</em>! That’s right!</p>
+<p>This document explains the widget modules in <code class="docutils literal notranslate"><span class="pre">mom6_bathy</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">mom6_bathy</span></code> comes with three UI modules/classes that wrap the three main
+classes—<code class="docutils literal notranslate"><span class="pre">VGrid</span></code>, <code class="docutils literal notranslate"><span class="pre">Grid</span></code>, and <code class="docutils literal notranslate"><span class="pre">Topo</span></code>—to help with creating vertical grids
+(<code class="docutils literal notranslate"><span class="pre">VGridCreator</span></code>), horizontal grids (<code class="docutils literal notranslate"><span class="pre">GridCreator</span></code>), and editing topography
+(<code class="docutils literal notranslate"><span class="pre">`TopoEditor</span></code>).</p>
+<p>The creators act as visual wrappers around the constructors of their respective
+classes, providing sliders and visualizations. They automatically generate
+folders called <code class="docutils literal notranslate"><span class="pre">VgridLibrary</span></code> and <code class="docutils literal notranslate"><span class="pre">GridLibrary</span></code> to store created grids.
+The currently selected grid is directly accessible as an object inside each
+creator.</p>
+<section id="topo-topoeditor">
+<h2>Topo &amp; TopoEditor<a class="headerlink" href="#topo-topoeditor" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Topo</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">TopoEditor</span></code> workflow is a bit more nuanced.</p>
+<p>Grids are simple: they are created once and rarely modified. <code class="docutils literal notranslate"><span class="pre">Topo</span></code> objects,
+however, are built on top of the horizontal grid and are heavily edited during
+the development cycle (filling bays, deepening ridges, etc.).</p>
+<p>Because of this, <code class="docutils literal notranslate"><span class="pre">Topo</span></code> has many editing functions. <code class="docutils literal notranslate"><span class="pre">TopoEditor</span></code> provides a
+visual, point-and-click interface on top of these functions.</p>
+<p>Current editing functions (<code class="docutils literal notranslate"><span class="pre">*</span></code> = available in <code class="docutils literal notranslate"><span class="pre">TopoEditor</span></code>):</p>
+<ol class="arabic simple">
+<li><ul class="simple">
+<li><p>Edit depth at a specific point</p></li>
+</ul>
+</li>
+<li><ul class="simple">
+<li><p>Edit the minimum depth</p></li>
+</ul>
+</li>
+<li><ul class="simple">
+<li><p>Erase a basin at a selected point</p></li>
+</ul>
+</li>
+<li><ul class="simple">
+<li><p>Erase every basin except the one containing the selected point</p></li>
+</ul>
+</li>
+<li><p>Generate and apply an ocean mask from a land-fraction dataset</p></li>
+<li><p>Apply a ridge to the bathymetry</p></li>
+</ol>
+<p>You can also reapply an initializer (technical edits not supported in the GUI):</p>
+<ol class="arabic simple">
+<li><p>Set flat bathy</p></li>
+<li><p>Set spoon bathy</p></li>
+<li><p>Set bowl bathy</p></li>
+<li><p>Set from dataset</p></li>
+<li><p>Set from previous topo object</p></li>
+</ol>
+<p>To support the iterative editing process, we provide <strong>undo and redo</strong>
+functionality across sessions. This requires maintaining a structured history,
+stored inside a directory associated with your <code class="docutils literal notranslate"><span class="pre">Topo</span></code> object.</p>
+<p>This folder contains:</p>
+<ol class="arabic simple">
+<li><p>The grid underlying the topo</p></li>
+<li><p>The original blank topo</p></li>
+<li><p>A temporary command history (session-only)</p></li>
+<li><p>A permanent command history (saved on disk; synced only when saving)</p></li>
+</ol>
+<figure class="align-center" id="id1">
+<a class="reference internal image-reference" href="_images/TopoLibrarySample.png"><img alt="_images/TopoLibrarySample.png" src="_images/TopoLibrarySample.png" style="width: 500px;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Layout of a <code class="docutils literal notranslate"><span class="pre">Topo</span></code> folder.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<figure class="align-center" id="id2">
+<a class="reference internal image-reference" href="_images/TopoTempCommandHistory.png"><img alt="_images/TopoTempCommandHistory.png" src="_images/TopoTempCommandHistory.png" style="width: 500px;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Structure of the temporary command history JSON file.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
 </section>
-<section id="git-and-how-to-use-it">
-<h2>Git and how to use it!<a class="headerlink" href="#git-and-how-to-use-it" title="Link to this heading"></a></h2>
-<p>We’re using Git to implement undo/redo functionality in the topo object! You can see the log of changes by doing git log in your topo folder!
-The temporary command history is a json file corresponding to git commit sha’s. So you can look up the details of the change from your git log in the command history file.</p>
-<p>We also implement a git create branch and checkout, which can be triggered with topo.tcm.create_branch(“branchname”) and topo.tcm.checkout(“branchname”).
-You can also do a “tag” with topo.tcm.tag(“tagname”), which will show up in your git history and save a topo file named like tagname_topog.nc. You cannot checkout the tag because that creates some undefined behavior we don’t want!</p>
-<p>To undo or redo, you can use topo.tcm.undo() or topo.tcm.redo(). It’ll show up in your git log as REDO-sha or UNDO-sha of the sha that was undone or redone. Be careful not to undo your initial set function!</p>
-<p>WARNING! Don’t do git commands in your folder! Use the topo.tcm functions! Only use git log –oneline! We manage the topo independently (for now), and using something like a git checkout would break the functionality (probably).</p>
+<section id="how-it-works">
+<h2>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>You create your <code class="docutils literal notranslate"><span class="pre">Topo</span></code> object, which initializes the four files above.</p></li>
+<li><p>You make changes using <code class="docutils literal notranslate"><span class="pre">Topo</span></code> or <code class="docutils literal notranslate"><span class="pre">TopoEditor</span></code>.</p></li>
+<li><p>Each change is added to the temporary history and, when saved, to the permanent history.</p></li>
+<li><p>Each change is then <strong>committed via Git</strong>—this powers undo/redo.</p></li>
+</ol>
 </section>
-<section id="naunces-initialization-naming-etc">
-<h2>Naunces (Initialization, naming, etc…)<a class="headerlink" href="#naunces-initialization-naming-etc" title="Link to this heading"></a></h2>
-<p>Folders are named after the hash of the grid tlon variable. This means that any initialization with the <em>same</em> grid will exist in the same folder.</p>
-<p>You can initilalize Topo in three ways:
-1. In __init__, which is like Topo(). That will create an empty topo with whatever minimum depth you have (So if you have a preexiting topo with the same grid, it will add two edits, a minimum depth edit that you specify, and it will set your depth to NaN)
-2. In class method from_topo</p>
+<section id="topo-git-functionality-and-how-to-use-it">
+<h2>Topo Git Functionality and How to Use It<a class="headerlink" href="#topo-git-functionality-and-how-to-use-it" title="Link to this heading"></a></h2>
+<p>We use Git to implement undo/redo functionality inside the topo directory.</p>
+<p>You can view the history with:</p>
+<p><code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span></code></p>
+<p>The temporary command history is a JSON file mapping commit SHAs to change
+metadata. You can cross-reference the Git log with this JSON file to inspect
+details of each edit.</p>
+<p>We also support simple version-control actions:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">topo.tcm.create_branch(&quot;branchname&quot;)</span></code> — create a branch</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topo.tcm.checkout(&quot;branchname&quot;)</span></code> — switch branches</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topo.tcm.tag(&quot;tagname&quot;)</span></code> — create a tag and save a <code class="docutils literal notranslate"><span class="pre">tagname_topog.nc</span></code> file</p></li>
+</ul>
+<p>Tags cannot be checked out (this can cause unexpected states).</p>
+<p>Undo and redo:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">topo.tcm.undo()</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topo.tcm.redo()</span></code></p></li>
+</ul>
+<p>These appear in the Git log as:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">UNDO-&lt;sha&gt;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">REDO-&lt;sha&gt;</span></code></p></li>
+</ul>
+<p>Be careful not to undo your initial set-function!</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Do <strong>not</strong> run Git commands inside this folder except for <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span> <span class="pre">--oneline</span></code>.
+We manage the folder internally. External Git commands (like <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">checkout</span></code>)
+may break state management.</p>
+</div>
+<figure class="align-center" id="id3">
+<a class="reference internal image-reference" href="_images/TopoSampleGitLog.png"><img alt="_images/TopoSampleGitLog.png" src="_images/TopoSampleGitLog.png" style="width: 500px;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Example <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span></code> for a topo editing session.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="nuances-initialization-naming-etc">
+<h2>Nuances (Initialization, Naming, etc.)<a class="headerlink" href="#nuances-initialization-naming-etc" title="Link to this heading"></a></h2>
+<p>Folders are named after the hash of the grid’s <code class="docutils literal notranslate"><span class="pre">tlon</span></code> variable.
+This means that <strong>any topo using the same grid</strong> will share the same folder.</p>
+<p>You can initialize <code class="docutils literal notranslate"><span class="pre">Topo</span></code> in three ways:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Topo()</span></code> — creates an empty topo with the provided minimum depth</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Topo.from_version_control(path)</span></code> — loads a folder, applies saved history, and returns the reconstructed topo</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Topo.from_topo_file(file)</span></code> — loads a topo file and applies it on top of any existing changes in the folder</p></li>
+</ol>
+<p>See also the demonstration notebook:</p>
+<p><a class="reference external" href="https://github.com/NCAR/mom6_bathy/blob/master/notebooks/6_demo_editors.ipynb">6_demo_editors.ipynb</a></p>
 </section>
 </section>
 
 
            </div>
           </div>
-          <footer>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="glossary.html" class="btn btn-neutral float-left" title="Glossary" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modules.html" class="btn btn-neutral float-right" title="mom6_bathy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
 
   <hr/>
 

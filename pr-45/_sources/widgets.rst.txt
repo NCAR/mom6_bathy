@@ -1,67 +1,144 @@
 Topo & The Widgets!
-=================
+===================
 
-This document function to explain the widget modules in mom_bathy.
+This document explains the widget modules in ``mom6_bathy``.
 
-mom6_bathy comes with three UI modules/classes that wrap each of the main classes (vgrid, Grid, Topo) to help with the creation of vertical (VGridCreator) and horizontal (GridCreator) grids and the editing of Topography (TopoEditor).
+``mom6_bathy`` comes with three UI modules/classes that wrap the three main
+classes—``VGrid``, ``Grid``, and ``Topo``—to help with creating vertical grids
+(``VGridCreator``), horizontal grids (``GridCreator``), and editing topography
+(```TopoEditor``).
 
-The creators' function as a visual wrapper around the contructors of their respective classes with helpful sliders and visualizations. They create folders called "VgridLibrary" and "GridLibrary" to store the created grids and the current grid can be directly accessed as an object in each creator.
+The creators act as visual wrappers around the constructors of their respective
+classes, providing sliders and visualizations. They automatically generate
+folders called ``VgridLibrary`` and ``GridLibrary`` to store created grids.  
+The currently selected grid is directly accessible as an object inside each
+creator.
 
+Topo & TopoEditor
+-----------------
 
-Topo & Topo Editor
-------------------------
-The Topo & TopoEditor is a bit more nuanced and will be explained further down here.
+The ``Topo`` & ``TopoEditor`` workflow is a bit more nuanced.
 
-The grids are simple classes that are only touched once (creation time). Topo is built on top of the horizontal grid and is majorly edited during the development cycle (filling bays, deepening ridges, etc...).
-As such, topo has a lot of edit functions. The TopoEditor is a visual tool to see the topo and wrap the edit functions in a "point-and-click" way. 
+Grids are simple: they are created once and rarely modified. ``Topo`` objects,
+however, are built on top of the horizontal grid and are heavily edited during
+the development cycle (filling bays, deepening ridges, etc.).
 
-The editing functions are an ever expanding list, but as of writing, here is the list, with the ones in the Topo Editor starred:
-1. * Edit depth at a specific point 
+Because of this, ``Topo`` has many editing functions. ``TopoEditor`` provides a
+visual, point-and-click interface on top of these functions.
+
+Current editing functions (``*`` = available in ``TopoEditor``):
+
+1. * Edit depth at a specific point
 2. * Edit the minimum depth
 3. * Erase a basin at a selected point
-4. * Erase every basin but the basin with the selected point
-5. Given a dataset containing land fraction, generate and apply ocean mask.
-6. Apply a ridge to the bathymetry.
+4. * Erase every basin except the one containing the selected point
+5. Generate and apply an ocean mask from a land-fraction dataset
+6. Apply a ridge to the bathymetry
 
-You can also just apply an initializer again, which is technically an edit (None of these are supported in the TopoEditor): 
+You can also reapply an initializer (technical edits not supported in the GUI):
+
 1. Set flat bathy
 2. Set spoon bathy
 3. Set bowl bathy
-4. Set from dataset 
+4. Set from dataset
 5. Set from previous topo object
 
-To support the iterative process, we provide undo & redo functionality (across sessions!) in the topography. To do this, there is a lot of overhead! Here's how it's setup.
+To support the iterative editing process, we provide **undo and redo**
+functionality across sessions. This requires maintaining a structured history,
+stored inside a directory associated with your ``Topo`` object.
 
-We use a folder to support the topo object, and it contains all the history of edits you make with the topo object or the TopoEditor. It has four items:
+This folder contains:
+
 1. The grid underlying the topo
-2. The original topo (which is blank) 
-3. A temporary command history for the *in session* changes
-4. A permanent command history that applies across sessions. Temporary & Permanent only get synced when the topo is saved!
+2. The original blank topo
+3. A temporary command history (session-only)
+4. A permanent command history (saved on disk; synced only when saving)
 
-How it works!
-1. You create your topo, which creates our folder of four files from above.
-2. You make changes using the topo object or through the topo editor. 
-3. The change gets added to the temporary command history, and whenever the object is saved, to the permanent command history.
-4. The change then gets *commited*! That's right! 
+.. figure:: images/TopoLibrarySample.png
+   :align: center
+   :width: 500px
 
-Git and how to use it!
-------------------------
+   Layout of a ``Topo`` folder.
 
-We're using Git to implement undo/redo functionality in the topo object! You can see the log of changes by doing git log in your topo folder! 
-The temporary command history is a json file corresponding to git commit sha's. So you can look up the details of the change from your git log in the command history file. 
+.. figure:: images/TopoTempCommandHistory.png
+   :align: center
+   :width: 500px
 
-We also implement a git create branch and checkout, which can be triggered with topo.tcm.create_branch("branchname") and topo.tcm.checkout("branchname").
-You can also do a "tag" with topo.tcm.tag("tagname"), which will show up in your git history and save a topo file named like tagname_topog.nc. You cannot checkout the tag because that creates some undefined behavior we don't want!
+   Structure of the temporary command history JSON file.
 
-To undo or redo, you can use topo.tcm.undo() or topo.tcm.redo(). It'll show up in your git log as REDO-sha or UNDO-sha of the sha that was undone or redone. Be careful not to undo your initial set function!
 
-WARNING! Don't do git commands in your folder! Use the topo.tcm functions! Only use git log --oneline! We manage the topo independently (for now), and using something like a git checkout would break the functionality (probably).
+How It Works
+------------
 
-Naunces (Initialization, naming, etc...)
---------------------------------------------
+1. You create your ``Topo`` object, which initializes the four files above.
+2. You make changes using ``Topo`` or ``TopoEditor``.
+3. Each change is added to the temporary history and, when saved, to the permanent history.
+4. Each change is then **committed via Git**—this powers undo/redo.
 
-Folders are named after the hash of the grid tlon variable. This means that any initialization with the *same* grid will exist in the same folder. 
+Topo Git Functionality and How to Use It
+---------------------
 
-You can initilalize Topo in three ways:
-1. In __init__, which is like Topo(). That will create an empty topo with whatever minimum depth you have (So if you have a preexiting topo with the same grid, it will add two edits, a minimum depth edit that you specify, and it will set your depth to NaN)
-2. In class method from_topo
+We use Git to implement undo/redo functionality inside the topo directory.
+
+You can view the history with:
+
+``git log``
+
+The temporary command history is a JSON file mapping commit SHAs to change
+metadata. You can cross-reference the Git log with this JSON file to inspect
+details of each edit.
+
+We also support simple version-control actions:
+
+- ``topo.tcm.create_branch("branchname")`` — create a branch  
+- ``topo.tcm.checkout("branchname")`` — switch branches  
+- ``topo.tcm.tag("tagname")`` — create a tag and save a ``tagname_topog.nc`` file  
+
+Tags cannot be checked out (this can cause unexpected states).
+
+Undo and redo:
+
+- ``topo.tcm.undo()``
+- ``topo.tcm.redo()``
+
+These appear in the Git log as:
+
+- ``UNDO-<sha>``
+- ``REDO-<sha>``
+
+Be careful not to undo your initial set-function!
+
+.. warning::
+
+   Do **not** run Git commands inside this folder except for ``git log --oneline``.
+   We manage the folder internally. External Git commands (like ``git checkout``)
+   may break state management.
+
+
+.. figure:: images/TopoSampleGitLog.png
+   :align: center
+   :width: 500px
+
+   Example ``git log`` for a topo editing session.
+
+Nuances (Initialization, Naming, etc.)
+--------------------------------------
+
+Folders are named after the hash of the grid's ``tlon`` variable.  
+This means that **any topo using the same grid** will share the same folder.
+
+You can initialize ``Topo`` in three ways:
+
+1. ``Topo()`` — creates an empty topo with the provided minimum depth
+2. ``Topo.from_version_control(path)`` — loads a folder, applies saved history, and returns the reconstructed topo
+3. ``Topo.from_topo_file(file)`` — loads a topo file and applies it on top of any existing changes in the folder
+
+
+See also the demonstration notebook:
+
+`6_demo_editors.ipynb <https://github.com/NCAR/mom6_bathy/blob/master/notebooks/6_demo_editors.ipynb>`_
+
+
+
+
+
