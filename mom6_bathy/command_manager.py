@@ -47,7 +47,7 @@ class CommandManager(ABC):
         """Execute a command, push it onto the undo stack, and clear the redo stack."""
         pass
 
-    def push(self, command, cmd_type: CommandType, command_message=None):
+    def commit(self, command, cmd_type: CommandType, command_message=None):
         """Add a command to the history."""
 
         # The command must be serializable to JSON
@@ -248,7 +248,7 @@ class TopoCommandManager(CommandManager):
         )  # Add more as needed
         if cmd.__class__.__name__ in user_edit_types:
             cmd()
-            self.push(
+            self.commit(
                 cmd,
                 cmd_type=cmd_type,
                 command_message=message if message is not None else cmd.message,
