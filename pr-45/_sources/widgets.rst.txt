@@ -8,6 +8,9 @@ classes—``VGrid``, ``Grid``, and ``Topo``—to help with creating vertical gri
 (``VGridCreator``), horizontal grids (``GridCreator``), and editing topography
 (``TopoEditor``).
 
+Creators
+---------------------------
+
 The creators act as visual wrappers around the constructors of their respective
 classes, providing sliders and visualizations. They automatically generate
 folders called ``VgridLibrary`` and ``GridLibrary`` to store created grids.  
