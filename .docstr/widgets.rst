@@ -54,8 +54,7 @@ This folder contains:
 
 1. The grid underlying the topo
 2. The original blank topo
-3. A temporary command history (session-only)
-4. A permanent command history (saved on disk; synced only when saving)
+3. A permanent command history
 
 .. figure:: images/TopoLibrarySample.png
    :align: center
@@ -67,7 +66,7 @@ This folder contains:
    :align: center
    :width: 500px
 
-   Structure of the temporary command history JSON file.
+   Structure of the command history JSON file.
 
 
 How It Works
@@ -75,7 +74,7 @@ How It Works
 
 1. You create your ``Topo`` object, which initializes the four files above.
 2. You make changes using ``Topo`` or ``TopoEditor``.
-3. Each change is added to the temporary history and, when saved, to the permanent history.
+3. Each change is added to history.
 4. Each change is then **committed via Git**—this powers undo/redo.
 
 Topo Git Functionality and How to Use It
@@ -87,7 +86,7 @@ You can view the history with:
 
 ``git log``
 
-The temporary command history is a JSON file mapping commit SHAs to change
+The command history is a JSON file mapping commit SHAs to change
 metadata. You can cross-reference the Git log with this JSON file to inspect
 details of each edit.
 
@@ -135,6 +134,9 @@ You can initialize ``Topo`` in three ways:
 1. ``Topo()`` — creates an empty topo with the provided minimum depth
 2. ``Topo.from_version_control(path)`` — loads a folder, applies saved history, and returns the reconstructed topo
 3. ``Topo.from_topo_file(file)`` — loads a topo file and applies it on top of any existing changes in the folder
+
+All of the git versioning (undo, redo, reset, checkout, tag, create branch) is handled by the TopoCommandManager, which can be accessed as the class variable "tcm". The code for this manager resides in the command_manager class. 
+We would use straight git functions, but the topo file itself is handled independently of the commits. (In the future, expect this to use icechunk)
 
 
 See also the demonstration notebook:

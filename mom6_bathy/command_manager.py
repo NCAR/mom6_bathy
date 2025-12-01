@@ -180,25 +180,11 @@ class TopoCommandManager(CommandManager):
         self._original_topo_path = self.directory / "original_topog.nc"
         if not self._original_topo_path.exists():  # I.E. first time init
             self._topo.write_topo(self._original_topo_path)
-        # Override history path to temporary because topo editing should exist across session
-        self.history_file_path = self.directory / f"temp_command_history.json"
-
-        # Initialize temp history file if it doesn't exist
-        if not self.history_file_path.exists():
-            self.history_dict = {"Description": "Temporary Command History"}
-            self.write_history()
         self.load_history()
 
     def save(self, file_name="topog.nc"):
         """Save the current topo state, and make history permanent as a git tag with the given name."""
-        # First, copy over the temp history into real
-        # Copy temp history to permanent history
-        permanent_history_path = self.directory / f"command_history.json"
-        with self.history_file_path.open("r") as src, permanent_history_path.open(
-            "w"
-        ) as dst:
-            dst.write(src.read())
-        # Now write out topo
+        # Write Topo
         self._topo.write_topo(self.directory / file_name)
 
     def tag(self, tag_name):
