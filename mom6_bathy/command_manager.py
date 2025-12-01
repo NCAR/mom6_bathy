@@ -167,23 +167,6 @@ class CommandManager(ABC):
 
     def get_tag_names(self):
         return [tag.name for tag in self.repo.tags]
-    
-    def cleanup_history(self):
-        """Drop all commits newer than the last commit recorded in history_dict."""
-        self.load_history()
-
-        # history_dict keys = SHAs of all valid commits
-        valid_shas = set(self.history_dict.keys())
-
-        # Walk newest → oldest until we find the newest valid SHA
-        last_valid_sha = None
-        for commit in self.repo.iter_commits():  # default: newest → oldest
-            if commit.hexsha in valid_shas:
-                last_valid_sha = commit.hexsha
-                break
-
-        # Reset to the last valid commit (deletes all newer ones)
-        self.repo.git.reset("--hard", last_valid_sha)
 
 
 class TopoCommandManager(CommandManager):

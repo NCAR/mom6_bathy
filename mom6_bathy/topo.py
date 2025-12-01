@@ -81,7 +81,7 @@ class Topo:
             self.version_control = False  # For backwards compatability
 
     @classmethod
-    def from_version_control(folder_path: str | Path, min_depth = 0.0):
+    def from_version_control(folder_path: str | Path, min_depth=0.0):
         """
         Create a bathymetry object from an existing version-controlled bathymetry folder.
 
