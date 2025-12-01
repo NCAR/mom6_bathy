@@ -505,7 +505,7 @@ class TopoEditor(widgets.HBox):
         self.update_undo_redo_buttons()
 
     def on_git_create_branch(self, b):
-        """Create a new git branch and switch to it."""
+        """Create a new git branch"""
         name = self._git_branch_name.value.strip()
         if not name:
             print("Please enter a branch name.")
