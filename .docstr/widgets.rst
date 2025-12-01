@@ -6,7 +6,7 @@ This document explains the widget modules in ``mom6_bathy``.
 ``mom6_bathy`` comes with three UI modules/classes that wrap the three main
 classes—``VGrid``, ``Grid``, and ``Topo``—to help with creating vertical grids
 (``VGridCreator``), horizontal grids (``GridCreator``), and editing topography
-(```TopoEditor``).
+(``TopoEditor``).
 
 The creators act as visual wrappers around the constructors of their respective
 classes, providing sliders and visualizations. They automatically generate
@@ -14,8 +14,8 @@ folders called ``VgridLibrary`` and ``GridLibrary`` to store created grids.
 The currently selected grid is directly accessible as an object inside each
 creator.
 
-Topo & TopoEditor
------------------
+Topo & TopoEditor Edits
+---------------------------
 
 The ``Topo`` & ``TopoEditor`` workflow is a bit more nuanced.
 
@@ -28,20 +28,23 @@ visual, point-and-click interface on top of these functions.
 
 Current editing functions (``*`` = available in ``TopoEditor``):
 
-1. * Edit depth at a specific point
-2. * Edit the minimum depth
-3. * Erase a basin at a selected point
-4. * Erase every basin except the one containing the selected point
+1. ``*`` Edit depth at a specific point
+2. ``*`` Edit the minimum depth
+3. ``*`` Erase a basin at a selected point
+4. ``*`` Erase every basin except the one containing the selected point
 5. Generate and apply an ocean mask from a land-fraction dataset
 6. Apply a ridge to the bathymetry
 
-You can also reapply an initializer (technical edits not supported in the GUI):
+You can also reapply an initializer (none supported in the TopoEditor):
 
 1. Set flat bathy
 2. Set spoon bathy
 3. Set bowl bathy
 4. Set from dataset
 5. Set from previous topo object
+
+Undo & Redo
+------------
 
 To support the iterative editing process, we provide **undo and redo**
 functionality across sessions. This requires maintaining a structured history,
@@ -110,7 +113,7 @@ Be careful not to undo your initial set-function!
 
 .. warning::
 
-   Do **not** run Git commands inside this folder except for ``git log --oneline``.
+   Do **not** run Git commands inside this folder except for harmless commands like ``git log``.
    We manage the folder internally. External Git commands (like ``git checkout``)
    may break state management.
 
