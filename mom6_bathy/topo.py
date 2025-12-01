@@ -81,7 +81,7 @@ class Topo:
             self.version_control = False  # For backwards compatability
 
     @classmethod
-    def from_version_control(folder_path: str | Path):
+    def from_version_control(folder_path: str | Path, min_depth = 0.0):
         """
         Create a bathymetry object from an existing version-controlled bathymetry folder.
 
@@ -94,16 +94,6 @@ class Topo:
         folder_path = Path(folder_path)
         assert folder_path.exists(), f"Cannot find bathymetry folder at {folder_path}."
 
-        # Read the bathymetry info json file
-        bathy_info_path = folder_path / "bathy_info.json"
-        assert (
-            bathy_info_path.exists()
-        ), f"Cannot find bathy_info.json file at {bathy_info_path}."
-
-        with open(bathy_info_path, "r") as f:
-            bathy_info = json.load(f)
-
-        min_depth = bathy_info["min_depth"]
         grid_file_path = folder_path / "grid.nc"
         assert grid_file_path.exists(), f"Cannot find grid file at {grid_file_path}."
 
@@ -114,14 +104,8 @@ class Topo:
             grid, min_depth
         )  # Because we hash the grid, the correct domain will be selected
 
-        # Read in the depth from the topog file
-        topog_file_path = folder_path / "topog.nc"
-        try:
-            topo.set_depth_via_topog_file(topog_file_path)
-        except Exception as e:
-            print(
-                "No topography file found in the version-controlled folder. Bathymetry depth not set."
-            )
+        # Reapply any changes
+        topo.tcm.reapply_changes()
 
         return topo
 
@@ -141,6 +125,7 @@ class Topo:
         """
 
         topo = cls(grid, 0.0)
+        topo.tcm.reapply_changes()
         topo.set_depth_via_topog_file(topo_file_path)
         topo.min_depth = min_depth
         return topo
