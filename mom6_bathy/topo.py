@@ -9,7 +9,13 @@ from mom6_bathy.grid import Grid
 from scipy.spatial import cKDTree
 import xesmf as xe
 from scipy.ndimage import binary_fill_holes
+from mom6_bathy.git_utils import get_domain_dir, get_repo
+import shutil
+import json
 from pathlib import Path
+from mom6_bathy.edit_command import *
+from mom6_bathy.command_manager import TopoCommandManager
+from mom6_bathy.command_manager import CommandType
 
 
 class Topo:
@@ -17,7 +23,7 @@ class Topo:
     Bathymetry Generator for MOM6 grids (mom6_bathy.grid.Grid).
     """
 
-    def __init__(self, grid, min_depth):
+    def __init__(self, grid, min_depth, version_control_dir="TopoLibrary"):
         """
         MOM6 Simpler Models bathymetry constructor.
 
@@ -30,8 +36,79 @@ class Topo:
         """
 
         self._grid = grid
-        self._depth = None
+        self._depth = xr.DataArray(
+            np.full((grid.ny, grid.nx), np.nan, dtype=float),
+            dims=["ny", "nx"],
+            attrs={"units": "m"},
+        )  # Initialize depth with NaNs
         self._min_depth = min_depth
+
+        if version_control_dir != None:
+            self.version_control = True
+
+            # Create a folder to store bathymetry objects in
+            self.topos_root = Path(version_control_dir).mkdir(exist_ok=True)
+
+            # Create the subfolder for this specific bathymetry
+            self.domain_dir = Path(get_domain_dir(grid, base_dir=version_control_dir))
+            self.domain_dir.mkdir(
+                exist_ok=True
+            )  # This folder should not already exist.
+
+            # Save the grid info there (there can only be 1 grid per bathymetry)
+            self.grid_file_path = self.domain_dir / "grid.nc"
+            grid.write_supergrid(self.grid_file_path)
+
+            # Start the json file for tracking bathymetry
+            self.bathy_info_path = self.domain_dir / "bathy_info.json"
+            bathy_info = {
+                "min_depth": min_depth,
+                "grid_path": str(self.grid_file_path),
+            }
+
+            initial_command = MinDepthEditCommand(
+                self, attr="min_depth", new_value=min_depth
+            )
+
+            # Initialize the git repo
+            self.repo = get_repo(self.domain_dir)
+
+            # Set up TCM
+            self.tcm = TopoCommandManager(self, command_registry=COMMAND_REGISTRY)
+            self.tcm.execute(initial_command, cmd_type=CommandType.COMMAND)
+
+        else:
+            self.version_control = False  # For backwards compatability
+
+    @classmethod
+    def from_version_control(cls, folder_path: str | Path):
+        """
+        Create a bathymetry object from an existing version-controlled bathymetry folder.
+
+        Parameters
+        ----------
+        folder_path: str | Path
+            Path to an existing bathymetry folder created by mom6_bathy with version control enabled.
+        """
+
+        folder_path = Path(folder_path)
+        assert folder_path.exists(), f"Cannot find bathymetry folder at {folder_path}."
+
+        grid_file_path = folder_path / "grid.nc"
+        assert grid_file_path.exists(), f"Cannot find grid file at {grid_file_path}."
+
+        grid = Grid.from_supergrid(grid_file_path)
+
+        # Create the topo object
+        topo = Topo(
+            grid, 0.0
+        )  # Because we hash the grid, the correct domain will be selected
+
+        # Reapply any changes
+        topo.tcm.reapply_changes()
+        topo.tcm.undo()  # Undo the initialization min_depth set to 0.0.
+
+        return topo
 
     @classmethod
     def from_topo_file(cls, grid, topo_file_path, min_depth=0.0):
@@ -49,9 +126,43 @@ class Topo:
         """
 
         topo = cls(grid, 0.0)
+        topo.tcm.reapply_changes()
         topo.set_depth_via_topog_file(topo_file_path)
-        topo.min_depth = min_depth
+        min_depth_change = MinDepthEditCommand(
+            topo, attr="min_depth", new_value=min_depth
+        )
+        topo.tcm.execute(min_depth_change)
         return topo
+
+    @classmethod
+    def from_topo_version_control(cls, directory):
+        """
+        Create a bathymetry object from an existing topog file.
+
+        Parameters
+        ----------
+        directory: str
+            Path to an existing MOM6 topog file.
+
+        """
+        directory = Path(directory)
+        grid = Grid.from_supergrid(directory / "grid.nc")
+        topo_file_path = directory / "topog.nc"
+        topo_ds = xr.open_dataset(topo_file_path)
+
+        topo = cls(grid, topo_ds.attrs["min_depth"])
+        topo.set_depth_via_topog_file(topo_file_path)
+        return topo
+
+    def apply_edit(self, cmd):
+        self.command_manager.execute(cmd)
+        self.command_manager.save_commit("_autosave_working")
+
+    def undo_last_edit(self):
+        self.command_manager.undo()
+
+    def redo_last_edit(self):
+        self.command_manager.redo()
 
     @property
     def depth(self):
@@ -243,13 +354,36 @@ class Topo:
         D: float
             Bathymetric depth of the flat bottom to be generated.
         """
-        self._depth = xr.DataArray(
+
+        depth = xr.DataArray(
             np.full((self._grid.ny, self._grid.nx), D),
             dims=["ny", "nx"],
             attrs={"units": "m"},
         )
 
-    def set_depth_via_topog_file(self, topog_file_path):
+        # Save to object (Build TCM Object)
+        # 2. Generate all affected indices (row-major order)
+        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
+
+        # 3. Flatten the new values to match the indices
+        new_values = depth.values.ravel().tolist()
+
+        # 4. Flatten old values if depth exists
+        old_values = (
+            self.depth.values.ravel().tolist() if self.depth is not None else None
+        )
+
+        # 5. Build command
+        type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
+        depth_edit_command = DepthEditCommand(
+            self, all_indices, new_values, old_values=old_values
+        )
+
+        self.tcm.execute(depth_edit_command, cmd_type=type)
+
+    def set_depth_via_topog_file(self, topog_file_path, quietly=False):
         """
         Apply a bathymetry read from an existing topog file
 
@@ -337,8 +471,28 @@ class Topo:
         # Set all NaNs to land
         depth = depth.fillna(0)
 
-        # Save to object
-        self.depth = depth
+        # Save to object (Build TCM Object)
+        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
+
+        # 3. Flatten the new values to match the indices
+        new_values = depth.values.ravel().tolist()
+
+        # 4. Flatten old values if depth exists
+        old_values = (
+            self.depth.values.ravel().tolist() if self.depth is not None else None
+        )
+
+        # 5. Build command
+        cmd_type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
+        depth_edit_command = DepthEditCommand(
+            self, all_indices, new_values, old_values=old_values
+        )
+        if not quietly:
+            self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
+        else:
+            depth_edit_command()
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
@@ -362,18 +516,13 @@ class Topo:
         nx = self._grid.nx
         ny = self._grid.ny
         leny = self._grid.supergrid.leny
-        self._depth = xr.DataArray(
-            np.full((ny, nx), max_depth),
-            dims=["ny", "nx"],
-            attrs={"units": "m"},
-        )
 
         D0 = (max_depth - dedge) / (
             (1.0 - np.exp(-0.5 * leny * rad_earth * np.pi / (180.0 * expdecay)))
             * (1.0 - np.exp(-0.5 * leny * rad_earth * np.pi / (180.0 * expdecay)))
         )
 
-        self._depth[:, :] = dedge + D0 * (
+        new_values = dedge + D0 * (
             np.sin(
                 np.pi * (self._grid.tlon[:, :] - west_lon) / self._grid.supergrid.lenx
             )
@@ -387,6 +536,25 @@ class Topo:
                 )
             )
         )
+
+        # Save to object (Build TCM Object)
+        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
+
+        # 3. Flatten the new values to match the indices
+        new_values = new_values.values.ravel().tolist()
+
+        # 4. Flatten old values
+        old_values = self.depth.values.ravel().tolist()
+
+        # 5. Build command
+        cmd_type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
+        depth_edit_command = DepthEditCommand(
+            self, all_indices, new_values, old_values=old_values
+        )
+
+        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
 
     def set_bowl(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
@@ -408,18 +576,13 @@ class Topo:
         south_lat = self._grid.tlat[0, 0]
         len_lon = self._grid.supergrid.x.max() - self._grid.supergrid.x.min()
         len_lat = self._grid.supergrid.y.max() - self._grid.supergrid.y.min()
-        self._depth = xr.DataArray(
-            np.full((self._grid.ny, self._grid.nx), max_depth),
-            dims=["ny", "nx"],
-            attrs={"units": "m"},
-        )
 
         D0 = (max_depth - dedge) / (
             (1.0 - np.exp(-0.5 * len_lat * rad_earth * np.pi / (180.0 * expdecay)))
             * (1.0 - np.exp(-0.5 * len_lat * rad_earth * np.pi / (180.0 * expdecay)))
         )
 
-        self._depth[:, :] = dedge + D0 * (
+        new_values = dedge + D0 * (
             np.sin(np.pi * (self._grid.tlon[:, :] - west_lon) / len_lon)
             * (
                 (
@@ -442,6 +605,27 @@ class Topo:
                 )
             )
         )
+
+        # Save to object (Build TCM Object)
+        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
+
+        # 3. Flatten the new values to match the indices
+        new_values = new_values.values.ravel().tolist()
+
+        # 4. Flatten old values if depth exists
+        old_values = (
+            self.depth.values.ravel().tolist() if self.depth is not None else None
+        )
+
+        # 5. Build command
+        cmd_type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
+        depth_edit_command = DepthEditCommand(
+            self, all_indices, new_values, old_values=old_values
+        )
+
+        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
 
     def set_from_dataset(
         self,
@@ -541,7 +725,6 @@ class Topo:
         write_to_file=True,
         verbose=True,
     ):
-
         if verbose:
             print(
                 f"""
@@ -982,7 +1165,50 @@ class Topo:
             0
         )  # After min_depth filtering, move the land values to zero
         bathymetry.depth.attrs["units"] = "meters"
-        self._depth = bathymetry.depth
+        new_values = bathymetry.depth
+
+        # Save to object (Build TCM Object)
+        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
+
+        # 3. Flatten the new values to match the indices
+        new_values = new_values.values.ravel().tolist()
+
+        # 4. Flatten old values if depth exists
+        old_values = (
+            self.depth.values.ravel().tolist() if self.depth is not None else None
+        )
+
+        # 5. Build command
+        cmd_type = (
+            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
+        )
+        depth_edit_command = DepthEditCommand(
+            self, all_indices, new_values, old_values=old_values
+        )
+
+        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
+
+    def erase_selected_basin(self, i, j):
+        label = self.basintmask.data[j, i]
+        affected = np.where(self.basintmask.data == label)
+        indices = list(zip(affected[0], affected[1]))
+        if not indices:
+            return
+        old_values = [self.depth.data[jj, ii] for jj, ii in indices]
+        new_values = [0] * len(indices)
+        cmd = DepthEditCommand(self, indices, new_values, old_values=old_values)
+        self.tcm.execute(cmd)
+
+    def erase_disconnected_basin(self, i, j):
+        label = self.basintmask.data[j, i]
+        affected = np.where(self.basintmask.data != label)
+        indices = list(zip(affected[0], affected[1]))
+        if not indices:
+            return
+        old_values = [self.depth.data[jj, ii] for jj, ii in indices]
+        new_values = [0] * len(indices)
+        cmd = DepthEditCommand(self, indices, new_values, old_values=old_values)
+        self.tcm.execute(cmd)
 
     def apply_ridge(self, height, width, lon, ilat):
         """
@@ -1013,9 +1239,17 @@ class Topo:
         ridge_height_mapped = np.where(
             ridge_height_mapped <= 0.0, ridge_height_mapped, 0.0
         )
-
+        affected_indices = []
+        old_vals = []
+        new_vals = []
         for j in range(ilat[0], ilat[1]):
-            self._depth[j, :] += ridge_height_mapped
+            affected_indices.extend([(j, i) for i in range(self._grid.nx)])
+            old_vals.extend(self._depth[j, :].values)
+            new_vals.extend((self._depth[j, :] + ridge_height_mapped).values)
+        depth_edit_command = DepthEditCommand(
+            self, affected_indices, new_vals, old_values=old_vals
+        )
+        self.tcm.execute(depth_edit_command)
 
     def apply_land_frac(
         self,
@@ -1101,9 +1335,30 @@ class Topo:
             ds, ds_mapped, method, periodic=Grid.is_cyclic_x(self._grid.supergrid)
         )
         mask_mapped = regridder(ds.landfrac)
-        self._depth.data = np.where(
-            mask_mapped > cutoff_frac, depth_fillval, self._depth
+
+        # Build TCM Object
+        mask = mask_mapped > cutoff_frac  # boolean mask
+        ny, nx = self._depth.shape
+
+        affected_indices = []
+        old_vals = []
+        new_vals = []
+
+        for j in range(ny):
+            for i in range(nx):
+
+                if mask[j, i]:
+                    affected_indices.append((j, i))
+                    old_val = self._depth[j, i]
+                    new_val = depth_fillval
+
+                    old_vals.append(old_val)
+                    new_vals.append(new_val)
+
+        depth_edit_command = DepthEditCommand(
+            self, affected_indices, new_vals, old_values=old_vals
         )
+        self.tcm.execute(depth_edit_command)
 
     def gen_topo_ds(self, title=None):
         """
@@ -1159,6 +1414,13 @@ class Topo:
         )
 
         return ds
+
+    def save(self):
+        """
+        Save the TOPO_FILE (bathymetry file) in netcdf format to version control
+        """
+
+        self.tcm.save()
 
     def write_topo(self, file_path, title=None):
         """
@@ -1438,7 +1700,6 @@ class Topo:
         i0 = 1  # start index for node id's
 
         if self._grid.is_tripolar(self._grid._supergrid):
-
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()[: -(nx // 2 - 1)]
             qlat_flat = self._grid.qlat.data[:, :-1].flatten()[: -(nx // 2 - 1)]
@@ -1473,7 +1734,6 @@ class Topo:
                 return [ll, lr, ur, ul]
 
         elif Grid.is_cyclic_x(self._grid.supergrid) == True:
-
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()
             qlat_flat = self._grid.qlat.data[:, :-1].flatten()
@@ -1490,7 +1750,6 @@ class Topo:
             ]
 
         else:  # non-cyclic grid
-
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data.flatten()
             qlat_flat = self._grid.qlat.data.flatten()
