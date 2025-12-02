@@ -81,7 +81,7 @@ class Topo:
             self.version_control = False  # For backwards compatability
 
     @classmethod
-    def from_version_control(folder_path: str | Path, min_depth=0.0):
+    def from_version_control(cls, folder_path: str | Path):
         """
         Create a bathymetry object from an existing version-controlled bathymetry folder.
 
@@ -101,11 +101,12 @@ class Topo:
 
         # Create the topo object
         topo = Topo(
-            grid, min_depth
+            grid, 0.0
         )  # Because we hash the grid, the correct domain will be selected
 
         # Reapply any changes
         topo.tcm.reapply_changes()
+        topo.tcm.undo()  # Undo the initialization min_depth set to 0.0.
 
         return topo
 
@@ -127,7 +128,10 @@ class Topo:
         topo = cls(grid, 0.0)
         topo.tcm.reapply_changes()
         topo.set_depth_via_topog_file(topo_file_path)
-        topo.min_depth = min_depth
+        min_depth_change = MinDepthEditCommand(
+            topo, attr="min_depth", new_value=min_depth
+        )
+        topo.tcm.execute(min_depth_change)
         return topo
 
     @classmethod

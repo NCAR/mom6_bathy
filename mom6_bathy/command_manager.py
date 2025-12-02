@@ -53,7 +53,10 @@ class CommandManager(ABC):
         # The command must be serializable to JSON
         command_data = command.serialize()
 
-        self.add_to_history("head", json.dumps(command_data))
+        if cmd_type == CommandType.COMMAND:
+            self.add_to_history("head", json.dumps(command_data))
+        else:
+            self.touch_history()  # just bump history to let the commit happen
         # git add it
         rel_path = os.path.relpath(self.history_file_path, self.repo.working_tree_dir)
 
@@ -81,16 +84,30 @@ class CommandManager(ABC):
             else:
                 cmd_type = commit_msg.strip()
                 affected_sha = None
-            cmd_type = cmd_type.strip()
+            cmd_type = CommandType(cmd_type.strip())
 
             # write  acheck that if the shaw it's head instead we use key head
             if sha == self.repo.head.commit.hexsha:
                 sha = "head"
-            cmd_data = json.loads(self.history_dict[sha])
 
+            if cmd_type == CommandType.COMMAND:
+                cmd_data = json.loads(self.history_dict[sha])
+            else:
+                cmd_data = None
             return cmd_type, affected_sha, cmd_data
         except Exception as e:
             raise ValueError(f"Invalid commit message format: {commit_msg}") from e
+
+    def touch_history(self):
+        """make a change to the history for commit purposes"""
+        if "head" in self.history_dict:
+            self.history_dict[self.repo.head.commit.hexsha] = self.history_dict["head"]
+
+        if "touch" in self.history_dict:
+            self.history_dict["touch"] = not self.history_dict["touch"]
+        else:
+            self.history_dict["touch"] = True
+        self.write_history()
 
     def add_to_history(self, sha, command_data: str):
         """
@@ -137,21 +154,20 @@ class CommandManager(ABC):
             except ValueError:
                 continue
 
-            if cmd_type == "COMMAND":
+            if cmd_type == CommandType.COMMAND:
                 state[sha] = dict(
                     cmd_data=cmd_data,
                     applied=True,
                 )
+                state["undone_order"].clear()
 
-            elif cmd_type == "UNDO":
+            elif cmd_type == CommandType.UNDO:
                 # this UNDO targets affected_sha
                 state["undone_order"].append(affected_sha)
-                if affected_sha in state:
-                    state[affected_sha]["applied"] = False
+                state[affected_sha]["applied"] = False
 
-            elif cmd_type == "REDO":
-                if affected_sha in state:
-                    state[affected_sha]["applied"] = True
+            elif cmd_type == CommandType.REDO:
+                state[affected_sha]["applied"] = True
                 state["undone_order"].remove(affected_sha)
 
         return state
