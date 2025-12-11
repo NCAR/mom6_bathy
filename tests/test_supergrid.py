@@ -9,5 +9,5 @@ import numpy as np
     ],
 )
 def test_even_spacing_hgrid(lat, lon):
-    assert isinstance(EvenSpacingSupergrid(lon[0],lon[1]-lon[0], lat[0], lat[1]-lat[0],0.05), EvenSpacingSupergrid)
+    assert isinstance(RectilinearCartesianSupergrid(lon[0],lon[1]-lon[0], lat[0], lat[1]-lat[0],0.05), RectilinearCartesianSupergrid)
 
