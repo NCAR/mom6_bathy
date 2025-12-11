@@ -2,11 +2,11 @@
 This module defines MOM6-style supergrid classes and associated utilities. It sits underneath the mom6_bathy.grid class and fills the roll of calculating the grid geometry: angle_dx, area, dx, dy, x, and y. 
 
 Classes defined here:
-- SupergridBase: Abstract base class defining the MOM6-style supergrid interface.
-- EqualDegreeSupergrid: MOM6-style supergrid with constant-degree spacing (lon/lat grid).
-- EvenSpacingSupergrid: MOM6-style supergrid with (as close to) uniform Cartesian spacing (still a lat/lon grid).
+- SupergridBase: Base class defining the MOM6-style supergrid interface.
+- UniformSphericalSupergrid: MOM6-style supergrid with constant-degree spacing (lon/lat grid).
+- RectilinearCartesianSupergrid: MOM6-style supergrid with (as close to) uniform Cartesian spacing (still a lat/lon grid).
 
-The code for these classes does not originally come from mom6_bathy, but was adapted: EqualDegreeSupergrid by Mathew Harrison in MIDAS (https://github.com/mjharriso/MIDAS) and EvenSpacingSupergrid by Ashley Barnes in regional_mom6 (https://github.com/COSIMA/regional-mom6).
+The code for these classes does not originally come from mom6_bathy, but was adapted: UniformSphericalSupergrid by Mathew Harrison in MIDAS (https://github.com/mjharriso/MIDAS) and RectilinearCartesianSupergrid by Ashley Barnes in regional_mom6 (https://github.com/COSIMA/regional-mom6).
 """
 
 import numpy as np
@@ -14,10 +14,19 @@ import xarray as xr
 from datetime import datetime
 from typing import Optional
 from mom6_bathy.utils import quadrilateral_areas, mdist
+from mom6_bathy.grid import Grid
 
 
 class SupergridBase:
-    """Abstract base class defining the MOM6-style supergrid interface."""
+    """Base class defining the MOM6-style supergrid interface."""
+
+    @property
+    def is_cyclic_x(self):
+        return np.allclose(
+            normalize_deg(self.x[:, 0]),
+            normalize_deg(self.x[:, -1]),
+            rtol=1e-5,
+        )
 
     @property
     def lenx(self):
@@ -94,7 +103,7 @@ class SupergridBase:
         return ds
 
 
-class EqualDegreeSupergrid(SupergridBase):
+class UniformSphericalSupergrid(SupergridBase):
     """MOM6-style supergrid with constant-degree spacing (lon/lat grid)."""
 
     @classmethod
@@ -219,7 +228,7 @@ class EqualDegreeSupergrid(SupergridBase):
         return dx, dy, area, angle_dx, axis_units
 
 
-class EvenSpacingSupergrid(SupergridBase):
+class RectilinearCartesianSupergrid(SupergridBase):
     """MOM6-style supergrid with uniform Cartesian spacing (x/y in meters). Originally by Ashley Barnes in regional_mom6"""
 
     def __init__(self, lon_min, len_x, lat_min, len_y, resolution):
@@ -285,4 +294,3 @@ class EvenSpacingSupergrid(SupergridBase):
 
         axis_units = "degrees"
         return lon, lat, dx, dy, area, angle_dx, axis_units
-

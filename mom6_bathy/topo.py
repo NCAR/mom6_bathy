@@ -417,8 +417,8 @@ class Topo:
 
         west_lon = self._grid.tlon[0, 0]
         south_lat = self._grid.tlat[0, 0]
-        len_lon = self._grid.supergrid.x.max() - self._grid.supergrid.x.min()
-        len_lat = self._grid.supergrid.y.max() - self._grid.supergrid.y.min()
+        len_lon = self._grid.supergrid.lenx
+        len_lat = self._grid.supergrid.leny
         self._depth = xr.DataArray(
             np.full((self._grid.ny, self._grid.nx), max_depth),
             dims=["ny", "nx"],
@@ -1109,7 +1109,7 @@ class Topo:
         )
 
         regridder = xe.Regridder(
-            ds, ds_mapped, method, periodic=Grid.is_cyclic_x(self._grid.supergrid)
+            ds, ds_mapped, method, periodic=self._grid.is_cyclic_x
         )
         mask_mapped = regridder(ds.landfrac)
         self._depth.data = np.where(
@@ -1482,7 +1482,7 @@ class Topo:
 
                 return [ll, lr, ur, ul]
 
-        elif Grid.is_cyclic_x(self._grid.supergrid) == True:
+        elif self._grid.is_cyclic_x == True:
 
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()
