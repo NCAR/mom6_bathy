@@ -9,11 +9,12 @@ from time import time
 from pathlib import Path
 from scipy.spatial import cKDTree
 from scipy.sparse import csc_matrix, coo_matrix
+import xesmf as xe
 
 MPI = None
 rank = lambda: MPI.COMM_WORLD.Get_rank() if MPI else 0
 
-from mom6_bathy.aux import get_mesh_dimensions, cell_area_rad, normalize_deg, is_mesh_cyclic_x, get_avg_resolution_km
+from mom6_bathy.utils import get_mesh_dimensions, cell_area_rad, normalize_deg, is_mesh_cyclic_x, get_avg_resolution_km
 
 def grid_from_esmf_mesh(mesh: xr.Dataset | str | Path) -> "Grid":
     """Given an ESMF mesh where the grid metrics are stored in 1D (flattened) arrays,
@@ -852,6 +853,50 @@ def gen_rof_maps(rof_mesh_path, ocn_mesh_path, output_dir, mapping_file_prefix, 
         print(f"  {nnsm_map_filepath}")
     
     print ("Done generating runoff to ocean mapping file(s).")
+
+def regrid_dataset_via_xesmf(input_dataset, output_dataset, regridding_method=None, write_to_file=True, output_path=Path("regridded_dataset.nc")):
+    """
+    Regrids the dataset given ``input_dataset`` which contains the original dataset and ``output_dataset`` which is a template for the regridded product.
+    Uses xESMF for regridding.
+
+    Args:
+        input_dataset (Xarray Dataset): original dataset with proper  metadata and structure for ESMF regridding.
+        output_dataset (Xarray Dataset): Template for the regridded dataset regridding_method: (Optional[str]) The type of regridding method to use. Defaults to bilinear
+        write_to_file (Optional[bool]): Files saved to ``output_dir`` Defaults to ``True``. Must be set to true if using manual regridding methods with ESMF_regrid.
+
+    Returns:
+        regridded_dataset (Xarray.Dataset): 
+    """
+
+    if regridding_method is None:
+        regridding_method = "bilinear"
+
+    input_dataset = input_dataset.load()
+
+    print(
+        "Begin regridding dataset...\n\n"
+        + f"Original dataset size: {input_dataset.nbytes/1e6:.2f} Mb\n"
+        + f"Regridded size: {output_dataset.nbytes/1e6:.2f} Mb\n"
+    )
+
+    regridder = xe.Regridder(
+        input_dataset,
+        output_dataset,
+        method=regridding_method,
+        locstream_out=False,
+        periodic=False,
+    )
+
+    dataset = regridder(input_dataset)
+
+    if write_to_file:
+        dataset.to_netcdf(
+            output_path,
+            mode="w",
+            engine="netcdf4",
+        )
+
+    return dataset
 
 def main(args):
 
