@@ -14,7 +14,6 @@ import xarray as xr
 from datetime import datetime
 from typing import Optional
 from mom6_bathy.utils import quadrilateral_areas, mdist
-from mom6_bathy.grid import Grid
 
 
 class SupergridBase:

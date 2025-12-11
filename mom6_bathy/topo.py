@@ -7,9 +7,9 @@ from scipy.ndimage import label
 from mom6_bathy.utils import cell_area_rad, longitude_slicer
 from mom6_bathy.grid import Grid
 from scipy.spatial import cKDTree
-import xesmf as xe
 from scipy.ndimage import binary_fill_holes
 from pathlib import Path
+from mom6_bathy.mapping import regrid_dataset_via_xesmf
 
 
 class Topo:
@@ -518,12 +518,12 @@ class Topo:
             )
 
         if run_regrid_dataset:
-            self.regridded_bathy = self.regrid_dataset(
+            self.regridded_bathy = regrid_dataset_via_xesmf(
                 bathymetry_output=self.bathymetry_output,
                 empty_bathy=self.empty_bathy,
                 regridding_method=regridding_method,
-                output_dir=output_dir,
                 write_to_file=write_to_file,
+                output_path = output_dir/"bathymetry_unfinished.nc"
             )
 
         if run_tidy_dataset:
@@ -606,7 +606,7 @@ class Topo:
     ):
         """
         Sets up necessary objects/files for regridding bathymetry. Can be flexibly used with
-        regrid_dataset() or user can manually regrid with ESMF_regrid.
+        mapping.regrid_bathy_dataset() or user can manually regrid with ESMF_regrid.
 
         If manual regridding is necessary, write_to_file must be set to True.
 
@@ -731,59 +731,7 @@ class Topo:
             )
             empty_bathy.close()
         return bathymetry_output, empty_bathy
-
-    def regrid_dataset(
-        self,
-        bathymetry_output,
-        empty_bathy,
-        regridding_method=None,
-        output_dir=Path(""),
-        write_to_file=True,
-    ):
-        """
-        Regrids the bathymetry given ``bathymetry_output`` which contains the original bathymetry and ``empty_bathy`` which is a template for the regridded product.
-        Uses xESMF for regridding.
-
-        Args:
-            bathymetry_output (Xarray Dataset): Refactor of original bathymetry with proper  metadata and structure for ESMF regridding.
-            empty_bathy (Xarray Dataset): Template for the regridded bathymetry regridding_method: (Optional[str]) The type of regridding method to use. Defaults to self.regridding_method.
-            write_to_file (Optional[bool]): Files saved to ``output_dir`` Defaults to ``True``. Must be set to true if using manual regridding methods with ESMF_regrid.
-
-        Returns:
-            regridded_bathymetry (Dataset): Still needs to be cleaned and processed
-            with ``tidy_dataset``.
-        """
-        output_dir = Path(output_dir)
-
-        if regridding_method is None:
-            regridding_method = "bilinear"
-
-        bathymetry_output = bathymetry_output.load()
-
-        print(
-            "Begin regridding bathymetry...\n\n"
-            + f"Original bathymetry size: {bathymetry_output.nbytes/1e6:.2f} Mb\n"
-            + f"Regridded size: {empty_bathy.nbytes/1e6:.2f} Mb\n"
-        )
-
-        regridder = xe.Regridder(
-            bathymetry_output,
-            empty_bathy,
-            method=regridding_method,
-            locstream_out=False,
-            periodic=False,
-        )
-
-        bathymetry = regridder(bathymetry_output)
-
-        if write_to_file:
-            bathymetry.to_netcdf(
-                output_dir / "bathymetry_unfinished.nc",
-                mode="w",
-                engine="netcdf4",
-            )
-
-        return bathymetry
+        
 
     def tidy_dataset(
         self,
