@@ -48,7 +48,6 @@ class VGrid:
 
     @property
     def zl(self):
-    def zl(self):
         """Array of vertical grid cell center depths (meters)."""
         return np.cumsum(self.dz) - 0.5 * self.dz
 
