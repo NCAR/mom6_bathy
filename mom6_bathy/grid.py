@@ -4,11 +4,7 @@ from typing import Optional
 import numpy as np
 import xarray as xr
 from scipy.spatial import cKDTree
-from mom6_bathy._supergrid import (
-    EqualDegreeSupergrid,
-    EvenSpacingSupergrid,
-    SupergridBase,
-)
+from mom6_bathy._supergrid import UniformSphericalSupergrid, RectilinearCartesianSupergrid, SupergridBase
 from mom6_bathy.utils import normalize_deg
 
 
@@ -67,7 +63,7 @@ class Grid:
         ystart: Optional[float] = None,
         cyclic_x: bool = False,
         name: Optional[str] = None,
-        type: str = "equal_degree",
+        type: str = "uniform_spherical",
     ) -> None:
         """
         Grid instance constructor.
@@ -94,9 +90,9 @@ class Grid:
             flag to make the grid cyclic in x direction. False by default.
         name : str, optional
             name of the grid. None by default.
-        even_spacing_grid : bool, optional
-            If True, creates an evenly spaced in distance(m) grid.
-            If False, creates a generic grid equal-degree spaced. False by default.
+        type : str, optional
+            If not specified, creates an uniform_degree grid.
+            Options are uniform_degree or rectilinear_cartesian
         """
 
         # default ystart value (centers the domain at the Equator)
@@ -114,9 +110,9 @@ class Grid:
             ), "resolution must be provided if nx and ny are not"
             nx = int(lenx / resolution)
             ny = int(leny / resolution)
-
-        if type == "even_spacing" and resolution is None:
-            raise ValueError("resolution must be provided for even_spacing grid type")
+        
+        if type == "rectilinear_cartesian" and resolution is None:
+            raise ValueError("resolution must be provided for rectilinear_cartesian grid type")
 
         # consistency checks for constructor arguments
         assert nx > 0, "nx must be a positive integer"
@@ -131,12 +127,17 @@ class Grid:
         self.name = name
         self.cyclic_x = cyclic_x
 
-        if type == "equal_degree":
-            self.supergrid = EqualDegreeSupergrid.from_extents(
-                lon_min=xstart, len_x=lenx, lat_min=ystart, len_y=leny, nx=nx, ny=ny
+        if type == "uniform_spherical":
+            self.supergrid = UniformSphericalSupergrid.from_extents(
+                lon_min=xstart,
+                len_x=lenx,
+                lat_min=ystart,
+                len_y=leny,
+                nx=nx,
+                ny=ny
             )
-        elif type == "even_spacing":
-            self.supergrid = EvenSpacingSupergrid(
+        elif type == "rectilinear_cartesian":
+            self.supergrid = RectilinearCartesianSupergrid(
                 lon_min=xstart,
                 len_x=lenx,
                 lat_min=ystart,
@@ -245,7 +246,9 @@ class Grid:
 
         # Periodicity checks:
 
-        cyclic_x = self.cyclic_x and (i_low == 0) and (i_high == self.nx)
+        cyclic_x = (
+            self.cyclic_x and (i_low == 0) and (i_high == self.nx)
+        )
 
         # Cyclic Y and tripolar are still TODO (these were not supported previously)
         # cyclic_y = (
@@ -264,7 +267,7 @@ class Grid:
         s_i_low = i_low * srefine
         s_i_high = (i_high) * srefine + 1
 
-        sub_supergrid = EqualDegreeSupergrid.from_xy(
+        sub_supergrid = UniformSphericalSupergrid.from_xy(
             x=self.supergrid.x[s_j_low:s_j_high:j_step, s_i_low:s_i_high:i_step],
             y=self.supergrid.y[s_j_low:s_j_high:j_step, s_i_low:s_i_high:i_step],
         )
@@ -442,6 +445,7 @@ class Grid:
             "ic": init_result,
         }
 
+
     @classmethod
     def from_supergrid(cls, path: str, name: Optional[str] = None) -> "Grid":
         """Create a Grid instance from a supergrid file.
@@ -460,11 +464,7 @@ class Grid:
             The Grid instance created from the supergrid file.
         """
         ds = xr.open_dataset(path)
-        name = (
-            name or os.path.basename(path).replace(".nc", "")
-            if os.path.basename(path).endswith(".nc")
-            else os.path.basename(path)
-        )
+        name = name or os.path.basename(path).replace(".nc", "") if os.path.basename(path).endswith(".nc") else os.path.basename(path)
         return Grid.from_supergrid_ds(ds, name)
 
     @classmethod
@@ -501,7 +501,7 @@ class Grid:
             lenx=(ds.x.max() - ds.x.min()).item(),
             leny=(ds.y.max() - ds.y.min()).item(),
             cyclic_x=Grid.is_cyclic_x(ds),
-            name=name,
+            name=name
         )
 
         # override obj.supergrid with the data from the original supergrid file
@@ -516,6 +516,7 @@ class Grid:
         obj._compute_MOM6_grid_metrics()
 
         return obj
+
 
     @classmethod
     def subgrid_from_supergrid(
@@ -569,7 +570,7 @@ class Grid:
     def lenx(self) -> float:
         """Length of the grid in the x-direction."""
         return self.supergrid.lenx
-
+    
     @property
     def leny(self) -> float:
         """Length of the grid in the y-direction."""
@@ -898,8 +899,9 @@ class Grid:
             2-dimensional array of the new y coordinates.
         """
 
-        self.supergrid = EqualDegreeSupergrid.from_xy(xdat, ydat)
+        self.supergrid = UniformSphericalSupergrid.from_xy(xdat, ydat)
 
+    
     def write_supergrid(
         self, path: Optional[str] = None, author: Optional[str] = None
     ) -> None:

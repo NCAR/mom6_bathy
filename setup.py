@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="mom6_bathy",  # Replace with your own username
+    name="mom6_bathy", # Replace with your own username
     version="0.0.1",
     author="Alper Altuntas",
     author_email="altuntas@ucar.edu",
@@ -12,13 +12,13 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/NCAR/mom6-bathy",
-    packages=["mom6_bathy"],
+    packages=['mom6_bathy'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.11.10,<3.12",
+    python_requires='>=3.11.10,<3.12',
     install_requires=[
         "setuptools>=69.0,<69.1",
         "numpy>=1.26,<1.27",

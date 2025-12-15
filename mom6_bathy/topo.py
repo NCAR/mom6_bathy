@@ -7,7 +7,6 @@ from scipy.ndimage import label
 from mom6_bathy.utils import cell_area_rad, longitude_slicer
 from mom6_bathy.grid import Grid
 from scipy.spatial import cKDTree
-import xesmf as xe
 from scipy.ndimage import binary_fill_holes
 from mom6_bathy.git_utils import get_domain_dir, get_repo
 import shutil
@@ -16,6 +15,7 @@ from pathlib import Path
 from mom6_bathy.edit_command import *
 from mom6_bathy.command_manager import TopoCommandManager
 from mom6_bathy.command_manager import CommandType
+from mom6_bathy.mapping import regrid_dataset_via_xesmf
 
 
 class Topo:
@@ -233,7 +233,7 @@ class Topo:
             attrs={"name": "T mask"},
         )
         return tmask_da
-
+    
     @property
     def umask(self):
         """
@@ -244,13 +244,31 @@ class Topo:
         # Create empty mask DataArray for umask
         umask = xr.DataArray(
             np.ones(self._grid.ulat.shape, dtype=int),
-            dims=["yh", "xq"],
-            attrs={"name": "U mask"},
-        )
-
+            dims = ['yh','xq'],
+            attrs={"name": "U mask"})
+        
         # Fill umask with mask values
-        umask[:, :-1] &= tmask.values  # h-point translates to the left u-point
-        umask[:, 1:] &= tmask.values  # h-point translates to the right u-point
+        umask[:,:-1] &= tmask.values # h-point translates to the left u-point
+        umask[:,1:] &= tmask.values # h-point translates to the right u-point
+
+        return umask   
+     
+    @property
+    def umask(self):
+        """
+        Ocean domain mask on U grid. 1 if ocean, 0 if land.
+        """
+        tmask = self.tmask
+
+        # Create empty mask DataArray for umask
+        umask = xr.DataArray(
+            np.ones(self._grid.ulat.shape, dtype=int),
+            dims = ['yh','xq'],
+            attrs={"name": "U mask"})
+        
+        # Fill umask with mask values
+        umask[:,:-1] &= tmask.values # h-point translates to the left u-point
+        umask[:,1:] &= tmask.values # h-point translates to the right u-point
 
         return umask
 
@@ -264,16 +282,15 @@ class Topo:
         # Create empty mask DataArray for umask
         vmask = xr.DataArray(
             np.ones(self._grid.vlat.shape, dtype=int),
-            dims=["yq", "xh"],
-            attrs={"name": "V mask"},
-        )
-
+            dims = ['yq','xh'],
+            attrs={"name": "V mask"})
+        
         # Fill vmask with mask values
-        vmask[:-1, :] &= tmask.values  # h-point translates to the bottom v-point
-        vmask[1:, :] &= tmask.values  # h-point translates to the top v-point
+        vmask[:-1,:] &= tmask.values # h-point translates to the bottom v-point
+        vmask[1:,:] &= tmask.values # h-point translates to the top v-point
 
         return vmask
-
+    
     @property
     def qmask(self):
         """
@@ -284,15 +301,14 @@ class Topo:
         # Create empty mask DataArray for umask
         qmask = xr.DataArray(
             np.ones(self._grid.qlat.shape, dtype=int),
-            dims=["yq", "xq"],
-            attrs={"name": "Q mask"},
-        )
-
+            dims = ['yq','xq'],
+            attrs={"name": "Q mask"})
+        
         # Fill qmask with mask values
-        qmask[:-1, :-1] &= tmask.values  # top-left of h goes to top-left q
-        qmask[:-1, 1:] &= tmask.values  # top-right
-        qmask[1:, :-1] &= tmask.values  # bottom-left
-        qmask[1:, 1:] &= tmask.values  # bottom-right
+        qmask[:-1, :-1] &= tmask.values    # top-left of h goes to top-left q
+        qmask[:-1, 1:]  &= tmask.values     # top-right
+        qmask[1:, :-1]  &= tmask.values   # bottom-left
+        qmask[1:, 1:]   &= tmask.values     # bottom-right 
 
         # Corners of the qmask are always land -> regional cases
         qmask[0, 0] = 0
@@ -301,16 +317,18 @@ class Topo:
         qmask[-1, -1] = 0
 
         return qmask
+          
 
+        
     @property
     def basintmask(self):
         """
         Ocean domain mask at T grid. Seperate number for each connected water cell, 0 if land.
         """
         res, num_features = label(self.tmask)
-
+        
         return xr.DataArray(res)
-
+    
     @property
     def supergridmask(self):
         """
@@ -320,29 +338,23 @@ class Topo:
         supergridmask = xr.DataArray(
             np.zeros(self._grid._supergrid.x.shape, dtype=int),
             dims=["nyp", "nxp"],
-            attrs={"name": "supergrid mask"},
-        )
+            attrs={"name": "supergrid mask"})
         supergridmask[::2, ::2] = self.qmask.values
         supergridmask[::2, 1::2] = self.vmask.values
-        supergridmask[1::2, ::2] = self.umask.values
-        supergridmask[1::2, 1::2] = self.tmask.values
+        supergridmask[ 1::2,::2] = self.umask.values
+        supergridmask[ 1::2,1::2] = self.tmask.values
         return supergridmask
 
-    def point_is_ocean(self, lons, lats):
+    def point_is_ocean(self, lons,lats):
         """
         Given a list of coordinates, return a list of booleans indicating if the coordinates are in the ocean (True) or land (False)
         """
-        assert len(lons) == len(
-            lats
-        ), "Lons & Lats must be the same length, they describe a set of points"
+        assert len(lons) == len(lats), "Lons & Lats must be the same length, they describe a set of points"
 
-        is_ocean = []
+        is_ocean=[]
         for i in range(len(lons)):
-            match = np.where(
-                (self._grid._supergrid.x == lons[i])
-                & (self._grid._supergrid.y == lats[i])
-            )
-            is_ocean.append(self.supergridmask[match[0], match[1]].item())
+            match = np.where((self._grid._supergrid.x == lons[i]) & (self._grid._supergrid.y == lats[i]))
+            is_ocean.append(self.supergridmask[match[0],match[1]].item())
         return is_ocean
 
     def set_flat(self, D):
@@ -398,9 +410,7 @@ class Topo:
         ), f"Cannot find topog file at {topog_file_path}."
 
         ds_topo = xr.open_dataset(topog_file_path)
-        assert (
-            "depth" in ds_topo
-        ), f"Cannot find the 'depth' field in topog file {topog_file_path}"
+        assert "depth" in ds_topo, f"Cannot find the 'depth' field in topog file {topog_file_path}"
         depth = ds_topo["depth"]
 
         if depth.shape[0] < self._grid.ny or depth.shape[1] < self._grid.nx:
@@ -410,17 +420,17 @@ class Topo:
             )
         elif depth.shape[0] > self._grid.ny or depth.shape[1] > self._grid.nx:
             assert (
-                "geolat" in ds_topo and "geolon" in ds_topo
+                'geolat' in ds_topo and 'geolon' in ds_topo
             ), f"Topog file {topog_file_path} does not contain geolat and geolon fields, "
             "which are required to determine if the grid is a subgrid of the topog file, "
             "since the topography data is larger than the grid (in index space). "
 
             # Determine if the grid is a subgrid of the topog file
-            geolat = ds_topo["geolat"]
-            geolon = ds_topo["geolon"]
+            geolat = ds_topo['geolat']
+            geolon = ds_topo['geolon']
 
             # find the closest cell in the topog file to the (sub)grid's origin (southwest corner)
-            topog_kdtree = cKDTree(
+            topog_kdtree =  cKDTree(
                 np.column_stack((geolat.data.flatten(), geolon.data.flatten()))
             )
             _, indices = topog_kdtree.query(
@@ -441,17 +451,20 @@ class Topo:
 
             # Compare the coords of grid with the coords of the subregion of the topog
             # data where it may overlap with the grid
-            grid_overlaps_topo = np.all(
-                np.isclose(
-                    geolat[cj : cj + self._grid.ny, ci : ci + self._grid.nx],
-                    self._grid.tlat.data,
-                    rtol=1e-5,
+            grid_overlaps_topo = (
+                np.all(
+                    np.isclose(
+                        geolat[cj:cj + self._grid.ny, ci:ci + self._grid.nx],
+                        self._grid.tlat.data,
+                        rtol=1e-5
+                    )
                 )
-            ) and np.all(
-                np.isclose(
-                    geolon[cj : cj + self._grid.ny, ci : ci + self._grid.nx],
-                    self._grid.tlon.data,
-                    rtol=1e-5,
+                and np.all(
+                    np.isclose(
+                        geolon[cj:cj + self._grid.ny, ci:ci + self._grid.nx],
+                        self._grid.tlon.data,
+                        rtol=1e-5
+                    )
                 )
             )
             if not grid_overlaps_topo:
@@ -463,10 +476,10 @@ class Topo:
                 )
 
             # If the grid is a subgrid of the topog data, extract the subregion
-            depth = depth[cj : cj + self._grid.ny, ci : ci + self._grid.nx]
-
+            depth = depth[cj:cj + self._grid.ny, ci:ci + self._grid.nx]
+        
         else:
-            pass  # the depth array is the right size
+            pass # the depth array is the right size
 
         # Set all NaNs to land
         depth = depth.fillna(0)
@@ -574,8 +587,8 @@ class Topo:
 
         west_lon = self._grid.tlon[0, 0]
         south_lat = self._grid.tlat[0, 0]
-        len_lon = self._grid.supergrid.x.max() - self._grid.supergrid.x.min()
-        len_lat = self._grid.supergrid.y.max() - self._grid.supergrid.y.min()
+        len_lon = self._grid.supergrid.lenx
+        len_lat = self._grid.supergrid.leny
 
         D0 = (max_depth - dedge) / (
             (1.0 - np.exp(-0.5 * len_lat * rad_earth * np.pi / (180.0 * expdecay)))
@@ -691,12 +704,12 @@ class Topo:
             )
 
         if run_regrid_dataset:
-            self.regridded_bathy = self.regrid_dataset(
+            self.regridded_bathy = regrid_dataset_via_xesmf(
                 bathymetry_output=self.bathymetry_output,
                 empty_bathy=self.empty_bathy,
                 regridding_method=regridding_method,
-                output_dir=output_dir,
                 write_to_file=write_to_file,
+                output_path = output_dir/"bathymetry_unfinished.nc"
             )
 
         if run_tidy_dataset:
@@ -778,7 +791,7 @@ class Topo:
     ):
         """
         Sets up necessary objects/files for regridding bathymetry. Can be flexibly used with
-        regrid_dataset() or user can manually regrid with ESMF_regrid.
+        mapping.regrid_bathy_dataset() or user can manually regrid with ESMF_regrid.
 
         If manual regridding is necessary, write_to_file must be set to True.
 
@@ -903,59 +916,7 @@ class Topo:
             )
             empty_bathy.close()
         return bathymetry_output, empty_bathy
-
-    def regrid_dataset(
-        self,
-        bathymetry_output,
-        empty_bathy,
-        regridding_method=None,
-        output_dir=Path(""),
-        write_to_file=True,
-    ):
-        """
-        Regrids the bathymetry given ``bathymetry_output`` which contains the original bathymetry and ``empty_bathy`` which is a template for the regridded product.
-        Uses xESMF for regridding.
-
-        Args:
-            bathymetry_output (Xarray Dataset): Refactor of original bathymetry with proper  metadata and structure for ESMF regridding.
-            empty_bathy (Xarray Dataset): Template for the regridded bathymetry regridding_method: (Optional[str]) The type of regridding method to use. Defaults to self.regridding_method.
-            write_to_file (Optional[bool]): Files saved to ``output_dir`` Defaults to ``True``. Must be set to true if using manual regridding methods with ESMF_regrid.
-
-        Returns:
-            regridded_bathymetry (Dataset): Still needs to be cleaned and processed
-            with ``tidy_dataset``.
-        """
-        output_dir = Path(output_dir)
-
-        if regridding_method is None:
-            regridding_method = "bilinear"
-
-        bathymetry_output = bathymetry_output.load()
-
-        print(
-            "Begin regridding bathymetry...\n\n"
-            + f"Original bathymetry size: {bathymetry_output.nbytes/1e6:.2f} Mb\n"
-            + f"Regridded size: {empty_bathy.nbytes/1e6:.2f} Mb\n"
-        )
-
-        regridder = xe.Regridder(
-            bathymetry_output,
-            empty_bathy,
-            method=regridding_method,
-            locstream_out=False,
-            periodic=False,
-        )
-
-        bathymetry = regridder(bathymetry_output)
-
-        if write_to_file:
-            bathymetry.to_netcdf(
-                output_dir / "bathymetry_unfinished.nc",
-                mode="w",
-                engine="netcdf4",
-            )
-
-        return bathymetry
+        
 
     def tidy_dataset(
         self,
@@ -1332,7 +1293,7 @@ class Topo:
         )
 
         regridder = xe.Regridder(
-            ds, ds_mapped, method, periodic=Grid.is_cyclic_x(self._grid.supergrid)
+            ds, ds_mapped, method, periodic=self._grid.is_cyclic_x
         )
         mask_mapped = regridder(ds.landfrac)
 
@@ -1413,6 +1374,7 @@ class Topo:
             attrs={"long_name": "t-grid cell depth", "units": "m"},
         )
 
+
         return ds
 
     def save(self):
@@ -1436,7 +1398,7 @@ class Topo:
         """
 
         ds = self.gen_topo_ds(title=title)
-        ds.to_netcdf(file_path, format="NETCDF3_64BIT")
+        ds.to_netcdf(file_path, format='NETCDF3_64BIT')
 
     def write_cice_grid(self, file_path):
         """
@@ -1523,9 +1485,7 @@ class Topo:
 
         ds["angle"] = xr.DataArray(
             np.deg2rad(
-                self._grid.angle_q.data[
-                    1:, 1:
-                ]  # Slice the q-grid from MOM6 (which is u-grid in CICE/POP) to CICE/POP convention, the top right of the t points
+                self._grid.angle_q.data[1:,1:] # Slice the q-grid from MOM6 (which is u-grid in CICE/POP) to CICE/POP convention, the top right of the t points
             ),
             dims=["nj", "ni"],
             attrs={
@@ -1557,7 +1517,7 @@ class Topo:
 
         ds.to_netcdf(
             file_path,
-            format="NETCDF3_64BIT",
+            format='NETCDF3_64BIT',
         )
 
     def write_scrip_grid(self, file_path, title=None):
@@ -1646,7 +1606,7 @@ class Topo:
 
         ds.to_netcdf(
             file_path,
-            format="NETCDF3_64BIT",
+            format='NETCDF3_64BIT',
         )
 
     def write_esmf_mesh(self, file_path, title=None):
@@ -1733,7 +1693,8 @@ class Topo:
 
                 return [ll, lr, ur, ul]
 
-        elif Grid.is_cyclic_x(self._grid.supergrid) == True:
+        elif self._grid.is_cyclic_x == True:
+
             nx, ny = self._grid.nx, self._grid.ny
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()
             qlat_flat = self._grid.qlat.data[:, :-1].flatten()
@@ -1781,4 +1742,4 @@ class Topo:
         )
 
         self.mesh_path = file_path
-        ds.to_netcdf(self.mesh_path, format="NETCDF3_64BIT")
+        ds.to_netcdf(self.mesh_path, format='NETCDF3_64BIT')
