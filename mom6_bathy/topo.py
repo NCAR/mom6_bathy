@@ -6,6 +6,8 @@ from scipy import interpolate
 from scipy.ndimage import label
 from mom6_bathy.utils import cell_area_rad, longitude_slicer
 from mom6_bathy.grid import Grid
+from mom6_bathy.utils import cell_area_rad, longitude_slicer
+from mom6_bathy.grid import Grid
 from scipy.spatial import cKDTree
 from scipy.ndimage import binary_fill_holes
 from mom6_bathy.git_utils import get_domain_dir, get_repo
@@ -1661,6 +1663,8 @@ class Topo:
 
         if self._grid.is_tripolar(self._grid._supergrid):
             nx, ny = self._grid.nx, self._grid.ny
+            qlon_flat = self._grid.qlon.data[:, :-1].flatten()[: -(nx // 2 - 1)]
+            qlat_flat = self._grid.qlat.data[:, :-1].flatten()[: -(nx // 2 - 1)]
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()[: -(nx // 2 - 1)]
             qlat_flat = self._grid.qlat.data[:, :-1].flatten()[: -(nx // 2 - 1)]
             nnodes = len(qlon_flat)
