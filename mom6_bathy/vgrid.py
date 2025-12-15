@@ -49,7 +49,7 @@ class VGrid:
         return np.sum(self.dz)
     
     @property
-    def z(self):
+    def zl(self):
         """Array of vertical grid cell center depths (meters)."""
         return np.cumsum(self.dz) - 0.5 * self.dz
     
@@ -168,7 +168,7 @@ class VGrid:
         return cls(dz)
 
     def write(self, filename: str):
-        """Write the vertical grid to a NetCDF file.
+        """Write the vertical grid (in thickness) to a NetCDF file.
         
         Parameters
         ----------
@@ -195,6 +195,48 @@ class VGrid:
         ds.attrs['maximum_depth'] = self.depth
         ds.attrs['history'] = f'Created on {datetime.now()}'
         ds.to_netcdf(filename, format='NETCDF3_64BIT',)
+        return ds
+
+    def write_z_file(self, filename: str):
+        """Write the vertical grid to a NetCDF file with interface and midpoints depths
+        
+        Parameters
+        ----------
+        filename: str
+            Name of the NetCDF file to write
+        """
+        ds = xr.Dataset(
+            data_vars={
+                'zi': (
+                    'zi', 
+                    self.zi, 
+                    {
+                        'units': 'meter',
+                        'long_name': 'Cell Interface Depths',
+                        'valid_min': np.min(self.zi),
+                        'valid_max': np.max(self.zi),
+                    }
+                ),
+                'zl': (
+                    'zl', 
+                    self.zl, 
+                    {
+                        'units': 'meter',
+                        'long_name': 'Cell Center Depths',
+                        'valid_min': np.min(self.zl),
+                        'valid_max': np.max(self.zl),
+                    }
+                )
+            },
+        )
+
+        ds.attrs['title'] = f'Vertical grid for MOM6 simulation'
+        ds.attrs['maximum_depth'] = self.depth
+        ds.attrs['history'] = f'Created on {datetime.now()}'
+        ds.to_netcdf(filename, format='NETCDF3_64BIT',)
+        return ds
+
+        
 
 
 def _cell_center_to_layer_thickness(

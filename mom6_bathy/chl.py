@@ -6,7 +6,7 @@ import xesmf as xe
 from datetime import datetime
 from pathlib import Path
 from os.path import isfile
-from mom6_bathy.aux import fill_missing_data
+from mom6_bathy.utils import fill_missing_data
 
 
 def interpolate_and_fill_seawifs(
