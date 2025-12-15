@@ -68,7 +68,7 @@ class SupergridBase:
             f"dy=({self.dy.min()}–{self.dy.max()})"
         )
 
-    def to_ds(self, author: Optional[str] = None) -> xr.Dataset:
+    def to_ds(self, name=None, author: Optional[str] = None) -> xr.Dataset:
         """
         Export the supergrid to an xarray.Dataset compatible with MOM6.
 
@@ -81,6 +81,8 @@ class SupergridBase:
 
         # ---- Metadata ----
         ds.attrs["type"] = "MOM6 supergrid"
+        if name is not None:
+            ds.attrs["name"] = name
         ds.attrs["Created"] = datetime.now().isoformat()
         if author:
             ds.attrs["Author"] = author
