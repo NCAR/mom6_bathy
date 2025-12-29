@@ -11,7 +11,7 @@ def get_domain_dir(grid, base_dir="TopoLibrary"):
     """
 
     # Flatten and convert to bytes (deterministic)
-    data_bytes = grid.tlon.values.tobytes()
+    data_bytes = grid.tlon.values.tobytes() + grid.tlat.values.tobytes()
 
     # Generate SHA256
     sha = hashlib.sha256(data_bytes).hexdigest()
