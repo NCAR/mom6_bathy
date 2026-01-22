@@ -9,11 +9,6 @@ class EditCommand(ABC):
         pass
 
     @abstractmethod
-    def undo(self):
-        """Undo the command. Derived classes should implement this method to revert the command's action."""
-        pass
-
-    @abstractmethod
     def serialize(self) -> dict:
         """Serialize the command to a dictionary format suitable for JSON encoding.
 
@@ -100,10 +95,6 @@ class DepthEditCommand(EditCommand):
         for idx, (j, i) in enumerate(self.affected_indices):
             self._set_value(j, i, self.new_values[idx])
 
-    def undo(self):
-        for idx, (j, i) in enumerate(self.affected_indices):
-            self._set_value(j, i, self.old_values[idx])
-
     def serialize(self):
         return {
             "type": self.__class__.__name__,
@@ -150,9 +141,6 @@ class MinDepthEditCommand(EditCommand):
         if self.old_value is None:
             self.old_value = to_native(getattr(self._topo, self.attr))
         setattr(self._topo, self.attr, self.new_value)
-
-    def undo(self):
-        setattr(self._topo, self.attr, self.old_value)
 
     def serialize(self):
         return {
