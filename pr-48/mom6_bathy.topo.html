@@ -287,6 +287,12 @@ The str or Path the write to file should write to. Defaults to the directory the
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="mom6_bathy.topo.Topo.send_entire_depth_change_to_tcm">
+<span class="sig-name descname"><span class="pre">send_entire_depth_change_to_tcm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">depth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quietly</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.send_entire_depth_change_to_tcm" title="Link to this definition"></a></dt>
+<dd><p>This function takes an entire depth change and adds it through the TopoCommandManager (TCM) or directly if quietly is enabled.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="mom6_bathy.topo.Topo.set_bowl">
 <span class="sig-name descname"><span class="pre">set_bowl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_depth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dedge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rad_earth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6378000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expdecay</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mom6_bathy.topo.Topo.set_bowl" title="Link to this definition"></a></dt>
 <dd><p>Create a bowl-shaped bathymetry. Same effect as setting the TOPO_CONFIG parameter to “bowl”.</p>
