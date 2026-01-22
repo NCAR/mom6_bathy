@@ -19,3 +19,9 @@ def minimal_grid_and_topo():
     topo = Topo(grid=grid, min_depth=10.0)
     topo.set_spoon(2000.0, 200)
     return topo
+
+def test_grid_topo(minimal_grid_and_topo):
+    topo = minimal_grid_and_topo
+    assert topo._grid.nx == 5
+    assert topo._grid.ny == 5
+    assert topo.depth.shape == (5, 5)

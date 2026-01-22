@@ -13,23 +13,22 @@ class VGridCreator(widgets.HBox):
     Allows creation, editing, saving, and loading of vertical grid profiles.
     """
 
-    def __init__(self, vgrid=None, repo_root=None, topo=None, grid=None):
+    def __init__(self, vgrid=None, repo_root=None, topo=None):
         self.repo_root = repo_root if repo_root is not None else os.getcwd()
         self.vgrids_dir = os.path.join(self.repo_root, "VGridLibrary")
         os.makedirs(self.vgrids_dir, exist_ok=True)
 
         self.topo = topo
 
-        # Try to infer min_depth from topo or grid if provided
+        # Try to infer min_depth from topo if provided
         self.min_depth = 1.0
-        if topo is not None and hasattr(topo, "depth"):
-            self.min_depth = float(np.nanmax(topo.depth.data))
-        elif grid is not None and hasattr(grid, "depth"):
-            self.min_depth = float(np.nanmax(grid.depth.data))
+        if topo is not None and hasattr(topo, "min_depth"):
+            self.min_depth = float(topo.min_depth)
+
 
         if vgrid is None:
             vgrid = VGrid.uniform(
-                nk=10, depth=100.0, save_on_create=False, repo_root=self.repo_root
+                nk=10, depth=100.0
             )
         self.vgrid = vgrid
         self._initial_dz = np.copy(self.vgrid.dz)

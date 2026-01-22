@@ -3,20 +3,14 @@ import numpy as np
 import xarray as xr
 from datetime import datetime
 from scipy import interpolate
-from scipy.ndimage import label
-from mom6_bathy.utils import cell_area_rad, longitude_slicer
-from mom6_bathy.grid import Grid
-from mom6_bathy.utils import cell_area_rad, longitude_slicer
-from mom6_bathy.grid import Grid
+from scipy.ndimage import label, binary_fill_holes
 from scipy.spatial import cKDTree
-from scipy.ndimage import binary_fill_holes
+from mom6_bathy.utils import cell_area_rad, longitude_slicer
+from mom6_bathy.grid import Grid
 from mom6_bathy.git_utils import get_domain_dir, get_repo
-import shutil
-import json
 from pathlib import Path
 from mom6_bathy.edit_command import *
-from mom6_bathy.command_manager import TopoCommandManager
-from mom6_bathy.command_manager import CommandType
+from mom6_bathy.command_manager import TopoCommandManager, CommandType
 from mom6_bathy.mapping import regrid_dataset_via_xesmf
 
 
@@ -45,42 +39,41 @@ class Topo:
         )  # Initialize depth with NaNs
         self._min_depth = min_depth
 
-        if version_control_dir != None:
-            self.version_control = True
+        if version_control_dir is None:
+            raise ValueError("version_control_dir cannot be None. Version control is required for Topo objects. Old Topo Files can be added through from_topo_file() or from_topo_version_control() classmethods.")
 
-            # Create a folder to store bathymetry objects in
-            self.topos_root = Path(version_control_dir).mkdir(exist_ok=True)
+        self.version_control = True
 
-            # Create the subfolder for this specific bathymetry
-            self.domain_dir = Path(get_domain_dir(grid, base_dir=version_control_dir))
-            self.domain_dir.mkdir(
-                exist_ok=True
-            )  # This folder should not already exist.
+        # Create a folder to store bathymetry objects in
+        self.topos_root = Path(version_control_dir).mkdir(exist_ok=True)
 
-            # Save the grid info there (there can only be 1 grid per bathymetry)
-            self.grid_file_path = self.domain_dir / "grid.nc"
-            grid.write_supergrid(self.grid_file_path)
+        # Create the subfolder for this specific bathymetry
+        self.domain_dir = Path(get_domain_dir(grid, base_dir=version_control_dir))
+        self.domain_dir.mkdir(
+            exist_ok=True
+        )  # This folder should not already exist.
 
-            # Start the json file for tracking bathymetry
-            self.bathy_info_path = self.domain_dir / "bathy_info.json"
-            bathy_info = {
-                "min_depth": min_depth,
-                "grid_path": str(self.grid_file_path),
-            }
+        # Save the grid info there (there can only be 1 grid per bathymetry)
+        self.grid_file_path = self.domain_dir / "grid.nc"
+        grid.write_supergrid(self.grid_file_path)
 
-            initial_command = MinDepthEditCommand(
-                self, attr="min_depth", new_value=min_depth
-            )
+        # Start the json file for tracking bathymetry
+        self.bathy_info_path = self.domain_dir / "bathy_info.json"
+        bathy_info = {
+            "min_depth": min_depth,
+            "grid_path": str(self.grid_file_path),
+        }
 
-            # Initialize the git repo
-            self.repo = get_repo(self.domain_dir)
+        initial_command = MinDepthEditCommand(
+            self, attr="min_depth", new_value=min_depth
+        )
 
-            # Set up TCM
-            self.tcm = TopoCommandManager(self, command_registry=COMMAND_REGISTRY)
-            self.tcm.execute(initial_command, cmd_type=CommandType.COMMAND)
+        # Initialize the git repo
+        self.repo = get_repo(self.domain_dir)
 
-        else:
-            self.version_control = False  # For backwards compatability
+        # Set up TCM
+        self.tcm = TopoCommandManager(self, command_registry=COMMAND_REGISTRY)
+        self.tcm.execute(initial_command, cmd_type=CommandType.COMMAND)            
 
     @classmethod
     def from_version_control(cls, folder_path: str | Path):
@@ -359,6 +352,31 @@ class Topo:
             is_ocean.append(self.supergridmask[match[0],match[1]].item())
         return is_ocean
 
+    def send_entire_depth_change_to_tcm(self, depth, quietly = False):
+        """
+        This function takes an entire depth change and adds it through the TopoCommandManager (TCM) or directly if quietly is enabled.
+        """
+        # 1. Generate all affected indices (row-major order)
+        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
+
+        # 2. Flatten the new values to match the indices
+        new_values = depth.values.ravel().tolist()
+
+        # 3. Flatten old values if depth exists
+        old_values = (
+            self.depth.values.ravel().tolist() if self.depth is not None else None
+        )
+
+        # 4. Build command
+        depth_edit_command = DepthEditCommand(
+            self, all_indices, new_values, old_values=old_values
+        )
+
+        if not quietly:
+            self.tcm.execute(depth_edit_command, cmd_type=CommandType.COMMAND)
+        else:
+            depth_edit_command()
+
     def set_flat(self, D):
         """
         Create a flat bottom bathymetry with a given depth D.
@@ -375,27 +393,9 @@ class Topo:
             attrs={"units": "m"},
         )
 
-        # Save to object (Build TCM Object)
-        # 2. Generate all affected indices (row-major order)
-        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
+        # Save to object
+        self.send_entire_depth_change_to_tcm(depth)
 
-        # 3. Flatten the new values to match the indices
-        new_values = depth.values.ravel().tolist()
-
-        # 4. Flatten old values if depth exists
-        old_values = (
-            self.depth.values.ravel().tolist() if self.depth is not None else None
-        )
-
-        # 5. Build command
-        type = (
-            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
-        )
-        depth_edit_command = DepthEditCommand(
-            self, all_indices, new_values, old_values=old_values
-        )
-
-        self.tcm.execute(depth_edit_command, cmd_type=type)
 
     def set_depth_via_topog_file(self, topog_file_path, quietly=False):
         """
@@ -487,27 +487,7 @@ class Topo:
         depth = depth.fillna(0)
 
         # Save to object (Build TCM Object)
-        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
-
-        # 3. Flatten the new values to match the indices
-        new_values = depth.values.ravel().tolist()
-
-        # 4. Flatten old values if depth exists
-        old_values = (
-            self.depth.values.ravel().tolist() if self.depth is not None else None
-        )
-
-        # 5. Build command
-        cmd_type = (
-            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
-        )
-        depth_edit_command = DepthEditCommand(
-            self, all_indices, new_values, old_values=old_values
-        )
-        if not quietly:
-            self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
-        else:
-            depth_edit_command()
+        self.send_entire_depth_change_to_tcm(depth, quietly=quietly)
 
     def set_spoon(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
@@ -553,23 +533,7 @@ class Topo:
         )
 
         # Save to object (Build TCM Object)
-        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
-
-        # 3. Flatten the new values to match the indices
-        new_values = new_values.values.ravel().tolist()
-
-        # 4. Flatten old values
-        old_values = self.depth.values.ravel().tolist()
-
-        # 5. Build command
-        cmd_type = (
-            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
-        )
-        depth_edit_command = DepthEditCommand(
-            self, all_indices, new_values, old_values=old_values
-        )
-
-        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
+        self.send_entire_depth_change_to_tcm(new_values)
 
     def set_bowl(self, max_depth, dedge, rad_earth=6.378e6, expdecay=400000.0):
         """
@@ -622,25 +586,7 @@ class Topo:
         )
 
         # Save to object (Build TCM Object)
-        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
-
-        # 3. Flatten the new values to match the indices
-        new_values = new_values.values.ravel().tolist()
-
-        # 4. Flatten old values if depth exists
-        old_values = (
-            self.depth.values.ravel().tolist() if self.depth is not None else None
-        )
-
-        # 5. Build command
-        cmd_type = (
-            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
-        )
-        depth_edit_command = DepthEditCommand(
-            self, all_indices, new_values, old_values=old_values
-        )
-
-        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
+        self.send_entire_depth_change_to_tcm(new_values)
 
     def set_from_dataset(
         self,
@@ -1131,25 +1077,7 @@ class Topo:
         new_values = bathymetry.depth
 
         # Save to object (Build TCM Object)
-        all_indices = list(np.ndindex(self.depth.shape))  # list of (j, i) tuples
-
-        # 3. Flatten the new values to match the indices
-        new_values = new_values.values.ravel().tolist()
-
-        # 4. Flatten old values if depth exists
-        old_values = (
-            self.depth.values.ravel().tolist() if self.depth is not None else None
-        )
-
-        # 5. Build command
-        cmd_type = (
-            CommandType.COMMAND if np.all(np.isnan(self.depth)) else CommandType.COMMAND
-        )
-        depth_edit_command = DepthEditCommand(
-            self, all_indices, new_values, old_values=old_values
-        )
-
-        self.tcm.execute(depth_edit_command, cmd_type=cmd_type)
+        self.send_entire_depth_change_to_tcm(new_values)
 
     def erase_selected_basin(self, i, j):
         label = self.basintmask.data[j, i]
@@ -1299,7 +1227,7 @@ class Topo:
         )
         mask_mapped = regridder(ds.landfrac)
 
-        # Build TCM Object
+        # Build TCM Object - This is not the entire depth change, just the cells to be filled
         mask = mask_mapped > cutoff_frac  # boolean mask
         ny, nx = self._depth.shape
 
@@ -1663,8 +1591,6 @@ class Topo:
 
         if self._grid.is_tripolar(self._grid._supergrid):
             nx, ny = self._grid.nx, self._grid.ny
-            qlon_flat = self._grid.qlon.data[:, :-1].flatten()[: -(nx // 2 - 1)]
-            qlat_flat = self._grid.qlat.data[:, :-1].flatten()[: -(nx // 2 - 1)]
             qlon_flat = self._grid.qlon.data[:, :-1].flatten()[: -(nx // 2 - 1)]
             qlat_flat = self._grid.qlat.data[:, :-1].flatten()[: -(nx // 2 - 1)]
             nnodes = len(qlon_flat)

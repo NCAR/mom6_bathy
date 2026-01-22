@@ -2,10 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as patches
 import ipywidgets as widgets
-import os
 import cartopy.crs as ccrs
 from matplotlib.ticker import MaxNLocator
-from mom6_bathy.command_manager import TopoCommandManager
 from mom6_bathy.edit_command import *
 from mom6_bathy.git_utils import *
 
@@ -420,7 +418,7 @@ class TopoEditor(widgets.HBox):
         )
 
         # Basin erase buttons
-        self._basin_specifier_toggle.on_click(self.erase_disconnected_basins)
+        self._basin_specifier_toggle.on_click(self.erase_disconnected_basin)
         self._basin_specifier_delete_selected.on_click(self.erase_selected_basin)
 
         # Depth change observer for selected cell
@@ -475,12 +473,12 @@ class TopoEditor(widgets.HBox):
             self.apply_edit(cmd)
             self.update_undo_redo_buttons()
 
-    def erase_disconnected_basins(self, b):
+    def erase_disconnected_basin(self, b):
         """Erase all disconnected basins in the topography."""
         if self._selected_cell is None:
             return
         i, j, _ = self._selected_cell
-        self.topo.erase_disconnected_basins(i, j)
+        self.topo.erase_disconnected_basin(i, j)
         self.update_undo_redo_buttons()
 
     def erase_selected_basin(self, b):

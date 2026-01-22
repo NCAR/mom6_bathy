@@ -1,12 +1,10 @@
 import json
 import os
-import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum
 from mom6_bathy.git_utils import get_repo
 from pathlib import Path
-import tempfile
-
+from mom6_bathy.edit_command import EditCommand
 
 class CommandType(Enum):
     """Enumeration for command types in the history."""
@@ -234,7 +232,7 @@ class TopoCommandManager(CommandManager):
         self._topo.set_depth_via_topog_file(branch_topo_path, quietly=True)
         state = self._history_state()
         for commit in state:
-            if type(state[commit]) == dict and state[commit]["applied"]:
+            if isinstance(state[commit], dict) and state[commit]["applied"]:
                 command_class = self.command_registry[state[commit]["cmd_data"]["type"]]
                 cmd = command_class.deserialize(state[commit]["cmd_data"])(self._topo)
                 cmd()  # No need to execute again, just replay
@@ -244,11 +242,7 @@ class TopoCommandManager(CommandManager):
         Execute a command object. If it's a user edit, push to history and clear redo.
         For system commands (undo, redo, save, load, reset), the command object handles everything.
         """
-        user_edit_types = (
-            "DepthEditCommand",
-            "MinDepthEditCommand",
-        )  # Add more as needed
-        if cmd.__class__.__name__ in user_edit_types:
+        if isinstance(cmd, EditCommand): 
             cmd()
             self.commit(
                 cmd,
