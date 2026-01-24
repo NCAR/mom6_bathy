@@ -519,8 +519,8 @@ class Topo:
 
         if run_regrid_dataset:
             self.regridded_bathy = regrid_dataset_via_xesmf(
-                bathymetry_output=self.bathymetry_output,
-                empty_bathy=self.empty_bathy,
+                input_dataset=self.bathymetry_output,
+                output_dataset=self.empty_bathy,
                 regridding_method=regridding_method,
                 write_to_file=write_to_file,
                 output_path = output_dir/"bathymetry_unfinished.nc"
