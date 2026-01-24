@@ -535,8 +535,8 @@ class Topo:
                 bathymetry=self.regridded_bathy,
                 output_dir=output_dir,
                 write_to_file=write_to_file,
-                longitude_coordinate_name=longitude_coordinate_name,
-                latitude_coordinate_name=latitude_coordinate_name,
+                longitude_coordinate_name="lon",
+                latitude_coordinate_name="lat",
             )
 
     def mpi_set_from_dataset(
