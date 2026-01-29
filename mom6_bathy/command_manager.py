@@ -50,7 +50,7 @@ class CommandManager(ABC):
 
         # The command must be serializable to JSON
         command_data = command.serialize()
-
+        breakpoint()
         if cmd_type == CommandType.COMMAND:
             self.add_to_history("head", json.dumps(command_data))
         else:
@@ -76,13 +76,13 @@ class CommandManager(ABC):
             # Access the commit message
             commit_msg = commit.message
             # Split at the first colon
-            if "-" in commit_msg:
-                cmd_type, affected_sha = commit_msg.split("-", 1)
+            cmd_raw, sep, affected_sha = commit_msg.partition("-")
+            cmd_type = CommandType(cmd_raw.strip())
+            if cmd_type in (CommandType.UNDO, CommandType.REDO):
                 affected_sha = affected_sha.strip()
             else:
-                cmd_type = commit_msg.strip()
                 affected_sha = None
-            cmd_type = CommandType(cmd_type.strip())
+            
 
             # write  acheck that if the shaw it's head instead we use key head
             if sha == self.repo.head.commit.hexsha:
@@ -206,18 +206,6 @@ class TopoCommandManager(CommandManager):
         self.repo.git.tag(tag_name)
         self.save(file_name=f"{tag_name}_topog.nc")
 
-    def retrieve_tag(self, tag_name):
-        """Retrieve a tagged topo state."""
-        # Checkout the tag
-        self.repo.git.checkout(tag_name)
-        # Load the topo file
-        tagged_topo_path = self.directory / f"{tag_name}_topog.nc"
-        if not tagged_topo_path.exists():
-            raise FileNotFoundError(
-                f"Tagged topo file {tagged_topo_path} does not exist."
-            )
-        self._topo.set_depth_via_topog_file(tagged_topo_path)
-
     def checkout(self, branch_name):
         """Switch to a branch, loading the topo state from that branch."""
         self.repo.git.checkout(branch_name)
@@ -295,7 +283,7 @@ class TopoCommandManager(CommandManager):
         return can_redo
 
     def reset(self):
-        """Reset the bathymetry to its original state by replaying commands from the beginning."""
+        """Reset the bathymetry to its original state by replaying commands from end to beginning."""
 
         for commit in self.repo.iter_commits():
             commit_sha = commit.hexsha
@@ -304,7 +292,7 @@ class TopoCommandManager(CommandManager):
             except ValueError:
                 continue  # skip malformed messages
 
-            if cmd_type == "COMMAND":
+            if cmd_type == CommandType.COMMAND:
                 # Reconstruct and execute the command
                 command_class = self.command_registry[cmd_data["type"]]
                 cmd = command_class.reverse_deserialize(cmd_data)(self._topo)

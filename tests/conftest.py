@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from mom6_bathy.grid import Grid
+from mom6_bathy.topo import Topo
 
 @pytest.fixture
 def get_realistic_vgrid_elements():
@@ -55,3 +56,9 @@ def get_rect_grid():
         name="panama1",
     )
     return grid
+
+@pytest.fixture
+def get_rect_topo(get_rect_grid, tmp_path):
+    topo = Topo(get_rect_grid, min_depth = 0, version_control_dir = tmp_path)
+    topo.set_flat(1000)
+    return topo
