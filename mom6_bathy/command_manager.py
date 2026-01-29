@@ -6,6 +6,7 @@ from mom6_bathy.git_utils import get_repo
 from pathlib import Path
 from mom6_bathy.edit_command import EditCommand
 
+
 class CommandType(Enum):
     """Enumeration for command types in the history."""
 
@@ -50,11 +51,10 @@ class CommandManager(ABC):
 
         # The command must be serializable to JSON
         command_data = command.serialize()
-        breakpoint()
         if cmd_type == CommandType.COMMAND:
             self.add_to_history("head", json.dumps(command_data))
         else:
-            self.touch_history()  # just bump history to let the commit happen
+            self.touch_history()  # just bump history to let the commt happen
         # git add it
         rel_path = os.path.relpath(self.history_file_path, self.repo.working_tree_dir)
 
@@ -82,7 +82,6 @@ class CommandManager(ABC):
                 affected_sha = affected_sha.strip()
             else:
                 affected_sha = None
-            
 
             # write  acheck that if the shaw it's head instead we use key head
             if sha == self.repo.head.commit.hexsha:
@@ -111,6 +110,9 @@ class CommandManager(ABC):
         """
         Ensure the command unoffical history file exists (true history is generated from commit messages), append a line to it.
         """
+
+        # Load existing history
+        self.load_history()
 
         # Move previous head entry to sha entry of current head
         if "head" in self.history_dict:
@@ -230,7 +232,7 @@ class TopoCommandManager(CommandManager):
         Execute a command object. If it's a user edit, push to history and clear redo.
         For system commands (undo, redo, save, load, reset), the command object handles everything.
         """
-        if isinstance(cmd, EditCommand): 
+        if isinstance(cmd, EditCommand):
             cmd()
             self.commit(
                 cmd,
