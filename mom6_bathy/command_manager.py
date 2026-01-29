@@ -99,6 +99,8 @@ class CommandManager(ABC):
         """make a change to the history for commit purposes"""
         if "head" in self.history_dict:
             self.history_dict[self.repo.head.commit.hexsha] = self.history_dict["head"]
+            del self.history_dict["head"]
+
 
         if "touch" in self.history_dict:
             self.history_dict["touch"] = not self.history_dict["touch"]
@@ -117,6 +119,7 @@ class CommandManager(ABC):
         # Move previous head entry to sha entry of current head
         if "head" in self.history_dict:
             self.history_dict[self.repo.head.commit.hexsha] = self.history_dict["head"]
+            del self.history_dict["head"]
 
         # 2. Add/overwrite the SHA entry
         self.history_dict[sha] = command_data

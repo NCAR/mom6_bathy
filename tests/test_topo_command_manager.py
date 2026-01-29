@@ -3,6 +3,7 @@ from mom6_bathy.edit_command import *
 from test_edit_commands import gen_MinDepthCommand
 import pytest
 import xarray as xr
+import json
 
 
 def test_TopoCommandManager_init(get_rect_topo):
@@ -191,4 +192,11 @@ def test_tcm_commit(get_rect_topo, gen_MinDepthCommand):
     topo.tcm.commit(gen_MinDepthCommand, CommandType.COMMAND)
     history = topo.tcm.history_dict
     assert "head" in history  # head should be in history
-    assert history["head"] == gen_MinDepthCommand.serialize()
+    assert history["head"] == json.dumps(gen_MinDepthCommand.serialize())
+    prev_hist = sum(1 for _ in topo.tcm.repo.iter_commits())
+    old_history = history.copy()
+    topo.tcm.commit(gen_MinDepthCommand, CommandType.UNDO)
+    assert sum(1 for _ in topo.tcm.repo.iter_commits()) == prev_hist + 1
+    topo.tcm.commit(gen_MinDepthCommand, CommandType.REDO)
+    topo.tcm.load_history()
+    assert  len(topo.tcm.history_dict.keys()) == len(old_history.keys()) +1 and "touch" in topo.tcm.history_dict and "touch" not in old_history.keys()  # History should not change on undo/redo commits
