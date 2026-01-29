@@ -208,13 +208,6 @@ class VGrid:
             filename,
             format="NETCDF3_64BIT",
         )
-        ds.attrs["title"] = f"Vertical grid for MOM6 simulation"
-        ds.attrs["maximum_depth"] = self.depth
-        ds.attrs["history"] = f"Created on {datetime.now()}"
-        ds.to_netcdf(
-            filename,
-            format="NETCDF3_64BIT",
-        )
         return ds
 
     def write_z_file(self, filename: str):

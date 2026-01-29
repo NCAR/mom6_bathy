@@ -57,13 +57,6 @@ class Topo:
         self.grid_file_path = self.domain_dir / "grid.nc"
         grid.write_supergrid(self.grid_file_path)
 
-        # Start the json file for tracking bathymetry
-        self.bathy_info_path = self.domain_dir / "bathy_info.json"
-        bathy_info = {
-            "min_depth": min_depth,
-            "grid_path": str(self.grid_file_path),
-        }
-
         initial_command = MinDepthEditCommand(
             self, attr="min_depth", new_value=min_depth
         )
@@ -120,44 +113,10 @@ class Topo:
             Minimum water column depth (m). Columns with shallower depths are to be masked out.
         """
 
-        topo = cls(grid, 0.0)
+        topo = cls(grid, min_depth)
         topo.tcm.reapply_changes()
         topo.set_depth_via_topog_file(topo_file_path)
-        min_depth_change = MinDepthEditCommand(
-            topo, attr="min_depth", new_value=min_depth
-        )
-        topo.tcm.execute(min_depth_change)
         return topo
-
-    @classmethod
-    def from_topo_version_control(cls, directory):
-        """
-        Create a bathymetry object from an existing topog file.
-
-        Parameters
-        ----------
-        directory: str
-            Path to an existing MOM6 topog file.
-
-        """
-        directory = Path(directory)
-        grid = Grid.from_supergrid(directory / "grid.nc")
-        topo_file_path = directory / "topog.nc"
-        topo_ds = xr.open_dataset(topo_file_path)
-
-        topo = cls(grid, topo_ds.attrs["min_depth"])
-        topo.set_depth_via_topog_file(topo_file_path)
-        return topo
-
-    def apply_edit(self, cmd):
-        self.command_manager.execute(cmd)
-        self.command_manager.save_commit("_autosave_working")
-
-    def undo_last_edit(self):
-        self.command_manager.undo()
-
-    def redo_last_edit(self):
-        self.command_manager.redo()
 
     @property
     def depth(self):
