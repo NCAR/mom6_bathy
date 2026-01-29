@@ -101,6 +101,7 @@ def test_TopoCommandManager_reapply_changes(get_rect_topo, gen_MinDepthCommand):
     command = gen_MinDepthCommand
     topo.tcm.execute(gen_MinDepthCommand)
     assert topo.min_depth == 10.0  # Assert Action taken
+    prev_hist = sum(1 for _ in topo.tcm.repo.iter_commits())
     store_depth = topo._depth.copy()
     topo._depth = xr.zeros_like(
         topo._depth
@@ -108,7 +109,7 @@ def test_TopoCommandManager_reapply_changes(get_rect_topo, gen_MinDepthCommand):
     topo.tcm.reapply_changes()
     assert (topo.depth == store_depth).all()  # Assert reset worked
     assert (
-        sum(1 for _ in topo.tcm.repo.iter_commits()) == 3
+        sum(1 for _ in topo.tcm.repo.iter_commits()) == prev_hist
     )  # Assert history only has the initial commits (Reset is quiet)
 
 
@@ -124,11 +125,12 @@ def test_TopoCommandManager_reset(get_rect_topo, gen_MinDepthCommand):
 
 def test_tcm_checkout(get_rect_topo, gen_MinDepthCommand):
     topo = get_rect_topo
+    current_branch = topo.tcm.repo.active_branch.name
     topo.tcm.create_branch("test_branch")
     topo.tcm.checkout("test_branch")
     topo.tcm.execute(gen_MinDepthCommand)
     assert topo.min_depth == 10.0  # Assert Action taken
-    topo.tcm.checkout("main")
+    topo.tcm.checkout(current_branch)
     assert topo.min_depth == 0.0  # Assert back to main branch state
 
 
