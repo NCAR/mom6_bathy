@@ -101,7 +101,6 @@ class CommandManager(ABC):
             self.history_dict[self.repo.head.commit.hexsha] = self.history_dict["head"]
             del self.history_dict["head"]
 
-
         if "touch" in self.history_dict:
             self.history_dict["touch"] = not self.history_dict["touch"]
         else:

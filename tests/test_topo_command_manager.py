@@ -199,4 +199,8 @@ def test_tcm_commit(get_rect_topo, gen_MinDepthCommand):
     assert sum(1 for _ in topo.tcm.repo.iter_commits()) == prev_hist + 1
     topo.tcm.commit(gen_MinDepthCommand, CommandType.REDO)
     topo.tcm.load_history()
-    assert  len(topo.tcm.history_dict.keys()) == len(old_history.keys()) +1 and "touch" in topo.tcm.history_dict and "touch" not in old_history.keys()  # History should not change on undo/redo commits
+    assert (
+        len(topo.tcm.history_dict.keys()) == len(old_history.keys()) + 1
+        and "touch" in topo.tcm.history_dict
+        and "touch" not in old_history.keys()
+    )  # History should not change on undo/redo commits
