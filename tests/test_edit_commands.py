@@ -28,7 +28,7 @@ def test_serialize_deserialize_MinDepthCommand(gen_MinDepthCommand):
 @pytest.fixture
 def gen_DepthEditCommand(get_rect_topo):
     topo = get_rect_topo
-    j,i = 1,1
+    j,i = 1,2
     new_val = 10
     old_val = topo.depth[j,i]
     command = DepthEditCommand(topo, [(j, i)], [new_val], old_values=[old_val])

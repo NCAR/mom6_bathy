@@ -20,6 +20,7 @@ def minimal_grid_and_topo():
     topo.set_spoon(2000.0, 200)
     return topo
 
+
 def test_grid_topo(minimal_grid_and_topo):
     topo = minimal_grid_and_topo
     assert topo._grid.nx == 5

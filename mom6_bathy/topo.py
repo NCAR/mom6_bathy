@@ -64,7 +64,7 @@ class Topo:
         # Initialize the git repo
         self.repo = get_repo(self.domain_dir)
 
-        # Set up TCM
+        # Set up TCM (requires that self.domain_dir exists)
         self.tcm = TopoCommandManager(self, command_registry=COMMAND_REGISTRY)
         self.tcm.execute(initial_command, cmd_type=CommandType.COMMAND)            
 
@@ -89,17 +89,17 @@ class Topo:
 
         # Create the topo object
         topo = Topo(
-            grid, 0.0
+            grid, 0.0, version_control_dir=folder_path.parent
         )  # Because we hash the grid, the correct domain will be selected
 
         # Reapply any changes
         topo.tcm.reapply_changes()
-        topo.tcm.undo()  # Undo the initialization min_depth set to 0.0.
+        topo.tcm.undo()  # Undo the initialization min_depth set to 0.0. (How it works is the changes are ordered from the previous state to the new state, so undoing the initial set to 0.0 leaves the correct min_depth)
 
         return topo
 
     @classmethod
-    def from_topo_file(cls, grid, topo_file_path, min_depth=0.0):
+    def from_topo_file(cls, grid, topo_file_path, min_depth=0.0, version_control_dir="TopoLibrary"):
         """
         Create a bathymetry object from an existing topog file.
 
@@ -113,7 +113,7 @@ class Topo:
             Minimum water column depth (m). Columns with shallower depths are to be masked out.
         """
 
-        topo = cls(grid, min_depth)
+        topo = cls(grid, min_depth, version_control_dir=version_control_dir)
         topo.tcm.reapply_changes()
         topo.set_depth_via_topog_file(topo_file_path)
         return topo
