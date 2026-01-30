@@ -37,7 +37,7 @@ def gen_DepthEditCommand(get_rect_topo):
 def test_DepthEditCommand_init_and_execute(gen_DepthEditCommand):
     command = gen_DepthEditCommand # Init is tested in fixture
     command()
-    assert command._topo.depth[1,1] == 10.0
+    assert command._topo.depth[1,2] == 10.0
 
 def test_serialize_deserialize_DepthEditCommand(gen_DepthEditCommand):
     command = gen_DepthEditCommand

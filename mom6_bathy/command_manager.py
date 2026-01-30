@@ -70,30 +70,28 @@ class CommandManager(ABC):
         Parse a commit message to extract command type and data.
         Expected format: "<CommandType>"
         """
-        try:
-            commit = self.repo.commit(sha)
+        commit = self.repo.commit(sha)
 
-            # Access the commit message
-            commit_msg = commit.message
-            # Split at the first colon
-            cmd_raw, sep, affected_sha = commit_msg.partition("-")
-            cmd_type = CommandType(cmd_raw.strip())
-            if cmd_type in (CommandType.UNDO, CommandType.REDO):
-                affected_sha = affected_sha.strip()
-            else:
-                affected_sha = None
+        # Access the commit message
+        commit_msg = commit.message
+        # Split at the first colon
+        cmd_raw, sep, affected_sha = commit_msg.partition("-")
+        cmd_type = CommandType(cmd_raw.strip())
+        if cmd_type in (CommandType.UNDO, CommandType.REDO):
+            affected_sha = affected_sha.strip()
+        else:
+            affected_sha = None
 
-            # write  acheck that if the shaw it's head instead we use key head
-            if sha == self.repo.head.commit.hexsha:
-                sha = "head"
+        # write  acheck that if the shaw it's head instead we use key head
+        if sha == self.repo.head.commit.hexsha:
+            sha = "head"
 
-            if cmd_type == CommandType.COMMAND:
-                cmd_data = json.loads(self.history_dict[sha])
-            else:
-                cmd_data = None
-            return cmd_type, affected_sha, cmd_data
-        except Exception as e:
-            raise ValueError(f"Invalid commit message format: {commit_msg}") from e
+        if cmd_type == CommandType.COMMAND:
+            cmd_data = json.loads(self.history_dict[sha])
+        else:
+            cmd_data = None
+        return cmd_type, affected_sha, cmd_data
+
 
     def touch_history(self):
         """make a change to the history for commit purposes"""
