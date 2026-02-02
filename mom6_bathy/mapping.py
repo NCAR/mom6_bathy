@@ -576,17 +576,17 @@ def generate_ESMF_map_via_esmpy(src_mesh_path, dst_mesh_path, mapping_file, meth
     assert isinstance(src_mesh_path, (str, Path)), "src_mesh_path must be a path to an existing file"
     assert isinstance(dst_mesh_path, (str, Path)), "dst_mesh_path must be a path to an existing file"
 
-    match method:
-        case 'nearest_d2s':
-            method = esmpy.RegridMethod.NEAREST_DTOS
-        case 'nearest_s2d':
-            method = esmpy.RegridMethod.NEAREST_STOD
-        case 'bilinear':
-            raise NotImplementedError("Bilinear regridding is not yet tested.")
-        case 'conservative':
-            raise NotImplementedError("Conservative regridding is not yet tested.")
-        case _:
-            raise ValueError(f"Invalid regridding method: {method}")
+
+    if method == 'nearest_d2s':
+        method_enum = esmpy.RegridMethod.NEAREST_DTOS
+    elif method == 'nearest_s2d':
+        method_enum = esmpy.RegridMethod.NEAREST_STOD
+    elif method == 'bilinear':
+        raise NotImplementedError("Bilinear regridding is not yet tested.")
+    elif method == 'conservative':
+        raise NotImplementedError("Conservative regridding is not yet tested.")
+    else:
+        raise ValueError(f"Invalid regridding method: {method}")
     
     # Create src and dst meshes and fields
     src_mesh = esmpy.Mesh(
