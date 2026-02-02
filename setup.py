@@ -21,7 +21,6 @@ setuptools.setup(
     install_requires=[
         "setuptools",
         "numpy",
-        "xesmf",
         "xarray",
         "matplotlib",
         "scipy",
