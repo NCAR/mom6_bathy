@@ -10,13 +10,14 @@ from pathlib import Path
 from scipy.spatial import cKDTree
 from scipy.sparse import csc_matrix, coo_matrix
 import xesmf as xe
+from typing import Union
 
 MPI = None
 rank = lambda: MPI.COMM_WORLD.Get_rank() if MPI else 0
 
 from mom6_bathy.utils import get_mesh_dimensions, cell_area_rad, normalize_deg, is_mesh_cyclic_x, get_avg_resolution_km
 
-def grid_from_esmf_mesh(mesh: xr.Dataset | str | Path) -> "Grid":
+def grid_from_esmf_mesh(mesh:  Union[xr.Dataset, str, Path]) -> "Grid":
     """Given an ESMF mesh where the grid metrics are stored in 1D (flattened) arrays,
     compute the dimensions of the 2D grid and return a 2D horizontal grid dataset
     containing the longitude, latitude, and mask of the grid points which are all that

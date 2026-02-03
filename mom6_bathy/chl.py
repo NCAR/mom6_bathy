@@ -7,13 +7,14 @@ from datetime import datetime
 from pathlib import Path
 from os.path import isfile
 from mom6_bathy.utils import fill_missing_data
+from typing import Union
 
 
 def interpolate_and_fill_seawifs(
     grid: Grid,
     topo: Topo,
-    processed_seawifs_path: Path | str,
-    output_path: Path | str = None,
+    processed_seawifs_path:  Union[Path, str],
+    output_path:  Union[Path, str] = None,
 ):
     """
     Interpolate and fill SeaWiFS chlorophyll data to a model grid and save to NetCDF.
