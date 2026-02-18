@@ -22,8 +22,8 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
-          cache-environment: true
-          cache-downloads: true
+          # cache-environment: true
+          # cache-downloads: true
           micromamba-version: "latest"
       - name: Set git identity for testing
         run: |
