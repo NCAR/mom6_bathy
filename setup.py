@@ -32,6 +32,8 @@ setuptools.setup(
         "sphinx>=8.1,<8.2",
         "sphinx_rtd_theme>=3.0,<3.1",
         "black>=24.1,<24.2",
-        "pytest>=8.0"
-    ]
+        "pytest>=8.0",
+        "gitpython>=3.1,<4.0",
+        "cartopy>=0.23,<0.24",
+    ],
 )

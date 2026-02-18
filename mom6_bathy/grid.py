@@ -917,7 +917,7 @@ class Grid:
             Name of the author. If provided, the name will appear in files as metadata.
         """
 
-        ds = self.supergrid.to_ds(author=author)
+        ds = self.supergrid.to_ds(name=self.name, author=author)
         ds.attrs["filename"] = os.path.basename(path)
         ds.to_netcdf(path, format="NETCDF3_64BIT")
         return ds
