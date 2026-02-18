@@ -22,7 +22,12 @@ def test_topo_from_topo_file(get_rect_topo, tmp_path):
         tmp_path / "bleh.nc"
     )  # Would have this crazy depth because of the command in cell (1,1)
     topo.write_topo(topo_file_path)
-    topo_from_file = Topo.from_topo_file(topo._grid, topo_file_path, topo.min_depth, version_control_dir=topo.domain_dir.parent)
+    topo_from_file = Topo.from_topo_file(
+        topo._grid,
+        topo_file_path,
+        topo.min_depth,
+        version_control_dir=topo.domain_dir.parent,
+    )
     assert topo_from_file.min_depth == topo.min_depth
     assert topo_from_file.depth.equals(topo.depth)
     assert topo_from_file.depth[j, i] == 12123

@@ -1,5 +1,5 @@
 """
-This module defines MOM6-style supergrid classes and associated utilities. It sits underneath the mom6_bathy.grid class and fills the roll of calculating the grid geometry: angle_dx, area, dx, dy, x, and y. 
+This module defines MOM6-style supergrid classes and associated utilities. It sits underneath the mom6_bathy.grid class and fills the roll of calculating the grid geometry: angle_dx, area, dx, dy, x, and y.
 
 Classes defined here:
 - SupergridBase: Base class defining the MOM6-style supergrid interface.
