@@ -92,7 +92,6 @@ class CommandManager(ABC):
             cmd_data = None
         return cmd_type, affected_sha, cmd_data
 
-
     def touch_history(self):
         """make a change to the history for commit purposes"""
         if "head" in self.history_dict:

@@ -25,11 +25,8 @@ class VGridCreator(widgets.HBox):
         if topo is not None and hasattr(topo, "min_depth"):
             self.min_depth = float(topo.min_depth)
 
-
         if vgrid is None:
-            vgrid = VGrid.uniform(
-                nk=10, depth=100.0
-            )
+            vgrid = VGrid.uniform(nk=10, depth=100.0)
         self.vgrid = vgrid
         self._initial_dz = np.copy(self.vgrid.dz)
 

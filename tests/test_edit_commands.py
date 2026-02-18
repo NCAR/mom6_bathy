@@ -1,17 +1,20 @@
 from mom6_bathy.edit_command import *
-import pytest 
+import pytest
+
 
 @pytest.fixture
 def gen_MinDepthCommand(get_rect_topo):
     topo = get_rect_topo
-    command = MinDepthEditCommand(topo, "min_depth",10.0, 0.0)
+    command = MinDepthEditCommand(topo, "min_depth", 10.0, 0.0)
     return command
 
+
 def test_MinDepthCommand_init_and_execute(gen_MinDepthCommand):
-    command = gen_MinDepthCommand # Init is tested in fixture
+    command = gen_MinDepthCommand  # Init is tested in fixture
     assert command._topo.min_depth == 0.0
     command()
     assert command._topo.min_depth == 10.0
+
 
 def test_serialize_deserialize_MinDepthCommand(gen_MinDepthCommand):
     command = gen_MinDepthCommand
@@ -25,19 +28,22 @@ def test_serialize_deserialize_MinDepthCommand(gen_MinDepthCommand):
     assert rdc.old_value == command.new_value
     assert rdc.new_value == command.old_value
 
+
 @pytest.fixture
 def gen_DepthEditCommand(get_rect_topo):
     topo = get_rect_topo
-    j,i = 1,2
+    j, i = 1, 2
     new_val = 10
-    old_val = topo.depth[j,i]
+    old_val = topo.depth[j, i]
     command = DepthEditCommand(topo, [(j, i)], [new_val], old_values=[old_val])
     return command
 
+
 def test_DepthEditCommand_init_and_execute(gen_DepthEditCommand):
-    command = gen_DepthEditCommand # Init is tested in fixture
+    command = gen_DepthEditCommand  # Init is tested in fixture
     command()
-    assert command._topo.depth[1,2] == 10.0
+    assert command._topo.depth[1, 2] == 10.0
+
 
 def test_serialize_deserialize_DepthEditCommand(gen_DepthEditCommand):
     command = gen_DepthEditCommand

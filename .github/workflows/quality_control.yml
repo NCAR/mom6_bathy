@@ -12,4 +12,4 @@ jobs:
         uses: psf/black@stable
         with:
           options: "--check"
-          src: "mom6_bathy" # This isn't a recursive checkout, so rm6 and visualCasegen won't be checked
+          src: "."
