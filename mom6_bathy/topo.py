@@ -100,7 +100,7 @@ class Topo:
 
     @classmethod
     def from_topo_file(
-        cls, grid, topo_file_path, min_depth=0.0, version_control_dir="TopoLibrary"
+        cls, grid, topo_file_path, min_depth=0.0, varname="depth", version_control_dir="TopoLibrary"
     ):
         """
         Create a bathymetry object from an existing topog file.
@@ -113,11 +113,13 @@ class Topo:
             Path to an existing MOM6 topog file.
         min_depth: float, optional
             Minimum water column depth (m). Columns with shallower depths are to be masked out.
+        varname : str, optional
+            Name of the variable representing ocean depth in the dataset. Default is "depth".
         """
 
         topo = cls(grid, min_depth, version_control_dir=version_control_dir)
         topo.tcm.reapply_changes()
-        topo.set_depth_via_topog_file(topo_file_path)
+        topo.set_depth_via_topog_file(topo_file_path, varname)
         return topo
 
     @property
@@ -365,7 +367,7 @@ class Topo:
         # Save to object
         self.send_entire_depth_change_to_tcm(depth)
 
-    def set_depth_via_topog_file(self, topog_file_path, quietly=False):
+    def set_depth_via_topog_file(self, topog_file_path, varname, quietly=False):
         """
         Apply a bathymetry read from an existing topog file
 
@@ -373,6 +375,8 @@ class Topo:
         ----------
         topog_file_path: str
             absolute path to an existing MOM6 topog file
+        varname : str
+            Name of the variable representing ocean depth in the dataset.
         """
 
         assert os.path.exists(
@@ -380,10 +384,8 @@ class Topo:
         ), f"Cannot find topog file at {topog_file_path}."
 
         ds_topo = xr.open_dataset(topog_file_path)
-        assert (
-            "depth" in ds_topo
-        ), f"Cannot find the 'depth' field in topog file {topog_file_path}"
-        depth = ds_topo["depth"]
+        assert varname in ds_topo, f"Cannot find the '{varname}' field in topog file {topog_file_path}"
+        depth = ds_topo[varname]
 
         if depth.shape[0] < self._grid.ny or depth.shape[1] < self._grid.nx:
             raise ValueError(
@@ -601,7 +603,7 @@ class Topo:
         """
         print("""**NOTE**
             If bathymetry setup fails (e.g. kernel crashes), restart the kernel and edit this cell.
-            Call ``[topo_object_name].mpi_set_from_dataset()`` instead. Follow the given instructions for using mpi 
+            Call ``[topo_object_name].mpi_set_from_dataset()`` instead. Follow the given instructions for using mpi
             and ESMF_Regrid outside of a python environment. This breaks up the process, so be sure to call
             ``[topo_object_name].tidy_dataset() after regridding with mpi.""")
         if run_config_dataset:
@@ -654,23 +656,23 @@ class Topo:
         if verbose:
             print(f"""
             *MANUAL REGRIDDING INSTRUCTIONS*
-            
+
             Calling `[object_name].mpi_set_from_dataset` sets up the files necessary for regridding
             the bathymetry using mpirun and ESMF_Regrid. See below for the step-by-step instructions:
-            
+
             1. There should be two files: `bathymetry_original.nc` and `bathymetry_unfinished.nc` located at
-            {output_dir}. 
-            
+            {output_dir}.
+
             2. Open a terminal and change to this directory (e.g. `cd {output_dir}`).
-            
+
             3. Request appropriate computational resources (see example script below), and run the command:
-            
+
             `mpirun -np NUMBER_OF_CPUS ESMF_Regrid -s bathymetry_original.nc -d bathymetry_unfinished.nc -m bilinear --src_var depth --dst_var depth --netcdf4 --src_regional --dst_regional`
-            
-            4. Run Topo_object.tidy_bathymetry(args) to finish processing the bathymetry. 
-            
+
+            4. Run Topo_object.tidy_bathymetry(args) to finish processing the bathymetry.
+
             Example PBS script using NCAR's Casper Machine: https://gist.github.com/AidanJanney/911290acaef62107f8e2d4ccef9d09be
-            
+
             For additional details see: https://xesmf.readthedocs.io/en/latest/large_problems_on_HPC.html
             """)
 
